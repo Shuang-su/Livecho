@@ -17,9 +17,25 @@ package = false
 required-version = "==0.12.1"
 
 [tool.pytest.ini_options]
-addopts = "--strict-config --strict-markers"
+addopts = "--strict-config --strict-markers --import-mode=importlib"
 pythonpath = ["."]
-testpaths = ["tests"]
+testpaths = ["tests", "apps", "packages", "services", "workers", "tools"]
+norecursedirs = [
+  ".*",
+  "*.egg",
+  "*.egg-info",
+  "CVS",
+  "__pycache__",
+  "_darcs",
+  "{arch}",
+  "build",
+  "coverage",
+  "dist",
+  "node_modules",
+  "playwright-report",
+  "test-results",
+  "venv",
+]
 
 [tool.ruff]
 target-version = "py312"

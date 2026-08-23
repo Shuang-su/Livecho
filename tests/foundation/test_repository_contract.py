@@ -489,6 +489,37 @@ def test_mypy_covers_future_python_roots_and_ignores_generated_files(tmp_path: P
     assert "dist/generated.py" not in result.stdout
 
 
+def test_pytest_discovers_colocated_tests_in_future_python_roots(tmp_path: Path) -> None:
+    shutil.copyfile(REPOSITORY_ROOT / "pyproject.toml", tmp_path / "pyproject.toml")
+    shutil.copyfile(REPOSITORY_ROOT / ".gitignore", tmp_path / ".gitignore")
+
+    root_test = tmp_path / "tests" / "test_contract.py"
+    root_test.parent.mkdir()
+    root_test.write_text("def test_root_contract():\n    assert True\n", encoding="utf-8")
+
+    service_test = tmp_path / "services" / "backend" / "tests" / "test_contract.py"
+    service_test.parent.mkdir(parents=True)
+    service_test.write_text("def test_service_contract():\n    assert True\n", encoding="utf-8")
+
+    generated_test = tmp_path / "services" / "backend" / "coverage" / "test_generated.py"
+    generated_test.parent.mkdir()
+    generated_test.write_text("def test_generated():\n    assert False\n", encoding="utf-8")
+
+    result = subprocess.run(
+        [sys.executable, "-m", "pytest", "--collect-only", "-q"],
+        cwd=tmp_path,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    collected = result.stdout.replace("\\", "/")
+    assert result.returncode == 0, result.stderr
+    assert "tests/test_contract.py::test_root_contract" in collected
+    assert "services/backend/tests/test_contract.py::test_service_contract" in collected
+    assert "coverage/test_generated.py" not in collected
+
+
 def test_uv_version_matches_local_docs_and_ci(tmp_path: Path) -> None:
     pyproject_path = REPOSITORY_ROOT / "pyproject.toml"
     pyproject_text = pyproject_path.read_text(encoding="utf-8")

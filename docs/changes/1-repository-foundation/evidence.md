@@ -10,11 +10,12 @@
 | Command | Result | Date/commit |
 | --- | --- | --- |
 | `make bootstrap` | Passed; project-enforced uv 0.12.1 and frozen pnpm installs completed | 2026-08-24, PR branch |
-| `make verify` | Passed; ruff, repository-wide mypy, 39 pytest cases, base/result artifact and pnpm-native workspace gates | 2026-08-24, PR branch |
+| `make verify` | Passed; ruff, repository-wide mypy, 40 pytest cases, base/result artifact and pnpm-native workspace gates | 2026-08-24, PR branch |
 | `uv run pytest -q tests/foundation/test_repository_contract.py -k 'accepted_decisions or artifact_templates or lifecycle_rejects'` | Passed; 3 targeted rewrite-gate regressions | 2026-08-24, PR branch |
 | `uv run pytest -q tests/foundation/test_repository_contract.py -k 'other_issue_artifacts or bootstrap_cannot_include or mypy_covers'` | Passed; 3 targeted Issue-scope and Python-discovery regressions | 2026-08-24, PR branch |
 | `uv run pytest -q tests/foundation/test_repository_contract.py -k uv_version_matches_local_docs_and_ci` | Passed; exact local/CI uv pin alignment and fail-closed mismatch regression | 2026-08-24, PR branch |
 | `uv run pytest -q tests/foundation/test_repository_contract.py -k 'symlink or case_sensitive'` | Passed; 7 filesystem, Git-index, ancestor, base-tree, and case-sensitive-name regressions | 2026-08-24, PR branch |
+| `uv run pytest -q tests/foundation/test_repository_contract.py -k pytest_discovers_colocated` | Passed; colocated service tests are collected with root tests | 2026-08-24, PR branch |
 | `git diff --check` | Passed on the complete working-tree diff | 2026-08-24, PR branch |
 
 ## Manual evidence
@@ -79,6 +80,12 @@ Git blobs before implementation begins. Evidence remains writable afterward so
 implementation verification can be recorded. Regressions cover filesystem, index,
 ancestor, template, auxiliary-file, invalid-slug, case-insensitive filesystem, and
 implementation-base attacks.
+The final-head Codex review found that pytest discovery was restricted to the root
+`tests/` directory and could omit tests colocated with a future Python service. Pytest
+now searches every supported source root, excludes generated/dependency directories,
+and uses importlib mode so colocated tests may share a basename. A temporary-project
+collection regression proves that root and `services/backend/tests` tests are included
+without explicit paths while nested ignored coverage output is not collected.
 
 ## Deviations
 
