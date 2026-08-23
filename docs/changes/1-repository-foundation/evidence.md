@@ -10,9 +10,10 @@
 | Command | Result | Date/commit |
 | --- | --- | --- |
 | `make bootstrap` | Passed; frozen uv and pnpm installs completed | 2026-08-24, PR branch |
-| `make verify` | Passed; ruff, mypy, 28 pytest cases, base/result artifact and pnpm-native workspace gates | 2026-08-24, PR branch |
+| `make verify` | Passed; ruff, repository-wide mypy, 31 pytest cases, base/result artifact and pnpm-native workspace gates | 2026-08-24, PR branch |
 | `uv run pytest -q tests/foundation/test_repository_contract.py -k 'accepted_decisions or artifact_templates or lifecycle_rejects'` | Passed; 3 targeted rewrite-gate regressions | 2026-08-24, PR branch |
-| `git diff --check` | Passed on the complete staged diff | 2026-08-24, PR branch |
+| `uv run pytest -q tests/foundation/test_repository_contract.py -k 'other_issue_artifacts or bootstrap_cannot_include or mypy_covers'` | Passed; 3 targeted Issue-scope and Python-discovery regressions | 2026-08-24, PR branch |
+| `git diff --check` | Passed on the complete working-tree diff | 2026-08-24, PR branch |
 
 ## Manual evidence
 
@@ -54,6 +55,13 @@ treated `_template` files as accepted Issue decisions. The check now applies the
 real Issue-directory pattern as the durable-artifact gate, and a regression confirms
 that implementation PRs may update templates without making accepted Issue decisions
 mutable.
+The subsequent Codex review found that an implementation PR could still add a different
+Issue's artifact directory and that mypy's closed input list omitted future runtime
+Python roots. Lifecycle validation now rejects every changed numbered artifact directory
+whose Issue differs from the branch, including during the Issue 1 bootstrap exception.
+Mypy now discovers Python from the repository root while honoring the tracked
+`.gitignore`; a synthetic `services/backend` type error is detected while ignored `dist`
+output remains excluded.
 
 ## Deviations
 

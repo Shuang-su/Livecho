@@ -109,6 +109,28 @@ def _current_issue_artifact_errors(
     return []
 
 
+def _foreign_issue_artifact_errors(issue_number: int, changed_paths: set[str]) -> list[str]:
+    """Reject changing another Issue's artifacts on the current Issue branch."""
+    foreign_directories: set[str] = set()
+    for path_text in changed_paths:
+        path = Path(path_text)
+        if len(path.parts) < 3 or path.parts[:2] != ("docs", "changes"):
+            continue
+        directory = path.parts[2]
+        if not CHANGE_DIRECTORY_PATTERN.fullmatch(directory):
+            continue
+        directory_issue_number = int(directory.split("-", maxsplit=1)[0])
+        if directory_issue_number != issue_number:
+            foreign_directories.add(f"docs/changes/{directory}")
+
+    if foreign_directories:
+        return [
+            f"change for Issue {issue_number} cannot modify artifacts for other Issues: "
+            + ", ".join(sorted(foreign_directories))
+        ]
+    return []
+
+
 def _durable_base_artifact_errors(base_ref: str) -> list[str]:
     tree = _git("ls-tree", "-r", "--name-only", base_ref, "docs/changes")
     required_names = set(REQUIRED_FILES)
@@ -180,6 +202,7 @@ def lifecycle_errors() -> list[str]:
     resulting_tree_errors = [
         *_durable_base_artifact_errors(base_ref),
         *_current_issue_artifact_errors(issue_number),
+        *_foreign_issue_artifact_errors(issue_number, changed_paths),
     ]
     if resulting_tree_errors:
         return resulting_tree_errors

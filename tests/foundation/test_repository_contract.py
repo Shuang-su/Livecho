@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import shutil
+import subprocess
+import sys
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -227,6 +230,71 @@ def test_implementation_lifecycle_rejects_accepted_decision_rewrite(
     assert check_change_artifacts.lifecycle_errors() == [
         "implementation cannot rewrite accepted artifacts: docs/changes/2-architecture/plan.md"
     ]
+
+
+def test_implementation_lifecycle_rejects_other_issue_artifacts(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    changed_paths = {
+        "docs/changes/3-protocol/intent.md",
+        "docs/changes/README.md",
+        "docs/changes/_template/intent.md",
+        "services/backend/app.py",
+    }
+    monkeypatch.setenv("LIVECHO_HEAD_REF", "codex/issue-2-architecture")
+    monkeypatch.setattr(check_change_artifacts, "_base_ref", lambda branch: "base-sha")
+    monkeypatch.setattr(check_change_artifacts, "_changed_paths", lambda base: changed_paths)
+    monkeypatch.setattr(check_change_artifacts, "_durable_base_artifact_errors", lambda base: [])
+    monkeypatch.setattr(check_change_artifacts, "_current_issue_artifact_errors", lambda issue: [])
+
+    assert check_change_artifacts.lifecycle_errors() == [
+        "change for Issue 2 cannot modify artifacts for other Issues: docs/changes/3-protocol"
+    ]
+
+
+def test_issue_one_bootstrap_cannot_include_later_issue_artifacts(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    changed_paths = {
+        "AGENTS.md",
+        "docs/changes/1-repository-foundation/intent.md",
+        "docs/changes/2-architecture/intent.md",
+    }
+    monkeypatch.setenv("LIVECHO_HEAD_REF", "codex/issue-1-repository-foundation")
+    monkeypatch.setattr(check_change_artifacts, "_base_ref", lambda branch: "bootstrap-base")
+    monkeypatch.setattr(check_change_artifacts, "_changed_paths", lambda base: changed_paths)
+    monkeypatch.setattr(check_change_artifacts, "_durable_base_artifact_errors", lambda base: [])
+    monkeypatch.setattr(check_change_artifacts, "_current_issue_artifact_errors", lambda issue: [])
+    monkeypatch.setattr(check_change_artifacts, "_is_empty_repository_bootstrap", lambda base: True)
+
+    assert check_change_artifacts.lifecycle_errors() == [
+        "change for Issue 1 cannot modify artifacts for other Issues: docs/changes/2-architecture"
+    ]
+
+
+def test_mypy_covers_future_python_roots_and_ignores_generated_files(tmp_path: Path) -> None:
+    shutil.copyfile(REPOSITORY_ROOT / "pyproject.toml", tmp_path / "pyproject.toml")
+    shutil.copyfile(REPOSITORY_ROOT / ".gitignore", tmp_path / ".gitignore")
+
+    runtime_source = tmp_path / "services" / "backend" / "app.py"
+    runtime_source.parent.mkdir(parents=True)
+    runtime_source.write_text("caption: str = 1\n", encoding="utf-8")
+
+    ignored_source = tmp_path / "dist" / "generated.py"
+    ignored_source.parent.mkdir()
+    ignored_source.write_text("generated: str = 1\n", encoding="utf-8")
+
+    result = subprocess.run(
+        [sys.executable, "-m", "mypy", "--no-incremental"],
+        cwd=tmp_path,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 1
+    assert "services/backend/app.py:1: error: Incompatible types" in result.stdout
+    assert "dist/generated.py" not in result.stdout
 
 
 def test_workspace_requires_every_verification_script(tmp_path: Path) -> None:
