@@ -10,7 +10,8 @@
 | Command | Result | Date/commit |
 | --- | --- | --- |
 | `make bootstrap` | Passed; frozen uv and pnpm installs completed | 2026-08-24, PR branch |
-| `make verify` | Passed; ruff, mypy, 27 pytest cases, base/result artifact and pnpm-native workspace gates | 2026-08-24, PR branch |
+| `make verify` | Passed; ruff, mypy, 28 pytest cases, base/result artifact and pnpm-native workspace gates | 2026-08-24, PR branch |
+| `uv run pytest -q tests/foundation/test_repository_contract.py -k 'accepted_decisions or artifact_templates or lifecycle_rejects'` | Passed; 3 targeted rewrite-gate regressions | 2026-08-24, PR branch |
 | `git diff --check` | Passed on the complete staged diff | 2026-08-24, PR branch |
 
 ## Manual evidence
@@ -19,7 +20,8 @@
 - Roadmap: Issues
   [#1](https://github.com/Shuang-su/Livecho/issues/1)–[#19](https://github.com/Shuang-su/Livecho/issues/19),
   labels, and M0/M1/M2 milestones created
-- PR file-list review: 36 foundation/documentation files; no product runtime directories
+- PR file-list review: 37 changed paths (36 foundation/documentation additions and the
+  seed `.gitkeep` deletion); no product runtime directories
 - GitHub Actions run:
   [Verify #32651929263](https://github.com/Shuang-su/Livecho/actions/runs/32651929263),
   passed on Ubuntu 24.04 with pinned Node 24-compatible action releases
@@ -47,6 +49,11 @@ The final-head review additionally caught a pnpm/Python glob mismatch and mutabl
 accepted decisions during implementation. Workspace enumeration now delegates to pnpm,
 and implementation PRs cannot rewrite merged intent/spec/plan artifacts; `evidence.md`
 remains writable for verification results.
+Cursor Bugbot's final-head review found that the accepted-decision rewrite check also
+treated `_template` files as accepted Issue decisions. The check now applies the same
+real Issue-directory pattern as the durable-artifact gate, and a regression confirms
+that implementation PRs may update templates without making accepted Issue decisions
+mutable.
 
 ## Deviations
 

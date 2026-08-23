@@ -177,6 +177,35 @@ def test_implementation_cannot_rewrite_accepted_decisions(
     ) == ["implementation cannot rewrite accepted artifacts: docs/changes/2-architecture/spec.md"]
 
 
+def test_implementation_can_update_change_artifact_templates(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        check_change_artifacts,
+        "_git",
+        lambda *arguments: "\n".join(
+            [
+                "docs/changes/_template/intent.md",
+                "docs/changes/_template/spec.md",
+                "docs/changes/_template/plan.md",
+                "docs/changes/2-architecture/intent.md",
+            ]
+        ),
+    )
+
+    assert (
+        check_change_artifacts._accepted_artifact_rewrite_errors(
+            "base-sha",
+            {
+                "docs/changes/_template/intent.md",
+                "docs/changes/_template/spec.md",
+                "docs/changes/_template/plan.md",
+            },
+        )
+        == []
+    )
+
+
 def test_implementation_lifecycle_rejects_accepted_decision_rewrite(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

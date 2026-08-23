@@ -135,7 +135,13 @@ def _accepted_artifact_rewrite_errors(base_ref: str, changed_paths: set[str]) ->
     rewritten = sorted(
         path_text
         for path_text in tree.splitlines()
-        if Path(path_text).name in accepted_names and path_text in changed_paths
+        if (
+            len((path := Path(path_text)).parts) == 4
+            and path.parts[:2] == ("docs", "changes")
+            and CHANGE_DIRECTORY_PATTERN.fullmatch(path.parts[2])
+            and path.name in accepted_names
+            and path_text in changed_paths
+        )
     )
     if rewritten:
         return ["implementation cannot rewrite accepted artifacts: " + ", ".join(rewritten)]
