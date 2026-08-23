@@ -151,6 +151,14 @@ immediately hides output and blocks ingest, then invokes the room/session deleti
 workflow. Existing data is not retained merely because the 90-day source review had
 not yet expired.
 
+Each takedown record must determine its verified scope before destructive purge. A
+complaint or channel/rights revocation verified to cover the whole room uses
+`room(canonical_room_id)` and covers room metadata plus every session. A request that
+authoritatively identifies one immutable session uses `session(immutable_session_id)` and
+must not affect siblings or shared room state. If complaint scope is ambiguous or affected
+sessions cannot be separated reliably, block the widest safely identified exposure (deny
+the known room, otherwise global off), escalate, and do not guess a destructive selector.
+
 ## Takedown contacts and response
 
 - Livecho takedown governance owner: repository owner `@Shuang-su`. The operational
@@ -165,14 +173,21 @@ not yet expired.
 - Per-room rights-holder/authorized representative: **not recorded**. A direct contact,
   authority description, and acknowledgement path are mandatory in each room record.
 
-The missing per-room and channel-specific contacts are production blockers. On any
-credible complaint, an operator/admin must stop the session, hide pending/public output,
-deny the room, revoke its worker lease, clear transient audio and locators, and open a
-payload-free audit entry. An admin must then start idempotent deletion by canonical
-`room_id` and immutable `session_id`; an operator escalates the blocked target to an
-admin and cannot declare or initiate deletion. Partial deletion remains hidden and
-denied. Recovery may not serve traffic until deletion manifests and current safety state
-replay successfully.
+The missing per-room and channel-specific contacts are production blockers. On a credible
+session-scoped complaint, an operator/admin stops/hides/blocks that session and its lease,
+audio, locators, and pending/public output. On verified room scope, the operator/admin
+denies the room and stops all its active paths. On ambiguous scope, deny the known room or
+remain globally off as defined above. Each path opens a payload-free audit entry. An admin
+must then start idempotent deletion only after exact scope resolution, with exactly one
+typed selector: canonical `room_id` for room metadata and all current/historical/pending/
+late/restored sessions, or immutable `session_id` for only the session resolved through
+the backend's authoritative parent-room index. The caller does not have to provide—and
+cannot override—the session's parent room. None, both, conflicting, missing, non-unique,
+or ambiguous targets start no destructive purge. An operator escalates the safely blocked
+scope to an admin and cannot declare or initiate deletion. Room tombstones dominate
+child-session manifests; session deletion preserves siblings/shared room state. Partial
+deletion remains hidden and denied. Recovery may not serve traffic until typed exact-
+scope deletion manifests and current safety state replay successfully.
 
 ## Review and enablement record
 

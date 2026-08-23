@@ -30,13 +30,13 @@ database schemas, CLI names, or claims of runtime implementation.
 | `CTRL-IDENTITY-RESTORE-REVOCATION` | Typed pseudonymous account/device checkpoints and auth-invalidation state survive application backups; every stateful/stateless pre-restore credential is server-rejected before authentication or traffic. | Issues #4, #12, #13, #16, and #19 |
 | `CTRL-REENABLE-GATE` | Only an admin may technically enable/remove, and only after current owner approval and every incident, rights, deletion, journal, recovery, and tabletop prerequisite passes. | Issues #7, #16, #17, and #19 |
 | `CTRL-AUDIT-PAYLOAD-FREE` | Every safety, incident, deletion, and raw-access result is append-only and auditable without protected payload. | Issues #12, #13, #16, #17, and #19 |
-| `CTRL-DELETION-FAIL-CLOSED` | A takedown hides and blocks immediately; partial purge never reports completion and remains blocked through idempotent retry. | Issues #11, #16, and #17 |
+| `CTRL-DELETION-FAIL-CLOSED` | A takedown blocks the widest safely identified exposure immediately; invalid/ambiguous scope never starts guessed destructive purge, and partial purge never reports completion. | Issues #11, #16, and #17 |
 | `CTRL-WORKER-SYNTHETIC-ONLY` | Community workers receive synthetic audio unless the explicit rights and named High-residual gates for real PCM have passed. | Issues #8, #9, #14, and #15 |
 
 `CTRL-AUDIO-RAM-ONLY`, `CTRL-BACKUP-EVIDENCE`, `CTRL-RESTORE-REPLAY`,
 `CTRL-IDENTITY-RESTORE-REVOCATION`, `CTRL-AUDIT-PAYLOAD-FREE`, and
 `CTRL-DELETION-FAIL-CLOSED` use the stable data classes, control definitions, and
-three-state room/session deletion model in
+three-state typed room-or-session deletion model in
 `docs/security/data-lifecycle-and-deletion.md`.
 
 ## Roles and authorized actions
@@ -66,7 +66,8 @@ current approval of the triggering policy/risk decision.
 - the global ingest decision;
 - the canonical room-ID denylist;
 - an append-only sequence of disable, enable, add, and remove decisions;
-- the current room/session deletion and account/device revocation checkpoints; and
+- the current typed room-or-session deletion manifests, including room-over-session
+  dominance, and account/device revocation checkpoints; and
 - integrity metadata and references to any required owner approval.
 
 The journal stores the payload-free fields below, not platform responses, room content,
@@ -76,8 +77,8 @@ generation cannot replace a newer decision. An empty restored database is not ev
 that generation zero is current.
 
 Issue #16 must maintain an encrypted, integrity-protected current recovery copy containing
-enough of the latest safety/denylist state, journal integrity head, room/session deletion
-checkpoint, typed pseudonymous account/device checkpoints, and monotonic authentication-
+enough of the latest safety/denylist state, journal integrity head, typed room/session
+deletion manifests and dominance, typed pseudonymous account/device checkpoints, and monotonic authentication-
 invalidation generation or key version to detect stale application-data backups. A
 checkpoint target is a random immutable never-reused internal reference, not an email,
 role, public key, bearer, canonical room ID, or unkeyed digest of a low-entropy value.
@@ -134,8 +135,10 @@ deletion, control-integrity, or unknown-severity incident:
    revocation only if the platform supports it. Clear all conforming backend/worker
    audio buffers under `CTRL-AUDIO-RAM-ONLY`; revocation limits future disclosure and
    does not claim erasure on a malicious host.
-7. Hide pending publication and the affected room/session. If this is a takedown or
-   deletion event, enter `hidden` and follow `CTRL-DELETION-FAIL-CLOSED`.
+7. Hide pending publication and the widest safely identified scope. If this is a takedown
+   or deletion event, enter selector-scoped `hidden` only after exact target resolution.
+   When the room is known but session scope conflicts, deny the room; when no scope is
+   safely identifiable, remain globally off and escalate. Never guess destructive scope.
 8. Append a `CTRL-AUDIT-PAYLOAD-FREE` result for each attempted control and notify the
    incident owner through an approved non-payload channel.
 
@@ -146,22 +149,42 @@ incident; the system remains off rather than waiting on the failing ingest path.
 
 ## Takedown and partial deletion procedure
 
-An admin deletion request uses canonical `room_id` and immutable `session_id`; an
-operator may first stop/denylist the room but may not declare deletion complete.
+An admin deletion request supplies exactly one typed selector:
+`room(canonical_room_id)` deletes room-level metadata and every current, historical,
+pending, late-discovered, or restored session for that room, while
+`session(immutable_session_id)` deletes only the uniquely resolved session and its
+derivatives. The caller does not supply an authoritative parent room for session scope;
+the backend resolves it from its authoritative index. The request must never require
+both. None, both, an ambiguous room alias, a conflicting caller hint/store mapping, or a
+missing/non-unique session resolution is denied rather than guessed. Block the known room
+when safely identified, otherwise remain globally off, escalate, and begin no destructive
+purge. An operator may first stop/denylist the room but may not declare deletion complete.
 
-1. Immediately set `hidden`, block ingest/reconnect and all visibility, revoke relevant
-   leases and export capabilities, and persist the payload-free tombstone if the safety
-   store is available. If persistence is unavailable, global disable remains active and
-   the request is escalated; no content becomes visible again.
+1. Immediately set `hidden` for the verified selector. A room selector blocks the room's
+   new start/reconnect/write/publication, all session visibility, leases, audio/locators,
+   exports, and persistence. A session selector blocks only that session's visibility and
+   descendants and stops its ingest, lease, audio, locator, and export paths when active;
+   sibling sessions and shared room-level state remain available. Persist the typed
+   payload-free tombstone if the safety store is available. If persistence is unavailable,
+   global disable remains active and the request is escalated; no selected content becomes
+   visible again.
 2. Enumerate and idempotently purge every active store named by Issue #16: normalized
-   rows, indexes, caches, replicas, manifests, raw objects/versions, and managed exports.
-3. A failed or unchecked store keeps the target `hidden`. Record only a stable error
-   code and payload-free count, then retry idempotently. Never label the request
-   `active-purge-complete` while any active store remains unchecked.
-4. When all active stores verify empty, record the immutable completion timestamp. If
+   rows, indexes, caches, replicas, manifests, raw objects/versions, managed exports, and
+   derived/shared projections. Room scope re-enumerates every child session/path on each
+   retry/replay; session scope includes only the resolved session and recomputes shared
+   projections without deleting or hiding siblings/shared room state.
+3. A room tombstone dominates its child-session tombstones. A later session request cannot
+   narrow/overwrite the room block; an earlier session manifest may be linked into the
+   room manifest without resetting evidence or reviving data. Retries keep selector kind,
+   opaque target, original request time, and manifest identity.
+4. A failed, ambiguous, or unchecked store/child keeps the safe block. Record only a stable
+   error code/count, then retry idempotently. Room scope cannot complete until every child
+   is enumerated/empty; session scope cannot complete until its descendants are empty and
+   siblings/shared room state are proven preserved. Never guess-delete an uncertain owner.
+5. When the selector-specific proof passes, record the immutable completion timestamp. If
    more than 24 hours elapsed from the original request, transition truthfully to
    `active-purge-complete` with `sla_breached=true` and retain the incident result.
-5. Do not report `final-retention-window-satisfied` until every managed export and every
+6. Do not report `final-retention-window-satisfied` until every managed export and every
    enumerated provider backup/object-version window has expired or supplied verifiable
    purge evidence. Retain the tombstone through at least one successful restore
    verification after the last window.
@@ -225,8 +248,12 @@ restored bearer or admin session is grandfathered.
    become current or remain in the active verification set. Reject sampled pre-restore
    stateful/stateless links, cookies, and tokens in a server-side negative verification
    before proceeding.
-4. Load the current checkpoints. Replay room/session tombstones idempotently against
-   restored Postgres data, indexes/caches, raw objects/versions, and managed exports;
+4. Load the current checkpoints. Replay typed room tombstones over every restored session
+   for their canonical room and typed session tombstones only over their uniquely resolved
+   session, across Postgres data, indexes/caches, raw objects/versions, managed exports,
+   and shared projections. Room tombstones retain dominance over child-session manifests;
+   missing/conflicting parent mapping leaves the environment isolated/off and starts no
+   guessed purge;
    replay typed account/device deletion/revocation checkpoints against account, role,
    invite, device, statistics, token, verifier, and session rows. Verify that no deleted
    target is active, visible, authenticable, or able to receive newly issued authority.
@@ -284,7 +311,7 @@ fields below are stable content requirements, not a schema:
 | --- | --- |
 | Event identity/time | Random audit event reference; occurrence and recorded timestamps. |
 | Actor/control | Restricted pseudonymous actor reference, actor role, control ID, requested action, authorization result, and result code. |
-| Target | Object class plus opaque room/session/export reference; identity deletion/revocation records only an opaque checkpoint-manifest reference and count, never its account/device target ID, event body, email, public key, bearer, or user-facing content. |
+| Target | Object class plus exactly one typed room/session selector kind and opaque target/export reference; identity deletion/revocation records only an opaque checkpoint-manifest reference and count, never its account/device target ID, event body, email, public key, bearer, or user-facing content. |
 | Safety transition | Prior and resulting safety generation, previous/new effective posture, and stable reason code. |
 | Incident/deletion | Opaque incident/manifest reference, deletion state, payload-free store counts, retry count, completion timestamp, and immutable `sla_breached` result where applicable. |
 | Integrity | Key identifier/version, previous journal-link reference, and a keyed integrity digest of the canonical control or manifest record. |
@@ -322,40 +349,46 @@ pending normalized publication exists.
 **Pass result:** Future disclosure and publication are stopped, recovery-copy failure
 cannot fail open, and the record does not claim that an untrusted worker erased RAM.
 
-### Tabletop 2: room/session takedown with one failed object deletion
+### Tabletop 2: room-or-session takedown with one failed object deletion
 
-**Setup:** The target has normalized rows, cache/index entries, one encrypted raw object,
-a managed export, and a tombstone-capable recovery copy. Inject failure for deletion of
-the raw object and advance simulated time beyond 24 hours before its successful retry.
+**Setup:** Run two subcases against a tombstone-capable recovery copy. Room `R` initially
+has sessions `S1`/`S2`, and a stale backup later reveals `S3`; another room is unrelated.
+The session subcase selects `S1` while `S2` shares room-level projections. Each selected
+scope has normalized rows, cache/index entries, an encrypted raw object, and a managed
+export. Inject failure for one selected raw-object deletion and advance simulated time
+beyond 24 hours before its successful retry.
 
 | Step | Action | Expected result |
 | --- | --- | --- |
-| 1 | An admin requests deletion for canonical room/session IDs. | The target enters `hidden` immediately; ingest/reconnect and every public/history/cache path are blocked before purge begins. |
-| 2 | Purge all enumerated active stores with the raw-object failure injected. | Successful stores stay purged; the failed store records only an error code/count. The target stays `hidden`, retry is idempotent, and active completion is forbidden. |
+| 1 | An admin submits exactly one typed selector; separately test room/session plus none, both, ambiguous, unknown, and conflicting parent-hint/index inputs. | Room scope blocks `R`; session scope derives `S1`'s parent from the authoritative index and blocks only `S1`. Invalid scope starts no destructive purge; a known room is denied, otherwise global off/escalation applies. |
+| 2 | Purge all enumerated active stores with the raw-object failure injected. | Room scope covers room metadata plus `S1`/`S2`; session scope covers only `S1` and recomputes shared projections without exposing `S1` or deleting/hiding `S2`. Successful stores stay purged; the failed store records only an error code/count; completion is forbidden. |
 | 3 | Retry the same manifest after the 24-hour deadline and verify all active stores. | The raw object is removed; the state becomes `active-purge-complete` with the original request time, a completion timestamp, and immutable `sla_breached=true`. |
 | 4 | Evaluate exports and backups while their declared windows remain open. | Managed access is revoked and the target stays replay-protected, but `final-retention-window-satisfied` is withheld and retained copies are reported truthfully. |
-| 5 | Expire/verify every enumerated window and run a post-window restore check. | Only then may the final state be recorded; the tombstone survives through the successful restore verification. No physical-erasure claim is made. |
+| 5 | Restore the stale backup containing late `S3`; test both `session(S1)` then `room(R)` and `room(R)` then a later `session(S1)` request; expire/verify every window. | Room replay discovers/purges `S3`. In both orders the room tombstone remains dominant: the child manifest links without narrowing/overwriting the room block, resetting evidence, or reviving `R` metadata/`S1`/`S2`/`S3`. A standalone session tombstone affects only its session. Mapping conflicts stay isolated/off; final state waits for post-window verification. |
 
-**Pass result:** Visibility/ingest blocking is immediate, retries cannot resurrect or
-duplicate data, partial/late deletion is truthful, and no unchecked store is called
-complete.
+**Pass result:** Both typed selectors enforce their exact scope, invalid/composite inputs
+fail closed without guessed deletion, room retries/restores discover all room sessions and
+dominate narrower child tombstones, session deletion preserves siblings/shared state
+without leakage, partial/late deletion is truthful, and no unchecked scope is complete.
 
 ### Tabletop 3: restore stale enablement, deleted data, and revoked identity
 
 **Setup:** Restore an application-data backup whose generation is older, whose global
-setting says enabled, and whose rows include a room/session plus an account/device deleted
-after that backup. It also contains apparently unexpired magic-link, enrollment-token,
+setting says enabled, and whose rows include both a room-wide tombstone target (with a
+late restored child session), an exact-session tombstone target with a preserved sibling,
+and an account/device deleted after that backup. It also contains apparently unexpired magic-link, enrollment-token,
 session-verifier/session rows, a stateless token signed by the old key version, and the
 deleted subject's roles/invites/device statistics. The separate recovery copy contains
-the newer forced-off generation, denylist, room/session tombstone, typed pseudonymous
-account/device checkpoints, and newer auth-invalidation generation/key version.
+the newer forced-off generation, denylist, typed room/session tombstones with dominance,
+typed pseudonymous account/device checkpoints, and newer auth-invalidation generation/key
+version.
 
 | Step | Action | Expected result |
 | --- | --- | --- |
 | 1 | Boot the restore in isolation. | Startup ignores backed-up enablement and latches off before any viewer, ingest, worker, callback, or scheduled-job traffic. |
 | 2 | Verify and load the separate recovery copy. | The newer tombstone, identity/device checkpoints, safety generation, and auth-invalidation generation/key version are recognized; missing/tampered/conflicting-copy variants stop here and remain off. |
 | 3 | Purge/revoke restored verifier/session rows, reconcile the protected auth generation/key version, and probe old links/cookies/stateless tokens. | Every stateful/stateless pre-restore credential is server-rejected regardless of backed-up expiry/use state; old verification key material cannot become current; fresh authentication and enrollment are required. |
-| 4 | Replay room/session and typed account/device checkpoints, then verify deletion and issuance denial. | Content is purged/hidden; scoped account roles/invites/devices/statistics/tokens/sessions are purged or remain revoked; deleted authority can neither authenticate nor receive a new credential before safety reconciliation. |
+| 4 | Replay typed room/session and account/device checkpoints, then verify exact scope and issuance denial. | Room replay purges every restored child; session replay removes only its target and preserves the sibling; room dominance holds. Scoped account authority is purged/revoked and cannot authenticate or receive a new credential before safety reconciliation. |
 | 5 | Reconcile safety generation and denylist. | The stale backed-up generation cannot overwrite the current copy. Gaps or mismatches remain off and produce a payload-free alert. |
 | 6 | Evaluate `CTRL-REENABLE-GATE` using a fresh, non-restored, separately audited admin recovery authentication. | Restored admin sessions remain invalid. Traffic stays blocked until remediation, current rights/policy, audit, tabletop, provider-window, and owner approvals pass and the fresh recovery admin records a durable generation. |
 

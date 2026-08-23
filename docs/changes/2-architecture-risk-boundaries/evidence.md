@@ -21,12 +21,12 @@
 
 | Command | Result | Date/commit |
 | --- | --- | --- |
-| `make bootstrap` | Passed; uv checked 10 packages and pnpm reported the frozen workspace already up to date. | 2026-08-24 / post-review P1-fix worktree |
-| `make verify` | Passed; Ruff, workspace lint, mypy, typecheck, 40 pytest tests, pnpm tests, artifact gate, and build all succeeded. | 2026-08-24 / post-review P1-fix worktree |
-| `git diff --check && git diff --cached --check` | Passed with no whitespace errors. | 2026-08-24 / final staged P1-fix tree |
-| Mermaid CLI render command below | Passed with `@mermaid-js/mermaid-cli` 11.12.0 and system Google Chrome; the ADR Markdown produced a 94,792-byte SVG. | 2026-08-24 / post-review P1-fix worktree |
-| GitHub Markdown API table-render comparison | Passed; all 34 Markdown table delimiter rows rendered as 34 HTML tables across the six records. | 2026-08-24 / post-review P1-fix worktree |
-| Local Markdown link existence check | Passed; all 18 relative links in `README.md`, `SECURITY.md`, and the six records resolved to existing repository paths. | 2026-08-24 / post-review P1-fix worktree |
+| `make bootstrap` | Passed; uv checked 10 packages and pnpm reported the frozen workspace already up to date. | 2026-08-24 / post-review selector-fix worktree |
+| `make verify` | Passed; Ruff, workspace lint, mypy, typecheck, 40 pytest tests, pnpm tests, artifact gate, and build all succeeded. | 2026-08-24 / post-review selector-fix worktree |
+| `git diff --check && git diff --cached --check` | Passed with no whitespace errors. | 2026-08-24 / final staged selector-fix tree |
+| Mermaid CLI render command below | Passed with `@mermaid-js/mermaid-cli` 11.12.0 and system Google Chrome; the ADR Markdown produced a rendered SVG. | 2026-08-24 / post-review selector-fix worktree |
+| GitHub Markdown API table-render comparison | Passed; all 34 Markdown table delimiter rows rendered as 34 HTML tables across the six records. | 2026-08-24 / post-review selector-fix worktree |
+| Local Markdown link existence check | Passed; all 18 relative links in `README.md`, `SECURITY.md`, and the six records resolved to existing repository paths. | 2026-08-24 / post-review selector-fix worktree |
 
 The isolated Mermaid render used no repository dependency or output path:
 
@@ -62,23 +62,31 @@ update; it adds no runtime or deployment resource.
   Their production capabilities remain off or prohibited.
 - **Lifecycle trace: Passed as a design review.** Twelve stable data classes cover every
   accepted class plus a separate typed pseudonymous identity/device checkpoint without
-  broadening the room/session tombstone. The exact audio ceilings, no-retry-queue rule,
-  three truthful room/session deletion states, immutable late-SLA result, provider-window
-  boundary, checkpoint durability, and forced-off restore order are explicit. This is
-  not runtime enforcement evidence.
+  broadening the room/session tombstone. Room/session deletion is an exactly-one typed
+  union: canonical-room scope covers room metadata plus every current/historical/pending/
+  late/restored child; immutable-session scope covers only the authoritative session and
+  its derivatives while preserving siblings/shared room state. Invalid/conflicting scope
+  starts no guessed purge, and room tombstones dominate child manifests. The exact audio
+  ceilings, no-retry-queue rule, three truthful deletion states, immutable late-SLA result,
+  provider-window boundary, checkpoint durability, and forced-off restore order are
+  explicit. This is not runtime enforcement evidence.
 - **Tabletop 1 — active-room global disable: Passed on paper.** The runbook immediately
   latches off, denies starts/reconnects, stops the platform session, revokes the lease,
   rejects late output, clears conforming audio/locator RAM, hides publication, and keeps
   the system off after a journal/recovery-copy write failure.
-- **Tabletop 2 — partial and late deletion: Passed on paper.** The target becomes hidden
-  before purge, a failed raw-object deletion cannot report active completion, retry is
-  idempotent, a late success records `sla_breached=true`, and the final state waits for
-  every enumerated export/provider window and a post-window restore check.
+- **Tabletop 2 — typed room/session partial and late deletion: Passed on paper.** Separate
+  room and session subcases prove exactly-one selector validation; unknown/conflicting/
+  composite rejection without guessed purge; room-wide discovery of initial and stale-
+  restored sessions; session-only sibling/shared-state preservation; room-over-session
+  tombstone dominance; and shared-projection recomputation. A failed raw-object deletion
+  cannot report active completion, retry is idempotent, late success records
+  `sla_breached=true`, and final state waits for every window and restore check.
 - **Tabletop 3 — stale restore: Passed on paper.** The environment starts isolated and
   forced off; purges restored verifier/session rows; advances or reconciles a recovery-
   protected auth-invalidation generation/key version; rejects stateful/stateless pre-
-  restore credentials; replays room/session and typed account/device checkpoints; and
-  proves deleted authority cannot receive new credentials before safety reconciliation.
+  restore credentials; replays typed room-all-child/exact-session manifests with room
+  dominance plus typed account/device checkpoints; and proves deleted authority cannot
+  receive new credentials before safety reconciliation.
   Restored admin sessions stay invalid, and only a fresh non-restored separately audited
   recovery-admin authentication may request re-enable after all other gates pass.
 - **Tabletop 4 — malicious authenticated worker: Passed on paper.** Authentication is
@@ -154,11 +162,24 @@ and fresh non-restored audited recovery-admin authentication before re-enable. T
 accepted `intent.md`, `spec.md`, and `plan.md` remain unchanged; the implementation record
 closes the gap without reinterpreting the room/session tombstone.
 
-The post-fix independent review and mechanical consistency audit found no remaining
-P1/P2. The latest tree has 30 stable controls, 12 data classes, 13 individually unaccepted
-High rows, continuous `FLOW-ALLOW-001`–`020` and `FLOW-DENY-001`–`018`, no shared-control
-owner mismatch, 34/34 GFM tables, 18/18 local links, and a successful Mermaid 11.12.0
-render.
+The post-first-fix independent review and mechanical consistency audit found no remaining
+local P1/P2 at head `cc1345c`. The next remote review then found a second valid P1:
+[the deletion procedure required both `room_id` and `session_id` instead of supporting
+either scope](https://github.com/Shuang-su/Livecho/pull/22#discussion_r3839474501).
+The resolution defines an exactly-one typed selector across the ADR, lifecycle, threat,
+ingest policy, runbook, and tabletops: canonical-room scope covers room metadata and re-
+enumerates every current/historical/pending/late/restored session, while an immutable-
+session selector resolves its parent from the authoritative index, purges only that
+session, and preserves siblings/shared room state. Room tombstones dominate child
+manifests. None, both, ambiguous, conflicting, missing, or non-unique targets block the
+widest safely identified exposure and start no guessed destructive purge. The accepted
+artifact wording “delete by canonical room/session” remains unchanged and is implemented
+as the explicit union rather than a composite requirement.
+
+The final independent review and mechanical consistency audit found no remaining P1/P2.
+The latest tree has 30 stable controls, 12 data classes, 13 individually unaccepted High
+rows, continuous `FLOW-ALLOW-001`–`020` and `FLOW-DENY-001`–`018`, no shared-control owner
+mismatch, 34/34 GFM tables, 18/18 local links, and a successful Mermaid 11.12.0 render.
 
 ## Deviations
 

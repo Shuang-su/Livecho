@@ -53,9 +53,9 @@ properties:
 
 Alpha uses a modular monolith. One backend deployment is authoritative for
 authentication, authorization, canonical room and immutable session state, event
-ordering, worker leases, persistence mediation, safety controls, deletion manifests,
-and audit. Internal modules may expose narrow typed interfaces, but remain in the same
-authority and deployment boundary.
+ordering, worker leases, persistence mediation, safety controls, exactly-one typed
+room-or-session deletion manifests, and audit. Internal modules may expose narrow typed
+interfaces, but remain in the same authority and deployment boundary.
 
 No message broker, peer-to-peer worker control plane, separately authoritative ingest
 service, or separately authoritative history service may be introduced without a later
@@ -69,7 +69,8 @@ The Issue #4 maintenance component is a trusted, non-serving, single-purpose job
 run migrations, deletion reconciliation, or restore/recovery actions only when all of
 the following future controls are evidenced:
 
-- an approved runbook names the exact operation and target;
+- an approved runbook names the exact operation and, for deletion, exactly one canonical-
+  room-all-sessions or immutable-session-only target;
 - a mutual-exclusion control prevents the serving backend or another maintenance job
   from acting as a concurrent authority;
 - credentials are narrower than the serving backend and expire or are revoked after the
@@ -102,8 +103,9 @@ Every process start and every restore ignores any backed-up `enabled` value. Bef
 environment can accept authentication, ingest, worker, or viewer traffic, the Issue #4
 recovery path must verify the separate recovery copy; advance or reconcile its protected
 authentication-invalidation generation/key version; purge every restored magic-link,
-enrollment-token, session-verifier, and session row; replay room/session deletion plus
-typed account/device deletion/revocation checkpoints; and reconcile the newest safety
+enrollment-token, session-verifier, and session row; replay typed room-all-session or
+exact-session deletion with room-tombstone dominance plus typed account/device deletion/
+revocation checkpoints; and reconcile the newest safety
 generation and denylist. A pre-restore credential must remain rejected by the server even
 if its plaintext still exists in a mailbox or client. Re-enable also requires a fresh,
 non-restored, separately audited admin recovery authentication, current platform/rights
@@ -159,13 +161,23 @@ per-source retention, sanitization, encryption, least privilege, audit, deletion
 backup-window, and restore-replay controls. Missing or expired source/rights evidence
 stops new persistence and publication.
 
+Deletion uses exactly one typed selector. A canonical-room selector covers room metadata
+and every current, historical, pending, late-discovered, or restored session belonging to
+that room; an immutable-session selector resolves through the backend's authoritative
+index and covers only that session and its derivatives. It never requires a caller-
+supplied parent room. Room tombstones dominate child-session manifests. Requiring both,
+accepting neither, guessing an ambiguous/conflicting target, missing a room child, or
+deleting/hiding an unrelated sibling/shared room state is a fail-closed violation: block
+the widest safely identified exposure, start no guessed destructive purge, and escalate.
+
 ### `DEC-EXPORT-001`: separate managed admin-export boundary
 
 Ordinary browser and API paths never receive raw payloads. After Issue #16, an admin may
 request a managed raw export only through a distinct authorization and audit gate. Its
 access capability may last at most 15 minutes and the encrypted managed object at most
-24 hours; room/session deletion revokes or removes it sooner. The design does not permit
-untracked local plaintext export. If such disclosure is proposed later,
+24 hours; the selected room-wide or session-only deletion scope revokes or removes it
+sooner. The design does not permit untracked local plaintext export. If such disclosure
+is proposed later,
 `RISK-RAW-PLAINTEXT-EXPORT` is a separate High residual requiring an individual owner
 decision and bounded destination. Revocation cannot claim erasure of plaintext already
 disclosed outside the managed boundary.
@@ -297,7 +309,7 @@ authorizes and audits a bounded managed object through `EG`. `FLOW-DENY-001` and
 | `FLOW-ALLOW-008` | The owning Issue has implemented the data class and access rule. | Restricted normalized/minimal identity/control and payload-free audit only. | Do not persist. |
 | `FLOW-ALLOW-009` | Issue #16 and current source/rights gates pass. | Credential-, locator-, identity-, and audio-stripped; compressed and authenticated-encrypted. | Do not archive; never spill to another path. |
 | `FLOW-ALLOW-010` | Issue #12 authorizes an invite. | Minimum invited address and one-time-link content only. | Do not send; never log plaintext bearer material. |
-| `FLOW-ALLOW-011` | Safety, deletion/revocation, and authentication-invalidation updates can be integrity-protected and ordered. | Current control state, auth-invalidation generation/key version, room/session checkpoints, and typed pseudonymous account/device checkpoints only. | Disable the affected path locally and remain globally off. |
+| `FLOW-ALLOW-011` | Safety, deletion/revocation, and authentication-invalidation updates can be integrity-protected and ordered. | Current control state, auth-invalidation generation/key version, exactly-one typed room/session checkpoints with room dominance, and typed pseudonymous account/device checkpoints only. | Disable the widest safely identified path, start no guessed purge, and remain globally off when scope is unknown. |
 | `FLOW-ALLOW-012`–`FLOW-ALLOW-016` | An approved, mutually exclusive Issue #4 runbook is active. | Narrow operation-specific access; restored stateful and stateless credential invalidation plus deletion/revocation replay precedes safety reconciliation and traffic. | Abort, remain offline and globally off, alert. |
 | `FLOW-ALLOW-017`–`FLOW-ALLOW-020` | Issue #16 managed export and admin authorization/audit controls pass. | 15-minute capability; encrypted managed object no longer than 24 hours. | Deny or delete/revoke; no local plaintext fallback. |
 
@@ -330,7 +342,7 @@ are protocol no-flow constraints even though they are not separate diagram nodes
 | Private Bucket | Managed high-risk processor isolated from ordinary APIs. | Sanitized authenticated-encrypted raw data after Issue #16, plus a separately protected safety/deletion/revocation/auth-invalidation recovery copy. No audio. |
 | Resend | External email processor. | Minimum invited address and one-time-link content only after Issue #12. |
 | Issue #4 maintenance | Trusted only for one approved offline operation. | Narrow credentials; mutual exclusion; no serving or external-party flows. |
-| Safety recovery copy | Integrity-protected authority over restored application safety, deletion, revocation, and authentication invalidation. | Current safety/auth generations or key versions and denylist, room/session deletion records, and restricted typed pseudonymous account/device checkpoints only; no direct identity or bearer material. |
+| Safety recovery copy | Integrity-protected authority over restored application safety, deletion, revocation, and authentication invalidation. | Current safety/auth generations or key versions and denylist, typed room-all-session/exact-session deletion records and dominance, and restricted typed pseudonymous account/device checkpoints only; no direct identity or bearer material. |
 | Admin export | Separately authorized and audited managed boundary. | Encrypted, time-bounded object; no ordinary API or untracked plaintext route. |
 
 ## Consequences
@@ -369,9 +381,9 @@ are protocol no-flow constraints even though they are not separate diagram nodes
 - Issues #12 and #13 own account/device cascade, stateful and stateless credential
   invalidation, fresh recovery-admin authentication, and negative acceptance tests;
   Issues #14/#15 own lease and scheduling controls.
-- Issue #16 owns normalized/raw persistence, managed export, room/session and identity
-  checkpoints, backup inventory, independent auth-invalidation state, and restore-replay
-  evidence.
+- Issue #16 owns normalized/raw persistence, managed export, invalid-selector rejection,
+  room-all-child/session-sibling/dominance proofs, identity checkpoints, backup inventory,
+  independent auth-invalidation state, and exact-scope restore-replay evidence.
 - Issues #4 and #19 own isolated restore sequencing, deployment, monitoring, recovery,
   and final Alpha evidence.
 
@@ -395,7 +407,7 @@ are protocol no-flow constraints even though they are not separate diagram nodes
 | `GATE-ADR-OWNER` | Repository owner explicitly approves this final ADR. | **PENDING** |
 | `GATE-PLATFORM-RIGHTS` | Current authoritative terms, acquisition channel, purpose, rights, worker disclosure, output use, takedown contact, and review evidence are approved. | **PENDING; production ingest OFF** |
 | `GATE-SAFETY-RUNTIME` | Default-off, monotonic journal/recovery copy, denylist, cleanup, stateful/stateless restored-credential rejection, deletion/revocation replay, fresh recovery-admin authentication, audit, and re-enable controls have executable evidence. | **PENDING; production auth/ingest OFF** |
-| `GATE-PERSISTENCE` | Issue #16 implements approved access, sanitization, encryption, retention, deletion/revocation checkpoints, independent auth-invalidation state, backup, export, and recovery controls. | **PENDING; production persistence/export OFF** |
+| `GATE-PERSISTENCE` | Issue #16 implements approved access, sanitization, encryption, retention, exactly-one deletion selectors, room-all-child/session-sibling/dominance proofs, identity revocation checkpoints, independent auth-invalidation state, backup, export, and recovery controls. | **PENDING; production persistence/export OFF** |
 | `GATE-WORKER-PCM` | Rights allow third-party disclosure and the owner individually accepts `RISK-WORKER-AUDIO-RETENTION`. | **NOT MET; High risk NOT ACCEPTED; synthetic only** |
 | `GATE-RESIDUAL-RISK` | Every Critical/High residual in the threat model has an individual owner record with date, scope, compensating control, review date, and disable owner. | **PENDING; no blanket approval** |
 
