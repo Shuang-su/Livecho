@@ -4,21 +4,37 @@ Livecho is an experimental, distributed real-time captioning system for public l
 streams. A trusted cloud service ingests one stream, while invited community workers
 perform speech recognition and a public web client renders the resulting timeline.
 
-The repository is currently establishing its engineering and review foundation. No
-runtime product code is included in the first pull request.
+The repository currently contains its engineering foundation, an accepted Alpha boundary
+specification, and proposed supporting design records. It does not yet contain runtime
+product code or accept production traffic.
 
 ## Alpha boundaries
 
 - One operator-selected public and free Bilibili room.
-- One cloud ingest, invite-only Apple Silicon/MLX workers, and public live Web UI.
-- Captions, danmaku, Super Chat, and live-status events are retained; audio is never
-  persisted.
+- One cloud ingest, invite-only Apple Silicon/MLX workers, and public live Web UI. Real
+  audio remains disabled for community workers until the named rights and residual-risk
+  gates are approved; synthetic protocol work may proceed.
+- Captions, danmaku, Super Chat, and live-status events are restricted by default and may
+  be retained only after the source-specific policy and Issue 16 deletion gates pass;
+  audio is never persisted.
 - CUDA is contract-only during Alpha. Mac native UI and historical crawling are later
   milestones.
 
 Public availability does not grant redistribution rights. Production ingest remains
 disabled until the repository owner completes the current platform-policy and rights
 review described in the change artifacts.
+
+## Architecture and safety records
+
+- [Alpha modular-monolith ADR](docs/architecture/adr/0001-alpha-modular-monolith.md)
+- [Threat model and residual-risk register](docs/security/alpha-threat-model.md)
+- [Data lifecycle and deletion rules](docs/security/data-lifecycle-and-deletion.md)
+- [Bilibili public-ingest policy](docs/policy/bilibili-public-ingest.md)
+- [Independent implementation and license isolation](docs/policy/independent-implementation.md)
+- [Incident disable and recovery runbook](docs/operations/incident-disable-and-recovery.md)
+
+These records define constraints and later-Issue verification ownership; they do not
+claim that a runtime control has already been implemented.
 
 ## Development
 
