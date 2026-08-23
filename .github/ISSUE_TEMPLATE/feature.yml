@@ -1,0 +1,66 @@
+name: Feature or engineering change
+description: Propose one reviewable Livecho outcome.
+title: ""
+labels:
+  - type:feature
+body:
+  - type: markdown
+    attributes:
+      value: |
+        One Issue owns one outcome. An artifact PR is merged before implementation.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What is missing or unsafe today?
+    validations:
+      required: true
+  - type: textarea
+    id: outcome
+    attributes:
+      label: Outcome
+      description: Describe observable behavior, not a preferred implementation.
+    validations:
+      required: true
+  - type: textarea
+    id: non-goals
+    attributes:
+      label: Non-goals
+      description: What is explicitly outside this Issue?
+    validations:
+      required: true
+  - type: textarea
+    id: dependencies
+    attributes:
+      label: Dependencies
+      description: Link prerequisite Issues, artifacts, services, or hardware.
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: Use executable or independently observable checks.
+      value: |
+        - [ ]
+    validations:
+      required: true
+  - type: dropdown
+    id: data-impact
+    attributes:
+      label: Data impact
+      options:
+        - None
+        - Normalized public event data
+        - Raw encrypted event data
+        - Authentication or contributor identity data
+        - Ephemeral audio in RAM only
+    validations:
+      required: true
+  - type: textarea
+    id: risks
+    attributes:
+      label: Risks and rollback
+      description: Security, privacy, policy, compatibility, operational, and disable path.
+    validations:
+      required: true
