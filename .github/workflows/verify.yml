@@ -20,6 +20,8 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v7.0.1
+        with:
+          fetch-depth: 0
 
       - name: Install Python
         uses: actions/setup-python@v7.0.0
@@ -48,4 +50,7 @@ jobs:
         run: make bootstrap
 
       - name: Verify
+        env:
+          LIVECHO_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          LIVECHO_HEAD_REF: ${{ github.head_ref || github.ref_name }}
         run: make verify
