@@ -28,9 +28,9 @@ name requirements, not wire fields or runtime schemas.
 | `CTRL-AUTH-EXPIRY` | Bearer credentials have the maximum lifetimes, single-use rules, verifier storage, revocation, and purge behavior below. | Issues #12 and #13 |
 | `CTRL-AUDIT-PAYLOAD-FREE` | Security, safety-control, raw-access, and deletion audit records contain control metadata but no protected payload. | Issues #12, #13, #16, #17, and #19 |
 | `CTRL-DELETION-STATE` | A deletion selects exactly one typed target—canonical room or immutable session—and uses the existing durable `hidden` tombstone as its pending-deletion record before acceptance or purge; it enforces room-over-session dominance and exact-scope idempotent cascade and reports three truthful states with immutable late-SLA evidence. | Issue #16 |
-| `CTRL-DELETION-FAIL-CLOSED` | A verified selector is provisionally contained immediately, but its request is not accepted and purge does not start until the `hidden` tombstone commits to and reads back from the independent recovery boundary; failed or ambiguous admission remains off and unresolved. | Issues #11, #16, and #17 |
+| `CTRL-DELETION-FAIL-CLOSED` | The deletion ingress opens and reads back a recovery-visible intake-continuity epoch before accepting requests. A verified selector is provisionally contained immediately, but its request is not accepted and purge does not start until the `hidden` tombstone commits to and reads back from the independent recovery boundary; failed or ambiguous admission taints the current incarnation, prevents a clean epoch close, and remains off and unresolved across restart even if the initiating source disappears. | Issues #11, #16, and #17 |
 | `CTRL-BACKUP-EVIDENCE` | Every cache, replica, object version, export, and backup window is enumerated and evidenced; an unknown bound blocks production persistence or restored authentication. | Issues #4, #12, #13, #16, and #19 |
-| `CTRL-RESTORE-REPLAY` | A restore is offline and globally disabled until stateful/stateless pre-restore credentials are rejected, every pending `hidden` tombstone and deletion/revocation checkpoint is replayed, unresolved deletion intake is reconciled, and current safety state is verified. | Issues #4, #12, #13, #16, and #19 |
+| `CTRL-RESTORE-REPLAY` | A restore is offline and globally disabled until stateful/stateless pre-restore credentials are rejected, every unmatched intake-continuity epoch and unresolved deletion intake is reconciled, every pending `hidden` tombstone and deletion/revocation checkpoint is replayed, current safety state is verified, and a fresh current-incarnation activation independently passes. | Issues #4, #12, #13, #16, and #19 |
 | `CTRL-IDENTITY-RESTORE-REVOCATION` | Typed pseudonymous account/device checkpoints and auth-invalidation state survive application backups, and every stateful/stateless pre-restore credential is server-rejected before any traffic or authentication. | Issues #4, #12, #13, #16, and #19 |
 
 ## Normative lifecycle matrix
@@ -45,10 +45,10 @@ name requirements, not wire fields or runtime schemas.
 | `DATA-AUTH-BEARER`: authentication, enrollment, and session bearer secret | Disabled until its owning Issue. A magic link is single-use and valid for at most 15 minutes; a worker enrollment token is single-use and valid for at most 24 hours; a session cookie is individually revocable and valid for at most 30 days. The database stores only a verifier hash plus expiry/use state. Plaintext exists only in the intended Resend email or initiating client flow, never in a database, log, telemetry event, or URL analytics. | Expiry, use, or revocation immediately prevents future server acceptance; this does not claim erasure of plaintext in an email/client. Account/device deletion revokes related tokens and sessions immediately and purges active verifier/session rows within 24 hours. Every restore purges/revokes all restored magic-link, enrollment-token, session-verifier, and session rows and advances/reconciles a recovery-protected monotonic auth-invalidation generation or non-restorable signing/verifier key version. All pre-restore stateful/stateless credentials remain server-rejected, and current verification secret material is never restored from an application backup. Issue #12 owns account authentication/session evidence; Issue #13 owns worker enrollment evidence. |
 | `DATA-WORKER-DEVICE`: device identity and aggregate worker statistics | Disabled until Issue #13. Then limited to device public key, status, allowlisted capabilities, online/processed duration, success rate, RTF, and recent health while registered. | A contributor sees only that contributor's aggregates; an admin manages devices. Revoke immediately. Device/account deletion purges identifying active-store fields within 24 hours and writes a typed pseudonymous recovery checkpoint; a restore must replay it before accepting device authentication or traffic. |
 | `DATA-AUDIT`: security, control, deletion, and raw-access audit | Append-only actor/control result, timestamps, object class, safety generation, opaque manifest reference/count, and integrity metadata for 365 days. It contains no account/device checkpoint target, event body, email, public key, secret, playback locator, audio, transcript, or digest of low-entropy/raw values. Any opaque actor reference remains restricted pseudonymous data. Keyed integrity digests cover canonical manifest/control records, never deleted content. | Restricted admin/auditor access. After 365 days, purge active audit rows within 24 hours unless a documented incident hold names an owner and expiry. The payload-free field contract is also defined by `CTRL-AUDIT-PAYLOAD-FREE` in the incident runbook. |
-| `DATA-DELETION-TOMBSTONE`: room/session deletion manifest/tombstone | Exactly one typed selector (`room` bound to a canonical room or `session` bound to a uniquely resolved immutable session), opaque target reference, deletion state, safety generation, timestamps, and payload-free counts only. The authenticated intake assigns one immutable original initiating-request time before its first durability attempt; the durable intake atomically retains that time with selector/idempotency until the existing `hidden` tombstone reuses all three. The tombstone is the sole durable pending-deletion record and must commit to/pass read-back before the request is accepted or acknowledged, `hidden` is reported, or purge starts. Intake is only an unresolved blocker, never a tombstone or fourth state. Tombstone and intake are held separately from restorable application data and available to every restart/restore. | A room tombstone dominates every child-session tombstone and replays over room metadata plus every current, historical, pending, late-discovered, or restored session belonging to that room; a later session request cannot narrow or overwrite it. A session tombstone replays only over that session and its derivatives. A volatile visibility block, audit event, intake record, or empty application store never substitutes for this record. Retain it while any live/history store, object version, export, replica, or backup can reintroduce the selected scope and through at least one successful restore verification after the last backup window. It contains no raw, identity, event, transcript, or audio content. |
+| `DATA-DELETION-TOMBSTONE`: room/session deletion manifest/tombstone | Exactly one typed selector (`room` bound to a canonical room or `session` bound to a uniquely resolved immutable session), opaque target reference, deletion state, safety generation, timestamps, and payload-free counts only. Before accepting any request, deletion ingress must have a commit/read-back-verified intake-continuity `open(E)` record. That target-free control evidence is not a tombstone or deletion state. The authenticated intake assigns one immutable original initiating-request time before its first target-specific durability attempt; the durable intake atomically retains that time with selector/idempotency until the existing `hidden` tombstone reuses all three. The tombstone is the sole durable pending-deletion record and must commit to/pass read-back before the request is accepted or acknowledged, `hidden` is reported, or purge starts. Intake is only an unresolved blocker, never a tombstone or fourth state. Tombstone, intake, and continuity evidence are held separately from restorable application data and available to every restart/restore. | A room tombstone dominates every child-session tombstone and replays over room metadata plus every current, historical, pending, late-discovered, or restored session belonging to that room; a later session request cannot narrow or overwrite it. A session tombstone replays only over that session and its derivatives. An unmatched `open(E)` globally blocks restored traffic and every relaxation but contains no target and authorizes no purge. A volatile visibility block, audit event, intake record, clean-looking or empty application store, or admin assertion never substitutes for a tombstone or verified `clean-close(E)`. Retain the tombstone while any live/history store, object version, export, replica, or backup can reintroduce the selected scope and through at least one successful restore verification after the last backup window. It contains no raw, identity, event, transcript, or audio content. |
 | `DATA-IDENTITY-REVOCATION-CHECKPOINT`: account/device deletion or revocation checkpoint | Restricted pseudonymous control data held in the separate encrypted, integrity-protected recovery copy: typed random immutable never-reused internal account/device reference, operation (`deleted` or `revoked`), monotonic control generation, timestamp, and payload-free result. Never email, role, device public key, IP address, bearer/verifier hash, content, or an unkeyed digest of a low-entropy value. | A permanent deletion checkpoint is never converted back to a reversible revocation; a current revocation generation cannot be rolled back by a backup. Retain until the longest enumerated backup/object window that can reintroduce the target has passed and through one successful post-window restore, then delete under an audited rule. Access is narrowly authorized and audited because even opaque references are linkable pseudonymous identity. |
 | `DATA-MANAGED-RAW-EXPORT`: managed raw export and access capability | Disabled until Issue #16. The access capability lasts at most 15 minutes; an encrypted managed export object lasts at most 24 hours. Alpha forbids untracked local plaintext copies by default. | Per-access admin audit. Revoke/delete every managed object in the selected room-wide or exact-session scope within 24 hours. Revoking authorization prevents future access but does not claim erasure of plaintext already disclosed. Introducing such disclosure requires a named High residual, a bounded destination, and owner acceptance. |
-| `DATA-DERIVED-COPY`: cache, index, replica, object version, or backup | Never an independent source of truth. Active copies follow the 24-hour purge SLA. Each production configuration must enumerate its actual schedules, object-version behavior, recovery window, and deletion/purge evidence. | Restart/restore remains offline and globally disabled until protected auth-invalidation state rejects pre-restore credentials, every pending `hidden` room-all-session/session-exact tombstone and account/device deletion/revocation record replays, every unresolved deletion intake reconciles, and current safety/denylist state replays successfully. Unknown, conflicting, unbounded, or untested provider behavior blocks production persistence and restored authentication. |
+| `DATA-DERIVED-COPY`: cache, index, replica, object version, or backup | Never an independent source of truth. Active copies follow the 24-hour purge SLA. Each production configuration must enumerate its actual schedules, object-version behavior, recovery window, and deletion/purge evidence. | Restart/restore remains offline and globally disabled until protected auth-invalidation state rejects pre-restore credentials, every unmatched intake-continuity epoch and unresolved deletion intake reconciles, every pending `hidden` room-all-session/session-exact tombstone and account/device deletion/revocation record replays, and current safety/denylist state replays successfully. A durable `PREPARED` or prior-incarnation `COMMITTED` relaxation is not serving authority: each boot has no activation until that same incarnation freshly commits the exact-head relaxation and its local guard verifies the matching continuity epoch plus absence of pending intake, taint, or cleanup. Unknown, conflicting, unbounded, or untested provider behavior blocks production persistence and restored authentication. |
 
 ## Audio budget and teardown invariants
 
@@ -137,6 +137,44 @@ when proven; otherwise global off), escalate, and do not begin guessed purge. Th
 never has to provide a room for a session selector and cannot override the backend's
 authoritative parent-room lookup.
 
+The sole current serving authority must establish an append-only intake-continuity epoch
+in the independent recovery boundary before deletion ingress can accept an authenticated
+request. Its target-free `open(E)` evidence must commit and read back before the endpoint
+opens; if that write or read-back fails, times out, or is ambiguous, the endpoint remains
+closed and the environment remains globally off. Opening the epoch does not accept a
+deletion, identify a target, report a state, or authorize purge. Before the first target-
+specific durability attempt for each request, the current incarnation installs a sticky
+local intake-pending guard under the same transition authority used by relaxation
+activation.
+
+A `clean-close(E)` may be appended and read back only after the same logical authority
+atomically quiesces serving, safety-control, and deletion ingress; every accepted safety-
+control handler is drained and its outcome durably reconciled; late deletion requests are
+rejected; every accepted deletion handler is drained; each invalid request has a durable
+denial; each valid request has reconciled to
+its commit/read-back-verified `hidden` tombstone; and no safety/intake-pending guard or
+taint remains. The close binds the epoch predecessor and observed-request high-watermark
+and commits/read-backs while the ingress fence remains closed. If a safety/deletion
+request linearizes before quiescence, close waits for that reconciliation; if quiescence/
+close linearizes first, the request is rejected or must wait for a new commit/read-back-
+verified epoch. A missing,
+failed, ambiguous, stale, or cross-epoch close leaves `open(E)` unmatched and blocks every
+restart, restore, and relaxation. It carries no selector, so it can only hold the
+environment off; it can never justify a guessed target or destructive action.
+
+For this gate, a durable safety relaxation in `PREPARED` phase is only an append-only
+proposal. `COMMITTED` means the matching journal transition and conditional recovery-head
+update committed and read back, but it still grants no serving authority. Only the same
+live incarnation may use a short, non-restorable `current-incarnation activation` to
+apply its committed relaxation, and its final local compare-and-set must verify the exact
+committed head, unchanged tightening and intake guards, matching `open(E)`, and no pending
+intake, taint, or cleanup. If that check fails, the committed relaxation can never be
+activated later. Every boot begins with activation absent and globally off and must
+freshly prepare and commit an exact-head relaxation; a restored or late `PREPARED`/
+`COMMITTED` record or response cannot recreate activation. Global disable revokes the
+installed global activation before durability; `add(R)` instead revokes/blocks only `R`'s
+room-removal effect and preserves unrelated-room activation.
+
 For a verified selector, `CTRL-DELETION-FAIL-CLOSED` first applies immediate provisional
 containment to the selected visibility, ingest, lease, locator, export, and persistence
 paths. Provisional containment is deliberately not a fourth deletion state: it protects
@@ -154,17 +192,22 @@ admission succeeds. It is an unresolved admission blocker, not a deletion state,
 tombstone, or authorization to purge; the `hidden` tombstone remains the sole durable
 pending-deletion record and must reuse the intake time unchanged. A missing/mismatched
 time is an admission failure, never permission to mint a later clock. If the intake record
-itself cannot be durably written and read back, no request is acknowledged and the
-initiating admin/incident source must retain and retry the same selector, identity, and
-original time while the environment remains off.
+itself cannot be durably written and read back, no request is acknowledged, the local
+intake guard becomes tainted, the environment remains globally off, and the current epoch
+cannot cleanly close. The initiating admin/incident source may retain and retry the same
+selector, identity, and original time to aid recovery, but it is not the recovery
+authority and its availability is never a re-enable prerequisite or substitute.
 
 If commit or read-back fails, times out, or has an ambiguous result, the safest identified
 scope remains contained and the environment remains globally off. No success is returned
 and no purge begins. Retry uses the same selector and idempotency identity: if the first
 commit succeeded but its response was lost, retry reuses the same tombstone, original
 request time, and evidence; if it did not commit, retry creates it before progressing.
-An intake that has not obtained verified admission remains a re-enable blocker across
-process restart and restore.
+An intake that has not obtained verified admission prevents the current epoch from
+cleanly closing. After a crash, its unmatched epoch remains a recovery-visible blocker
+even when the source, exact target, audit, and application rows are unavailable. Only
+exact authoritative replay may recover the original triple and reconcile the request;
+without that evidence the environment remains off indefinitely.
 
 The idempotency key includes selector type plus opaque target reference. Each request
 cascades across normalized/transcript rows, indexes, caches, manifests, raw objects and
@@ -206,21 +249,25 @@ media.
 
 ### Required deletion sequence
 
-1. Authenticate and authorize an admin deletion request. Require exactly one typed room
-   or session selector; canonicalize the room or resolve the immutable session and parent
-   room from the authoritative index without accepting a missing/non-unique/conflicting
-   match. Invalid scope triggers the safe block/escalation above but no guessed purge.
+1. Before accepting a deletion request, commit and read back the current authority's
+   target-free intake-continuity `open(E)` evidence. A failure leaves the endpoint closed
+   and globally off. Under that verified epoch, authenticate and authorize the admin
+   request. Require exactly one typed room or session selector; canonicalize the room or
+   resolve the immutable session and parent room from the authoritative index without
+   accepting a missing/non-unique/conflicting match. Invalid scope triggers the safe
+   block/escalation above but no guessed purge.
 2. Immediately provisionally contain the verified scope while its durable admission is
    pending. A room selector blocks that room's new ingest/reconnect, all its session
    visibility, leases, exports, and persistence. A session selector blocks only that
    session's visibility/derivatives and stops its ingest, lease, audio, locator, and export
-   paths if active. Before the first write attempt, assign the authenticated request's
-   immutable original initiating time; atomically write/read back that time with selector
-   and idempotency identity in the same recovery boundary so all three survive until
-   verified admission. This record is only an unresolved admission blocker, and
-   containment is not a fourth deletion state.
-   If intake durability itself fails, return no success and require the initiating source
-   to retain and retry the same triple while global off remains in force.
+   paths if active. Before the first target-specific write attempt, install the sticky
+   current-incarnation intake guard and assign the authenticated request's immutable
+   original initiating time; atomically write/read back that time with selector and
+   idempotency identity in the same recovery boundary so all three survive until verified
+   admission. This record is only an unresolved admission blocker, and containment is not
+   a fourth deletion state. If intake durability itself fails or is ambiguous, return no
+   success, taint the guard, forbid `clean-close(E)` and every relaxation, and keep global
+   off. A source retry may help recover the same triple but is not the safety mechanism.
 3. Commit the existing typed `hidden` tombstone to the independent recovery boundary and
    verify read-back before acknowledging acceptance, reporting `hidden`, or starting
    purge. A failed, timed-out, or ambiguous commit keeps global off, returns no success,
@@ -244,17 +291,25 @@ media.
    `final-retention-window-satisfied` only when all stated conditions above are proven;
    retain the tombstone through one successful post-window restore verification.
 
+An intentional deletion-ingress shutdown follows the `clean-close(E)` ordering above.
+Neither a durable relaxation proposal nor a committed recovery snapshot may bypass that
+ordering: current-incarnation activation requires an exact committed head, the matching
+epoch, and unchanged clear tightening/intake guards at its final compare-and-set.
+
 A crash after durable intake but before verified tombstone admission produces no success
 acknowledgement; startup remains forced off and the unresolved intake supplies the same
 selector, idempotency identity, and immutable original time for retry before any traffic
-or re-enable. A crash before intake durability also produces no acknowledgement and
-requires the initiating source to retry that same triple. A crash after
-commit but before the acknowledgement is recovered by the same
-idempotent retry and existing tombstone. Every restart/restore must replay pending
-`hidden` tombstones before safety reconciliation. Recovery of an application store, or an
-empty tombstone view in that store, never clears an unresolved intake or authorizes
-re-enable; verified recovery-boundary admission, replay, and scope reconciliation are
-required.
+or re-enable. A crash before intake durability also produces no acknowledgement, but the
+already durable unmatched `open(E)` survives even if the initiating source and volatile
+triple disappear. It blocks traffic and relaxation without naming or purging a target.
+Only exact authoritative replay can recover and admit that request; if none exists, the
+environment stays off. A crash after commit but before acknowledgement is recovered by
+the same idempotent retry and existing tombstone. Every restart/restore must reject an
+unmatched continuity epoch and replay pending `hidden` tombstones before safety
+reconciliation. Recovery of an application store, an empty tombstone view, an audit row,
+an old `COMMITTED` relaxation, or a prior-incarnation activation never clears an
+unresolved intake or authorizes re-enable; verified recovery-boundary admission, replay,
+scope reconciliation, and fresh current-incarnation activation are required.
 
 Audit counts, keyed manifest digests, and failure metadata must never contain or hash
 raw, identity, transcript, event-body, secret, locator, or audio content. Backups may
@@ -301,10 +356,12 @@ is a control boundary, not proof of physical erasure.
 
 If any provider's maximum backup, recovery, object-version, or deletion window remains
 unknown; if a current deletion/revocation checkpoint cannot be made available to all
-restarts/restores; or if a failed or ambiguous deletion intake lacks a verified durable
-tombstone, production persistence, restored authentication, and re-enable remain
-disabled. A recovered or empty application store is not evidence that no pending target
-exists. Do not guess a value from an unselected provider option.
+restarts/restores; if an intake-continuity epoch is unmatched; or if a failed or ambiguous
+deletion intake lacks a verified durable tombstone, production persistence, restored
+authentication, and every relaxation remain disabled. A recovered or empty application
+store, an audit row, a durable `PREPARED`/`COMMITTED` relaxation, or a prior-incarnation
+activation is not evidence that no pending target exists. Do not guess a target or a value
+from an unselected provider option.
 
 ## Implementation ownership and acceptance evidence
 
@@ -318,9 +375,9 @@ exists. Do not guess a value from an unselected provider option.
 | #13 | 24-hour single-use enrollment token, device identity/statistics minimization, typed revocation/purge checkpoint, restored credential/device-authority rejection, and no new issuance to deleted targets. |
 | #14 | One active lease's bounded frame acceptance, cancellation/timeout/disconnect clearing, and rejection of late output. |
 | #15 | One-active-room/lease scheduling, standby-without-PCM promotion, and failover without an audio retry queue. |
-| #16 | Postgres/Bucket access, AES-256-GCM and separate keys, audit, managed export, store inventory, idempotent purge, truthful states, provider windows, exactly-one-selector rejection tests, room-all-sessions versus exact-session/sibling proofs, room-tombstone dominance/restore tests, recovery-boundary tombstone commit/read-back, commit/read-back fault injection, crash-before-commit and commit-before-response recovery, account/device checkpoints, and the independent auth-invalidation/current-verification-material boundary. |
-| #17 | Admin deletion-intake authorization and confirmation behavior proving failed, timed-out, or ambiguous admission returns no success, retains the exact intake for idempotent retry, exposes no false `hidden` state, and blocks re-enable until verified tombstone reconciliation. |
-| #4/#19 | Startup/restore forced-off deployment behavior and a recovery drill proving pending `hidden` tombstone replay, unresolved-intake blocking across restart, empty-application-store rejection, stateful/stateless pre-restore credential rejection, old-key exclusion, fresh non-restored recovery-admin authentication, and deletion/revocation plus safety replay before traffic. |
+| #16 | Postgres/Bucket access, AES-256-GCM and separate keys, audit, managed export, store inventory, idempotent purge, truthful states, provider windows, exactly-one-selector rejection tests, room-all-sessions versus exact-session/sibling proofs, room-tombstone dominance/restore tests, recovery-boundary intake-continuity open/clean-close and tombstone commit/read-back, first-intake-write plus close fault injection, source-loss/crash-before-commit and commit-before-response recovery, account/device checkpoints, and the independent auth-invalidation/current-verification-material boundary. |
+| #17 | Admin deletion-intake authorization, ingress quiescence, sticky current-incarnation pending/taint guard, and confirmation behavior proving failed, timed-out, or ambiguous admission returns no success, a source loss cannot cleanly close its epoch, no false `hidden` state is exposed, and relaxation remains blocked until exact authoritative reconciliation. |
+| #4/#19 | Startup/restore forced-off deployment behavior and a recovery drill proving unmatched intake-continuity epochs block across restart even with a lost source and empty application store, pending `hidden` tombstones replay, stateful/stateless pre-restore credentials are rejected, old keys and prior-incarnation activation are excluded, and deletion/revocation plus exact `COMMITTED` safety-head reconciliation precede fresh current-incarnation activation and traffic. |
 
 Issue #2 supplies no runtime acceptance evidence. A later owner must record the exact
 commands, provider configuration, restore results, residual risks, and source/rights

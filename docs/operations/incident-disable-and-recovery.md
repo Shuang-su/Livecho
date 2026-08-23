@@ -22,15 +22,15 @@ database schemas, CLI names, or claims of runtime implementation.
 
 | Control ID | Required behavior | Later evidence owners / integration dependencies |
 | --- | --- | --- |
-| `CTRL-SAFETY-DEFAULT-OFF` | Production ingest and every startup/restore are forced off; missing, stale, ambiguous, or conflicting state remains off. | Issues #4, #7, #16, and #19 |
-| `CTRL-SAFETY-GENERATION` | One monotonic generation orders two orthogonal safety dimensions—the global enabled bit and canonical-room denylist—without making a transition in one implicitly mutate the other; every transition uses the append-only journal and integrity-protected recovery copy outside restorable application-data backups. | Issues #4, #7, #16, #17, and #19 |
+| `CTRL-SAFETY-DEFAULT-OFF` | Production ingest and every startup/restore begin without serving activation; no durable value or old response recreates the non-restorable current-incarnation activation, and missing, stale, ambiguous, or conflicting state remains off. | Issues #4, #7, #16, and #19 |
+| `CTRL-SAFETY-GENERATION` | One monotonic generation orders two orthogonal safety dimensions—the global enabled bit and canonical-room denylist—through non-effective `PREPARED` proposals and a conditionally advanced `COMMITTED` recovery head; a committed relaxation still requires a non-restorable current-incarnation activation. | Issues #4, #7, #16, #17, and #19 |
 | `CTRL-ROOM-DENYLIST` | Eligibility and every reconnect use the canonical platform room ID; a verified add/remove changes only that room entry, while ambiguity, stale/binding conflict, or transition write/read-back failure escalates to global disable. | Issues #7, #16, and #17 |
 | `CTRL-DISABLE-CLEANUP` | Global disable cleans up every active/queued ingest scope; a successful canonical-room denylist add cleans up only that room and does not disturb unrelated rooms, without depending on the failing ingest path. | Issues #7, #8, #11, #14, #15, #16, #17, and #19 |
-| `CTRL-RESTORE-REPLAY` | An offline restore rejects stateful/stateless pre-restore credentials, reconciles unresolved deletion intake, replays every pending `hidden` tombstone and deletion/revocation checkpoint, and only then reconciles current orthogonal global/denylist state before admitting traffic. | Issues #4, #12, #13, #16, and #19 |
+| `CTRL-RESTORE-REPLAY` | An offline restore rejects stateful/stateless pre-restore credentials, reconciles every intake-continuity epoch and unresolved deletion intake, replays each pending `hidden` tombstone and deletion/revocation checkpoint, and only then reconciles current orthogonal global/denylist state; it never restores serving activation. | Issues #4, #12, #13, #16, and #19 |
 | `CTRL-IDENTITY-RESTORE-REVOCATION` | Typed pseudonymous account/device checkpoints and auth-invalidation state survive application backups; every stateful/stateless pre-restore credential is server-rejected before authentication or traffic. | Issues #4, #12, #13, #16, and #19 |
-| `CTRL-REENABLE-GATE` | Only an admin may technically enable globally or remove one denylist entry, as separate transitions, and only after current owner approval and every incident, rights, deletion, journal, recovery, and tabletop prerequisite passes. | Issues #7, #16, #17, and #19 |
+| `CTRL-REENABLE-GATE` | Only an admin may technically enable globally or remove one denylist entry, as separate exact-predecessor transitions, and only after current owner approval, deletion-intake continuity, and every incident, rights, journal, recovery, and tabletop prerequisite passes; durable commit alone never opens service. | Issues #7, #16, #17, and #19 |
 | `CTRL-AUDIT-PAYLOAD-FREE` | Every safety, incident, deletion, and raw-access result is append-only and auditable without protected payload. | Issues #12, #13, #16, #17, and #19 |
-| `CTRL-DELETION-FAIL-CLOSED` | A verified takedown selector is provisionally contained immediately, but acceptance, reportable `hidden`, and purge wait for commit/read-back of its durable `hidden` tombstone; invalid/ambiguous or persistence-failed scope never starts guessed destructive purge or reports success. | Issues #11, #16, and #17 |
+| `CTRL-DELETION-FAIL-CLOSED` | A verified takedown selector is provisionally contained immediately, but acceptance, reportable `hidden`, and purge wait for commit/read-back of its durable `hidden` tombstone; an append-only open/clean-close intake-continuity epoch prevents a persistence-failed or crash-lost request from being mistaken for absence. | Issues #11, #16, and #17 |
 | `CTRL-WORKER-SYNTHETIC-ONLY` | Community workers receive synthetic audio unless the explicit rights and named High-residual gates for real PCM have passed. | Issues #8, #9, #14, and #15 |
 
 `CTRL-AUDIO-RAM-ONLY`, `CTRL-BACKUP-EVIDENCE`, `CTRL-RESTORE-REPLAY`,
@@ -72,37 +72,83 @@ current approval of the triggering policy/risk decision.
 - integrity metadata and references to any required owner approval.
 
 The journal stores the payload-free fields below, not platform responses, room content,
-credentials, raw events, transcripts, or audio. A safety transition is bound to its
-predecessor generation and names exactly one action: global disable, global enable,
-denylist add for one canonical room, or denylist remove for one canonical room. The one
-generation orders both dimensions; it does not couple their effects. A stale, duplicated,
-rolled-back, missing, or conflicting generation cannot replace a newer decision. An empty
-restored database is not evidence that generation zero is current.
+credentials, raw events, transcripts, or audio. A safety transition has one idempotency
+identity, exact predecessor generation and head digest, one action—global disable,
+global enable, denylist add for one canonical room, or denylist remove for one canonical
+room—and the resulting complete orthogonal snapshot. The one generation orders both
+dimensions; it does not couple their effects. A stale, duplicated, rolled-back, missing,
+or conflicting generation cannot replace a newer decision. An empty restored database
+is not evidence that generation zero is current.
+
+The durable transition has two phases. `PREPARED` means the append-only proposal exists;
+it is not current safety state and never permits serving. `COMMITTED` means a matching
+journal proposal exists and a conditional compare-and-swap advanced the integrity-
+protected recovery head from the exact predecessor to the result, after which both
+records passed read-back. The recovery-head compare-and-swap is the durable-state
+linearization point. A journal-only proposal, a head-only or mismatched record, a failed
+conditional write, missing read-back, or an unknown result cannot activate a relaxation.
+This is an idempotent single-writer protocol over the already required journal and
+recovery copy; it does not claim an atomic transaction across process RAM and two stores.
+
+Each process start creates a never-reused serving incarnation with no serving activation.
+A `COMMITTED` global-enable or denylist-remove decision is durable history and a necessary
+condition, not permission to serve. Only the same still-live incarnation may, after exact
+read-back, perform one short local compare-and-set that checks the committed head, its
+captured tightening and deletion-intake fence epochs, the matching intake-continuity
+epoch, every cleanup and governance gate, and then installs global activation or applies
+the room-removal effect. This current-incarnation activation/effect is deliberately not
+durable and cannot be reconstructed after restart. If the attempt is failed, ambiguous,
+superseded, or loses its response, a late completion or client response cannot install
+it; a fresh exact-predecessor relaxation is required.
 
 The backend also has one high-priority, ingest-independent pending-tightening fence. A
-global disable atomically sets its sticky local global-off latch, and a denylist add sets
-its sticky target-room block, without waiting behind a normal transition or its durable
-I/O. Durable transitions still serialize against one predecessor and at most one
-successor may commit. Every in-flight or later enable/remove must recheck the fence and
-transition epoch immediately before durable commit **and** before any local relaxation;
-the final fence check and local effect/latch change are one atomic compare-and-set under
-that same logical transition authority. If relaxation linearizes first, a following
-tightening immediately latches/blocks and cleans; if tightening linearizes first, the
-relaxation fails without a reopen window or clearing the latch/block. Unfinished cleanup
-or ambiguous ordering also resolves globally off. A crash before tightening durability
-restarts default-off rather than honoring a backed-up or late-arriving relaxation.
+global disable atomically revokes current-incarnation global activation, increments the
+fence, and sets its sticky local global-off latch; a denylist add increments the fence,
+sets its sticky target-room block, and invalidates an in-flight removal for that room.
+Neither waits behind normal transition or durable I/O. If a tightening's conditional
+commit loses to another successor, it reloads the newest complete head and reapplies the
+same safe action idempotently; a relaxation never rebases its approval automatically. If
+relaxation's final local compare-and-set wins, a following tightening immediately revokes/
+blocks and cleans. If tightening or deletion intake wins, relaxation cannot activate.
+Unfinished cleanup or ambiguous ordering also resolves globally off. A crash discards
+every activation and starts the next incarnation off, so a previously committed
+relaxation or delayed response cannot reopen service while tightening durability catches
+up.
 
 Alpha has exactly one active serving authority process, which owns every active/queued
-room and therefore applies this fence without a cross-process durability dependency. A
-future multi-process deployment may not enable production until the same fence is
+room and therefore applies these local fences without a cross-process durability
+dependency. A future multi-process deployment may not enable production until the same
+fence is
 synchronously visible to every active owner through an ingest-independent path. Failure
 to enumerate an owner or obtain its fence acknowledgement immediately isolates/terminates
 that owner at the deployment or egress boundary, keeps global off, and blocks relaxation.
 
+Before a serving incarnation may accept deletion ingress or install serving activation,
+it commits and reads back an append-only `open(E)` serving/intake-continuity epoch in the
+recovery boundary. The epoch remains open while that incarnation can receive safety
+tightening or deletion requests. It may gain `clean-close(E)` evidence only after the same
+logical transition authority atomically quiesces serving, safety-control, and deletion
+ingress; every accepted safety-control handler is drained and its outcome durably
+reconciled; every deletion request seen in
+`E` is drained; each valid request maps to its commit/read-back-verified `hidden`
+tombstone; and each invalid request has a durable denial. The close is bound to the epoch
+predecessor/high-watermark, commits and reads back while the ingress fence remains closed,
+and cannot race a late control into the closing incarnation. If a safety/deletion request
+linearizes first, close waits; if close linearizes first, the request is rejected or bound
+to a new commit/read-back-verified epoch. Starting a
+deletion request atomically increments the local intake fence
+and sets `intake-pending`; any intake persistence failure makes it sticky `tainted`,
+revokes serving activation, and keeps global off. If the recovery boundary is then
+unavailable or the process crashes, the already durable unmatched `open(E)` remains the
+recovery-visible blocker. The initiating client is not a recovery authority. A later
+incarnation may clear the blocker only from exact authoritative replay and reconciliation;
+if the missing request cannot be recovered, production remains off rather than guessing
+that no request existed.
+
 Issue #16 must maintain an encrypted, integrity-protected current recovery copy containing
 enough of the latest safety/denylist state, journal integrity head, durable unresolved
 room/session deletion intake, typed deletion manifests and dominance, typed pseudonymous
-account/device checkpoints, and monotonic authentication-
+account/device checkpoints, append-only intake-continuity epochs, and monotonic authentication-
 invalidation generation or key version to detect stale application-data backups. A
 checkpoint target is a random immutable never-reused internal reference, not an email,
 role, public key, bearer, canonical room ID, or unkeyed digest of a low-entropy value.
@@ -115,53 +161,70 @@ transcript, audio, bearer/verifier, playback locator, or other user content.
 ### Safe transition rules
 
 - **Global disable:** an authorized operator/admin latches global off immediately and
-  closes local admission/publication gates and issues termination, revocation, clearing,
-  and hiding actions for every active or queued room before the first journal/recovery-
-  copy await. Cleanup completion may proceed concurrently with durable transition I/O; a
-  slow, hung, failed, or ambiguous write/read-back never delays, cancels, or reorders
-  those local actions. The backend allocates the next generation, appends the global-
-  disable decision without changing denylist membership, advances the recovery copy, and
-  verifies read-back. If any durable write/read-back or integrity/freshness check fails,
-  the local global-off latch remains in force while cleanup continues/retries
-  independently. Any cleanup failure alerts and blocks every relaxation; the design does
-  not claim erasure on an untrusted host.
+  atomically revokes current-incarnation global activation, increments the tightening
+  fence, marks the current continuity epoch safety-pending, closes local admission/
+  publication gates, and issues termination, revocation,
+  clearing, and hiding actions for every active or queued room before the first journal/
+  recovery-copy await. Cleanup completion may proceed concurrently with durable I/O. The
+  backend writes the exact-predecessor `PREPARED` decision without changing denylist
+  membership, conditionally advances the recovery head to `COMMITTED`, and verifies both
+  read-backs before acknowledgement and clearing safety-pending. If another transition committed first, disable is
+  reapplied to that complete head until it commits or remains unresolved/off. Any write,
+  read-back, integrity, or cleanup failure keeps the local latch in force, alerts, retries,
+  and blocks relaxation; the design does not claim erasure on an untrusted host.
 - **Denylist add:** after exact canonical-room binding, an authorized operator/admin
-  provisionally blocks and cleans up only that room. The backend allocates the next shared
-  generation, appends `add` for that canonical room without changing the global enabled
-  bit or any other room entry, advances the recovery copy, and verifies read-back. Once
-  verified, the room remains denied and unrelated rooms retain their prior state and
-  eligibility; nothing starts automatically. Ambiguous or changed binding, stale control
-  state, or failed/ambiguous journal or recovery-copy write/read-back escalates to global
-  disable rather than guessing a room-scoped success.
+  atomically increments the tightening fence, invalidates an in-flight removal for that
+  room, marks the current continuity epoch safety-pending, provisionally blocks it, and
+  starts only its cleanup without revoking global activation or interrupting another
+  room. The backend writes the
+  exact-predecessor `PREPARED` add without changing the global enabled bit or any other
+  entry, conditionally advances the recovery head to `COMMITTED`, and verifies both read-
+  backs before acknowledgement and clearing safety-pending. If another successor won, the same add is reapplied to
+  the newest complete head. Once verified, the room remains denied and unrelated rooms
+  retain their prior state and eligibility; nothing starts automatically. Ambiguous or
+  changed binding, stale control state, or failed/ambiguous journal or recovery-head
+  commit/read-back escalates to global disable rather than guessing a room-scoped success.
 - **Global enable:** only an admin may request this transition, with current recorded
-  owner approval and all `CTRL-REENABLE-GATE` evidence. Its new generation changes only
-  the global enabled bit and preserves the complete denylist; every denied room remains
-  denied. Journal/recovery-copy write and read-back must reconcile before enablement takes
-  effect, and the pending-tightening fence/epoch must be clear at pre-commit and at the
-  atomic final check-and-effect. A concurrent/newer tightening, unfinished cleanup, or
-  partial/ambiguous result is failure and leaves global ingest disabled.
+  owner approval and all `CTRL-REENABLE-GATE` evidence. The proposal captures the exact
+  recovery head, current incarnation, tightening and deletion-intake fence epochs, and
+  matching `open(E)`. Its `PREPARED` and conditionally `COMMITTED` generation sets only
+  the global bit and preserves the complete denylist. It never rebases automatically.
+  After both durable records read back, the same incarnation performs the final local
+  compare-and-set over the exact committed head, captured fences, continuity guard,
+  cleanup, and governance gates, then installs non-restorable global activation. A
+  concurrent/newer tightening or intake, unfinished cleanup, stale head, prior-incarnation
+  record, or partial/ambiguous result prevents activation. Even if its durable bit is
+  already enabled, a later incarnation requires a fresh committed transition and final
+  activation; the old result is never replayed into service.
 - **Denylist remove:** only an admin may request removal of one exactly bound canonical
-  room, with current owner approval and all applicable `CTRL-REENABLE-GATE` evidence. Its
-  new generation removes only that entry and preserves the global enabled bit and all
-  other entries. Removal neither globally enables ingest nor starts the room. It must
-  also pass the pre-commit check and atomic final fence/epoch check-and-effect. Binding,
-  freshness, concurrent/newer tightening, unfinished cleanup, write/read-back, or
-  integrity uncertainty escalates to global disable.
+  room, with current owner approval and all applicable `CTRL-REENABLE-GATE` evidence. Like
+  global enable, it captures one exact predecessor/incarnation/fence/continuity tuple,
+  never rebases, and removes only that entry in the conditionally `COMMITTED` snapshot
+  while preserving the global bit and every other entry. Only matching read-back plus the
+  same final local compare-and-set may clear the current room block. Removal neither
+  globally enables ingest nor starts the room. Binding, freshness, concurrent/newer add
+  or intake, unfinished cleanup, prior-incarnation use, write/read-back, or integrity
+  uncertainty prevents the local effect and escalates to global disable. A committed
+  removal from an old process can affect the durable snapshot but cannot by itself create
+  service; after restart, a fresh global activation over the exact complete snapshot is
+  still required.
 - **Canonical identity:** aliases and URLs resolve to one canonical Bilibili room ID
   before selection, eligibility, or denylist comparison. Resolution failure, ambiguity,
   stale state, or an unavailable configuration store is a denial, never a fallback.
-- **Ongoing checks:** the effective global generation, global enabled bit, and canonical
-  denylist are checked before each start and reconnect. A generation change requires
-  re-evaluation; it is not itself a cleanup instruction. A resulting global-off state
-  invokes global cleanup, a resulting denylist match invokes cleanup only for that room,
-  and an unrelated verified change preserves unaffected operation subject to ordinary
-  eligibility checks.
+- **Ongoing checks:** the current-incarnation activation, effective global generation,
+  global enabled bit, canonical denylist, and local tightening/intake guards are checked
+  before each start and reconnect. A generation change requires re-evaluation; it is not
+  itself a cleanup instruction or activation. A resulting global-off or missing-
+  activation state denies service, a global disable invokes global cleanup, a resulting
+  denylist match invokes cleanup only for that room, and an unrelated verified room
+  change preserves unaffected active operation subject to ordinary eligibility checks.
 
 No safety operation may silently decrement/rebase a generation, truncate history,
 reconstruct an enabled value from an application backup, or treat journal/recovery-copy
 unavailability as permission to continue. No implementation may derive the global bit
 from an empty/non-empty denylist, clear the denylist on global enable, or treat removal of
-one room as global enablement.
+one room as global enablement. No implementation may treat `PREPARED`, `COMMITTED`, a
+prior-incarnation activation, or a control response as interchangeable states.
 
 ## Immediate disable and denylist procedure
 
@@ -174,28 +237,31 @@ deletion, control-integrity, or unknown-severity incident:
    global disable rather than guessing an ID.
 2. Apply the provisional local effect immediately. Global disable rejects every new room
    start, reconnect, refresh, and worker assignment, including queued requests, **and
-   closes its local admission, publication, lease, and late-output authority gates and
+   atomically revokes current-incarnation activation, increments the tightening fence,
+   closes its local admission, publication, lease, and late-output authority gates, and
    issues cleanup for every active or queued room before awaiting any journal or recovery-
    copy I/O**. The single Alpha serving authority owns all such resources; its cleanup
    executor is independent of the failing ingest path and durable-I/O executor. Steps 4–7
    are the actions issued here; they progress before or concurrently with step 3 rather
    than being gated by their numbering. An exactly bound
-   canonical-room denylist add rejects only the
-   target room's starts, reconnects, refreshes, and assignments; it also begins target-
-   room cleanup immediately, while unrelated rooms retain their prior state and are not
-   started automatically.
-3. With the applicable cleanup already in progress, apply the corresponding next-
-   generation journal/recovery-copy transition and verify read-back. Slow or hung durable
-   I/O cannot postpone global cleanup. A global-disable write failure cannot undo its
-   local latch, stop cleanup, or reactivate a resource. A room-add write/read-back,
-   integrity, freshness, or binding failure escalates the local posture to global off,
-   immediately expands cleanup to every active or queued room without another durability
-   await, and raises a payload-free security alert; it is never reported as a successful
-   room-only transition.
+   canonical-room denylist add increments the fence, invalidates any in-flight removal,
+   and rejects only the target room's starts, reconnects, refreshes, and assignments; it
+   also begins target-room cleanup immediately, while unrelated rooms retain their prior
+   state and are not started automatically.
+3. With the applicable cleanup already in progress, append the exact-predecessor
+   `PREPARED` proposal, conditionally advance the recovery head to `COMMITTED`, and verify
+   both read-backs before acknowledgement. A tightening that loses the predecessor race
+   is reapplied to the newest complete head; it is not discarded with the stale proposal.
+   Slow or hung durable I/O cannot postpone cleanup. A global-disable write failure cannot
+   undo its local latch, stop cleanup, or reactivate a resource. A room-add write/read-
+   back, integrity, freshness, or binding failure escalates the local posture to global
+   off, immediately expands cleanup to every active or queued room without another
+   durability await, and raises a payload-free security alert; it is never reported as a
+   successful room-only transition.
 4. Complete the already-started cleanup at the effective scope. Global disable, including
-   escalation from a failed room-add transition, covers every active or queued room. A successfully
-   verified denylist add finishes cleanup only for the canonical target room and proves
-   non-target room state was not changed. Terminate each in-scope Bilibili platform
+   escalation from a failed room-add transition, covers every active or queued room. A
+   successfully verified denylist add finishes cleanup only for the canonical target room
+   and proves non-target room state was not changed. Terminate each in-scope Bilibili platform
    session and stop its playback bytes and business events. There is no alternate
    endpoint, credentialed fallback, or scraper.
 5. Revoke each in-scope worker lease, reject late output, and send only the bounded
@@ -210,8 +276,9 @@ deletion, control-integrity, or unknown-severity incident:
    durable-admission barrier below before reporting `hidden`. When the room is known but
    session scope conflicts, deny the room; when no scope is safely identifiable, remain
    globally off and escalate. Never guess destructive scope.
-8. Append a `CTRL-AUDIT-PAYLOAD-FREE` result for each attempted control and notify the
-   incident owner through an approved non-payload channel.
+8. Append a `CTRL-AUDIT-PAYLOAD-FREE` result for each attempted control, distinguishing
+   `PREPARED`, `COMMITTED`, and local activation/revocation without treating a response as
+   state, and notify the incident owner through an approved non-payload channel.
 
 The effective result is safe only when every in-scope start/reconnect is denied, platform
 session and lease authority are closed, transient backend state is cleared, and pending
@@ -232,6 +299,12 @@ both. None, both, an ambiguous room alias, a conflicting caller hint/store mappi
 missing/non-unique session resolution is denied rather than guessed. Block the known room
 when safely identified, otherwise remain globally off, escalate, and begin no destructive
 purge. An operator may first stop/denylist the room but may not declare deletion complete.
+Deletion ingress is unavailable until the current incarnation's `open(E)` has committed
+and read back. At the authenticated intake boundary, every request atomically increments
+the local deletion-intake fence, sets `intake-pending`, revokes current-incarnation global
+activation, and leaves global ingest off before it can race a relaxation. An invalid
+request clears pending only after its payload-free denial is durable; it never creates a
+tombstone or authorizes purge.
 
 1. Immediately apply provisional containment for the verified selector while durable
    admission is pending. A room selector blocks the room's new start/reconnect/write/
@@ -245,17 +318,21 @@ purge. An operator may first stop/denylist the room but may not declare deletion
    Atomically write/read back that time with selector and idempotency identity in the
    independent recovery boundary so all three survive until admission. It is only an
    unresolved blocker, not a deletion state, tombstone, or purge authorization. If intake
-   durability itself fails, return no success and require the initiating source to retain
-   and retry the same selector, identity, and original time while global off remains in
-   force. Then commit the existing typed, payload-free
+   durability itself fails, return no success, mark the current local guard sticky
+   `tainted`, retain the selector/time triple while the process can do so, and keep global
+   off. A client retry is useful but is not recovery evidence: `open(E)` cannot receive a
+   clean close until exact authoritative replay resolves this request. Then commit the
+   existing typed, payload-free
    `hidden` tombstone to that boundary and verify read-back **before** accepting or
    acknowledging the request, reporting `hidden`, or starting destructive purge. A
    volatile block, audit event, intake record, or empty application store is not a
    substitute. If tombstone commit/read-back fails, times out, or has an ambiguous result,
-   return no success, start no purge, keep global off, and leave the durable intake
-   unresolved for idempotent retry. The tombstone must reuse the intake's original time;
-   a missing/mismatched time fails admission. If a commit succeeded but its response was
-   lost, retry reuses the same tombstone, original request time, and manifest identity.
+   return no success, start no purge, keep global off, make/keep the continuity guard
+   tainted, and leave the durable intake unresolved for idempotent retry. The tombstone
+   must reuse the intake's original time; a missing/mismatched time fails admission. If a
+   commit succeeded but its response was lost, retry reuses the same tombstone, original
+   request time, and manifest identity. Only verified tombstone admission resolves this
+   request for continuity accounting; it does not recreate the revoked global activation.
 3. Enumerate and idempotently purge every active store named by Issue #16: normalized
    rows, indexes, caches, replicas, manifests, raw objects/versions, managed exports, and
    derived/shared projections. Room scope re-enumerates every child session/path on each
@@ -283,14 +360,16 @@ provider windows or untracked plaintext prevent final satisfaction and, under
 
 A crash after durable intake but before verified tombstone admission produces no success
 acknowledgement; the intake retains selector, idempotency identity, and immutable original
-time, startup remains forced off, and the same triple is retried before re-enable. A crash
-before intake durability also produces no acknowledgement and requires the initiating
-source to retain/retry that same triple. A crash after tombstone
-commit but before response is recovered by the idempotent retry and existing tombstone.
-Every restart/restore reconciles unresolved intake and replays a pending `hidden`
-tombstone before safety reconciliation. Recovery of the application store or an empty
-application tombstone view never clears an unresolved intake or proves that no target
-exists.
+time, and the unmatched `open(E)` plus unresolved record block re-enable. A crash before
+intake durability also produces no acknowledgement, but does not depend on the initiating
+source surviving: the already committed unmatched `open(E)` proves continuity was not
+cleanly closed. The next incarnation remains off until exact authoritative replay
+recovers and admits the request; if that is impossible, it remains off indefinitely. A
+crash after tombstone commit but before response is recovered by the idempotent retry and
+existing tombstone. Every restart/restore reconciles every intake-continuity epoch and
+unresolved intake, then replays a pending `hidden` tombstone before safety reconciliation.
+Recovery of the application store, an empty application tombstone view, or a stale/late
+client response never closes an epoch or proves that no target exists.
 
 ## Account/device deletion or revocation and restored credential procedure
 
@@ -334,15 +413,17 @@ restored bearer or admin session is grandfathered.
 `CTRL-RESTORE-REPLAY` is a pre-traffic gate, not a background cleanup:
 
 1. Isolate the new/restored environment from viewer, ingest, worker, scheduled-job, and
-   callback traffic. Start every process with the local forced-off latch regardless of
-   any restored setting.
+   callback traffic. Create a new never-reused serving incarnation with no activation and
+   the local forced-off latch, regardless of any restored setting.
 2. Verify the integrity and freshness of the separate safety/deletion/revocation
    recovery copy, including the independently recorded global enabled bit, complete
-   canonical-room denylist, and every pending `hidden` tombstone. Missing, stale, rolled-
-   back, conflicting, or unverifiable state—or an unresolved deletion intake without a
-   verified tombstone—ends the procedure with the environment isolated and off and every
-   authentication and traffic class denied. An empty restored application store is not
-   proof that no pending target or safety decision exists.
+   canonical-room denylist, every `PREPARED` proposal and `COMMITTED` head, each intake-
+   continuity epoch, and every pending `hidden` tombstone. Missing, stale, rolled-back,
+   conflicting, or unverifiable state—an unmatched prior `open(E)`, stale/cross-epoch
+   close, or an unresolved deletion intake without a verified tombstone—ends the procedure
+   with the environment isolated and off and every authentication and traffic class
+   denied. An empty restored application store is not proof that no pending target or
+   safety decision exists.
 3. Purge or revoke every restored magic-link, worker-enrollment, session-verifier, and
    session row, irrespective of its backed-up expiry/use/revocation state. Advance or
    reconcile the recovery-protected monotonic auth-invalidation generation or non-
@@ -365,25 +446,30 @@ restored bearer or admin session is grandfathered.
    independently: global enable never clears a room entry and removal of one room never
    implies global enable. A generation change triggers re-evaluation only; its resulting
    global/room decisions determine cleanup. A stale restored generation cannot overwrite
-   the newer copy; any gap, binding mismatch, or integrity conflict leaves the environment
-   globally off and creates a payload-free alert.
+   the newer copy. A journal-only `PREPARED` relaxation is abandoned without activation;
+   an exact prepared tightening is replayed against the current complete head. Any head/
+   journal gap, binding mismatch, or integrity conflict leaves the environment globally
+   off and creates a payload-free alert.
 6. Verify provider-window inventory, audit integrity, source/platform/rights currency,
    incident remediation, applicable deletion results, and current owner approvals. Every
    failed, timed-out, response-lost, or otherwise ambiguous deletion intake must reconcile
    to its verified durable tombstone and replay result; neither an audit event nor an empty
-   application store closes it. Run the relevant tabletop using the restored environment
-   while it remains isolated.
+   application store closes it. Reconcile and clean-close every prior continuity epoch,
+   then commit/read back `open(E)` for the new incarnation before accepting deletion
+   ingress or attempting activation. Run the relevant tabletop using the restored
+   environment while it remains isolated.
 7. Only after all checks pass may a fresh, non-restored, separately audited admin
    recovery authentication request a global-enable or one-room denylist-removal transition
    under `CTRL-REENABLE-GATE`. Its credential and trust root cannot originate in the
    restored application backup; repository-owner governance grants no production
-   credential. The requested action's generation/journal/recovery-copy write and read-back
-   must succeed before its effect is recognized, and its pending-tightening fence/epoch
-   must still match in the atomic final check-and-effect. Global enable preserves every
-   denylist entry, and removing one entry neither enables globally nor starts that room.
-   Otherwise keep the environment offline/off and investigate. No authentication, viewer, worker,
-   callback, or ingest traffic is admitted without the separately verified global-enable
-   result and every other pre-traffic gate.
+   credential. The request must advance from `PREPARED` to the conditionally `COMMITTED`
+   recovery head and pass both read-backs. Only then may the same incarnation atomically
+   verify the exact head, tightening/intake fences, matching `open(E)`, and all remaining
+   gates while installing its non-restorable local activation/effect. Global enable
+   preserves every denylist entry, and removing one entry neither enables globally nor
+   starts that room. Otherwise keep the environment offline/off and investigate. No
+   authentication, viewer, worker, callback, or ingest traffic is admitted from a prior-
+   incarnation record, delayed response, durable bit alone, or missing local activation.
 
 Restoration tooling must not automatically swap traffic or credentials into the fork.
 A provider's ability to restore old data is exactly why current deletion/revocation
@@ -406,14 +492,20 @@ requires all of the following under `CTRL-REENABLE-GATE`:
   intake has reconciled to a committed/read-back tombstone; every restored stateful/
   stateless credential is server-rejected; restored identity/device authority cannot issue
   a new credential; and no partial purge or unknown provider window is being misreported;
+- every prior serving/intake-continuity epoch is cleanly closed or reconciled from exact
+  authoritative safety/intake replay; the current incarnation's `open(E)` is committed/
+  read back; no safety-pending transition exists; and
+  its local intake fence has no pending or tainted request. An unmatched epoch is never
+  cleared from an empty store, audit row, client disappearance, or owner waiver;
 - the safety journal, recovery copy, shared generation, independently evaluated global
   enabled bit, complete canonical-room denylist, and audit are current and mutually
   consistent; neither a recovered/empty application store nor a generation change alone
   proves that a relaxation is safe;
 - no pending/newer local tightening fence, cleanup failure/retry, ambiguous transition,
-  or late response from an in-flight relaxation exists; the relaxation rechecks its
-  captured fence/epoch immediately before commit, then atomically performs the final
-  fence/epoch check and local effect under the same logical transition authority;
+  or late response from an in-flight relaxation exists; the relaxation captures one exact
+  predecessor and never rebases, reaches `COMMITTED` by conditional recovery-head update
+  and matching read-backs, then the same incarnation atomically performs the final head/
+  fence/continuity check and non-restorable local effect;
 - the relevant tabletop has fresh successful evidence;
 - every applicable Critical/High residual risk has an individual owner decision with
   date, scope, compensating controls, review date, and disable owner; and
@@ -424,7 +516,9 @@ requires all of the following under `CTRL-REENABLE-GATE`:
 Any failed or missing item leaves the global state disabled. Neither the repository
 owner nor admin may waive a platform or rights-holder restriction. A successful global
 enable preserves every denylist entry; a successful removal preserves the global bit and
-all other entries and does not start the removed room.
+all other entries and does not start the removed room. Every process restart requires a
+fresh committed global-enable transition and current-incarnation activation even if the
+durable bit says enabled; reconciliation or an old/late response never substitutes.
 
 ## Payload-free audit contract
 
@@ -436,8 +530,8 @@ fields below are stable content requirements, not a schema:
 | Event identity/time | Random audit event reference; occurrence and recorded timestamps. |
 | Actor/control | Restricted pseudonymous actor reference, actor role, control ID, requested action, authorization result, and result code. |
 | Target | For a denylist action, an opaque reference bound to the exactly verified canonical room; for deletion, exactly one typed room/session selector kind and opaque target/export reference. Identity deletion/revocation records only an opaque checkpoint-manifest reference and count, never its account/device target ID, event body, email, public key, bearer, or user-facing content. |
-| Safety transition | Explicit action kind (global disable, global enable, denylist add, or denylist remove); prior and resulting shared generation; prior/result global bit; affected room's prior/result membership where applicable; proof the orthogonal dimension and non-target entries were preserved; stable reason code. |
-| Incident/deletion | Opaque incident/manifest reference, immutable original initiating-request time, provisional-containment result, durable intake/tombstone commit/read-back and acknowledgement result, deletion state when admitted, payload-free store counts, retry count, completion timestamp, and immutable `sla_breached` result where applicable. |
+| Safety transition | Explicit action kind; transition identity; `PREPARED`/`COMMITTED` outcome; prior/result generation and head digest; prior/result global bit; affected-room membership and preserved orthogonal/non-target state; serving incarnation plus captured/final fence result; non-restorable activation installed/denied/superseded/revoked result; stable reason code. |
+| Incident/deletion | Opaque incident/manifest reference, intake-continuity epoch and open/clean-close/pending/tainted result, immutable original initiating-request time, provisional-containment result, durable intake/tombstone commit/read-back and acknowledgement result, deletion state when admitted, payload-free store counts, retry count, completion timestamp, and immutable `sla_breached` result where applicable. |
 | Integrity | Key identifier/version, previous journal-link reference, and a keyed integrity digest of the canonical control or manifest record. |
 | Failure | Stable component/control error code, canonical-binding/freshness/write/read-back stage, escalation scope, and success/failure/denied/ambiguous result, never an upstream response body or protected value. |
 | Governance | Opaque owner-approval/risk-decision reference and review expiry where required. |
@@ -466,15 +560,16 @@ pending normalized publication exists.
 | --- | --- | --- |
 | 1 | An operator invokes global disable while the durable safety store is deliberately slow. | The local latch changes to off immediately; new starts, refreshes, reconnects, and assignments are denied; local admission/publication gates close; and every active/queued room receives its termination/revocation/clear/hide actions before the first journal/recovery-copy await. |
 | 2 | Hold the journal/recovery-copy operation pending and inspect the active room; repeat with an injected timeout/failure and a hypothetical future-owner fence-ack failure. | Without waiting for durable I/O, the single Alpha authority reaches every locally controlled result: the platform connection is locally closed, playback bytes/business events stop, the lease is revoked, late output is rejected, pending publication is hidden, and the locator plus all conforming audio buffers are cleared. A hung or failed write cannot pause cleanup or reactivate any resource. A separately failing cleanup action alerts, retries while off, and blocks relaxation; an unacknowledged future owner is isolated/terminated and keeps global off. |
-| 3 | Reset to a separately approved globally-off predecessor, begin a valid `global-enable(g→g+1)`, and in separate race subcases inject global disable immediately before and immediately after its atomic final check-and-effect. | If disable linearizes first, enable fails its atomic fence/epoch comparison and never reopens. If enable linearizes first, disable immediately latches off and starts all-room cleanup; in both orders the final state is off, no late response clears the latch, and reconciliation uses the newest complete snapshot. |
-| 4 | Let the first disable transition commit/read back; observe the failed subcase. | The committed action changes only the global bit, advances from its predecessor, and preserves the denylist. The failed subcase remains locally off with cleanup independently completed or retrying under alert, and permits no enable/remove until reconciliation. |
-| 5 | In separate attempts, crash after local latch/authority closure but before journal commit; after journal commit but before recovery-copy commit/read-back; and after both read back but before the caller receives a response. | Every restart begins default-off with old leases/output rejected. An exact committed disable is reused; a split/unknown result remains off and reconciles from the newest complete snapshot without dropping the denylist. Retry/late response never clears the latch or repeats an unsafe local effect. |
+| 3 | Reset to an approved globally-off predecessor, write a `PREPARED` global enable, conditionally commit/read back its recovery head, and inject global disable before and after both that durable CAS and the final current-incarnation activation CAS. | If disable commits first, enable's exact-predecessor CAS fails and is not rebased. If enable commits first but disable wins the local fence, committed enable never activates and disable reapplies to the newest head. If enable activates first, disable immediately revokes activation and cleans. Every order ends off; durable commit and local serving effect are not falsely described as atomic. |
+| 4 | Let the winning disable transition commit/read back; observe the losing or superseded enable and delay its response. | Disable changes only the global bit and preserves the denylist. The enable remains prepared-only or committed-but-not-activated; its late response cannot install activation. Cleanup completes/retries while every further relaxation waits for reconciliation. |
+| 5 | Separately crash after enable prepare; after enable recovery-head commit but before read-back/final activation; after disable's local latch but before its durable commit; after split journal/recovery writes; and after commit/activation but before either response. Also race `clean-close(E)` against global disable and `add(B)` in both orders, including failed tightening durability followed by process exit. | Every restart creates a new incarnation with no activation and rejects old leases/output. Prepared/split/unknown state remains off. An exact committed tightening is reused or replayed; a committed relaxation from the dead incarnation is durable history only and requires a fresh transition. If tightening is accepted first, close waits for its durable reconciliation; if close wins the atomic ingress fence, the action is rejected or bound to a new verified epoch. No late action, retry, or response crosses a closed epoch, clears a latch/block, or activates an old result. |
 | 6 | Attempt a platform reconnect and a worker frame from the revoked lease. | Both are denied under the current generation. No credentialed/alternate platform fallback or audio retry queue is created. |
 | 7 | Inspect audit content. | The explicit global-disable action, prior/result global bit, preserved denylist, generation, result, and integrity metadata exist; no content, secret, locator, transcript, or audio appears. |
 
 **Pass result:** Future disclosure and publication are stopped, recovery-copy failure
 cannot fail open, slow or unavailable durability cannot defer active cleanup, and the
-record does not claim that an untrusted worker erased RAM.
+record does not claim RAM/durable atomicity or that an untrusted worker erased RAM. A
+committed relaxation without current-incarnation activation never serves.
 
 ### Tabletop 1B: canonical-room denylist add without global side effects
 
@@ -488,8 +583,8 @@ but inactive. Neither room is denied. Capture both rooms' state and the current 
 | 2 | Reset the isolated case, make `A` active again, and add exactly resolved room `A`. | Before or concurrently with durability, `A` is provisionally blocked and only `A`'s platform session, lease, late output, locator/audio, and pending publication are stopped/cleared. Commit/read-back decides whether scoped success may be reported; `A` reconnect is denied and unrelated `B` remains otherwise unchanged. |
 | 3 | Inspect both transition audits and re-evaluate unaffected rooms. | Each audit proves the explicit action, canonical binding, prior/result global bit and target membership, preserved non-target state, generation, and integrity result. A generation change alone triggers re-evaluation, not cleanup or automatic start. |
 | 4 | Separately inject alias ambiguity, changed room binding, stale safety state, and journal/recovery-copy write or read-back failure. | No room-scoped success is reported. Each variant escalates to local global off, immediately issues all-room cleanup without another durability await, emits a payload-free failure-stage/escalation audit, and blocks every relaxation pending reconciliation. |
-| 5 | Race global disable and `add(B)` from the same predecessor in both commit orders; also lose the response after a verified `add(B)` and retry it. | At most one successor commits. If add wins, disable still latches/cleans globally and reconciles from the newer snapshot while preserving `B`; if disable wins, stale add cannot overwrite off or drop entries. Response-loss retry reuses the verified add rather than reopening `B`; unverifiable scope never reports room success and escalates globally. |
-| 6 | Globally disable, then perform a separately approved global-enable transition while `B` remains denied; in a separate global-off subcase, perform an approved `remove(B)`. Reset another subcase with `A` initially denied, then race a valid `remove(A)` and newer `add(A)` on both sides of their atomic final check-and-effect. | Global enable does not remove `B`. Removing `B` does not enable globally, alter another entry, or start `B`. If removal linearizes first, the following add blocks/cleans `A`; if add linearizes first, removal fails without reopening `A` or clearing its block. The two dimensions and tightening precedence remain intact. |
+| 5 | Race global disable and `add(B)` from the same predecessor in both durable-CAS orders; also lose the response after a verified `add(B)` and retry it. | At most one successor commits for that predecessor, but the losing tightening is not lost: it latches first, reloads the winner's complete snapshot, and commits its same safe action at the next generation. Response-loss retry reuses the verified add; unverifiable scope never reports room success and escalates globally. |
+| 6 | Globally disable, then commit/activate global enable while `B` remains denied; separately commit `remove(B)` while off. Reset with `A` denied and race `remove(A)` against `add(A)` before/after durable commit and local activation, including crash after remove commit but before add durability. | Global enable does not remove `B`; remove does not enable/start it. Add first prevents removal activation; removal first may commit/activate, but add immediately blocks and reapplies to the latest head. A crash discards activation and starts globally off, so the old removal cannot serve `A`; prepared add is reconciled, and no old response reopens it. Unrelated rooms retain their prior active state unless failure escalates globally. |
 
 **Pass result:** A successful `add(B)` leaves active unrelated `A` untouched, while a
 successful `add(A)` contains only `A`; both preserve the global bit. Uncertainty escalates
@@ -497,8 +592,9 @@ globally, and a generation change by itself causes re-evaluation rather than cle
 
 ### Tabletop 2: room-or-session takedown with one failed object deletion
 
-**Setup:** Run room and session subcases through a durable takedown/incident intake and a
-tombstone-capable independent recovery copy. Room `R` initially has sessions `S1`/`S2`,
+**Setup:** Commit/read back `open(E)` before deletion ingress, then run room and session
+subcases through a durable takedown/incident intake and a tombstone-capable independent
+recovery copy. Room `R` initially has sessions `S1`/`S2`,
 and a stale backup later reveals `S3`; another room is unrelated. The session subcase
 selects `S1` while `S2` shares room-level projections. Each selected scope has normalized
 rows, cache/index entries, an encrypted raw object, and a managed export. Inject primary
@@ -508,10 +604,10 @@ time beyond 24 hours before the raw-object retry succeeds.
 
 | Step | Action | Expected result |
 | --- | --- | --- |
-| 1 | An admin submits exactly one typed selector; separately test room/session plus none, both, ambiguous, unknown, and conflicting parent-hint/index inputs. | A verified room scope immediately provisionally contains `R`; verified session scope derives `S1`'s parent from the authoritative index and provisionally contains only `S1`. Neither is yet accepted/reportable `hidden`. Invalid scope starts no tombstone or purge; a known room is denied, otherwise global off/escalation applies. |
+| 1 | An admin submits exactly one typed selector; separately test room/session plus none, both, ambiguous, unknown, and conflicting parent-hint/index inputs while racing a global enable. | Intake first increments its fence, sets pending, revokes activation, and makes enable's final CAS fail; activation first is immediately revoked by intake. A verified room/session scope is provisionally contained exactly. Invalid scope starts no tombstone/purge and clears pending only after durable denial. |
 | 2 | With the primary application/safety store unavailable, assign the immutable original initiating-request time and atomically write/read back it with selector/idempotency in the durable intake; then commit/read back the typed `hidden` tombstone in the independent recovery copy. | The unresolved intake retains the same selector/idempotency/time triple across the admission barrier but is not a deletion state or purge authority. The tombstone must reuse that time. After tombstone read-back, and only then, the request is accepted, `hidden` is reportable, and purge may begin; the application-store outage keeps global off until later reconciliation. Audit/intake alone is not admission. |
-| 3 | In separate attempts, fail intake durability, fail/time out tombstone commit/read-back after durable intake, and crash before verified tombstone commit. Restart with an empty application tombstone view and attempt re-enable. | No success, reportable `hidden`, or destructive purge occurs. Failed intake durability requires the initiating source to retry the original triple; an already durable intake remains unresolved with that triple. Restart begins off, resubmits it without resetting the SLA clock, and rejects re-enable. Empty application state cannot prove that no target exists. |
-| 4 | Let recovery-copy commit succeed, lose its response, and crash before acknowledgement; retry the same intake after restart. | Retry discovers and verifies the same tombstone, manifest identity, selector, and original request time. It neither creates a duplicate nor loses/resets the target or SLA clock. |
+| 3 | In separate attempts, fail `open(E)` commit/read-back; after a verified open, fail exact-intake durability; fail/time out tombstone commit/read-back after durable intake; and crash before verified tombstone commit. Let the initiating client disappear, restart with an empty application view, and attempt re-enable. | A failed/ambiguous open never exposes deletion ingress. Later failures produce no success, reportable `hidden`, purge, or clean close. The live guard becomes tainted. After crash, unmatched `open(E)` remains recovery-visible even when the target record is absent, so the new incarnation stays off without relying on client retry. Exact authoritative replay must recover/admit the request; absent it, production remains off. |
+| 4 | Let recovery-copy tombstone commit succeed, lose its response, and crash before acknowledgement; retry the same intake after restart. Then quiesce ingress and race a late authenticated request against `clean-close(E)` in both orders, including close write/read-back failure. | Retry discovers and verifies the same tombstone, identity, selector, and original time. It neither duplicates/resets the target nor installs serving activation. If the request linearizes first, close waits for durable denial or verified tombstone reconciliation; if quiescence wins, the request is rejected or waits for a new verified epoch. Failed, stale, cross-epoch, or ambiguous close remains unmatched, and a new epoch opens before any later ingress/activation. |
 | 5 | Purge all enumerated active stores with the raw-object failure injected. | Room scope covers room metadata plus `S1`/`S2`; session scope covers only `S1` and recomputes shared projections without exposing `S1` or deleting/hiding `S2`. Successful stores stay purged; the failed store records only an error code/count; completion is forbidden. |
 | 6 | Retry the same manifest after the 24-hour deadline and verify all active stores. | The raw object is removed; the state becomes `active-purge-complete` with the original request time, a completion timestamp, and immutable `sla_breached=true`. |
 | 7 | Evaluate exports and backups while their declared windows remain open. | Managed access is revoked and the target stays replay-protected, but `final-retention-window-satisfied` is withheld and retained copies are reported truthfully. |
@@ -520,7 +616,9 @@ time beyond 24 hours before the raw-object retry succeeds.
 **Pass result:** Both typed selectors enforce their exact scope; provisional containment
 is immediate but the three-state machine admits only a committed/read-back `hidden`
 tombstone; failures, ambiguous responses, both crash windows, restart, restore, and early
-re-enable cannot lose a target or fail open. Invalid/composite inputs cause no guessed
+re-enable cannot fail open. An unmatched continuity epoch preserves an off-state blocker
+even when a pre-durable target cannot be recovered; it never invents a deletion state or
+relies on the client. Invalid/composite inputs cause no guessed
 deletion, room retries/restores discover all room sessions and dominate narrower child
 tombstones, session deletion preserves siblings/shared state, and partial/late deletion is
 truthful.
@@ -536,23 +634,24 @@ rows, a stateless token signed by the old key version, and the deleted subject's
 invites/device statistics. The separate recovery copy contains the newer forced-off
 global bit and complete denylist under one generation, a durable unresolved deletion
 intake plus pending `hidden` typed room/session tombstones with dominance, typed
-pseudonymous account/device checkpoints, and newer auth-invalidation generation/key
-version.
+pseudonymous account/device checkpoints, a prior unmatched intake-continuity epoch, and
+newer auth-invalidation generation/key version.
 
 | Step | Action | Expected result |
 | --- | --- | --- |
-| 1 | Boot the restore in isolation. | Startup ignores backed-up enablement and latches off before any viewer, ingest, worker, callback, or scheduled-job traffic. |
-| 2 | Verify and load the separate recovery copy. | The unresolved intake, pending `hidden` tombstones, identity/device checkpoints, orthogonal global-bit/complete-denylist snapshot, safety generation, and auth-invalidation generation/key version are recognized. Missing/tampered/conflicting-copy or empty-application-store-as-proof variants stop here and remain off. |
+| 1 | Boot the restore in isolation. | Startup creates a new never-reused incarnation without activation, ignores backed-up enablement, and stays off before any viewer, ingest, worker, callback, or scheduled-job traffic. |
+| 2 | Verify and load the separate recovery copy. | Prepared/committed transition state, the unmatched continuity epoch, unresolved intake, pending tombstones, identity/device checkpoints, orthogonal snapshot, and auth state are recognized. A prior committed enable is not activated; missing/tampered/conflicting-copy or empty-store-as-proof variants remain off. |
 | 3 | Purge/revoke restored verifier/session rows, reconcile the protected auth generation/key version, and probe old links/cookies/stateless tokens. | Every stateful/stateless pre-restore credential is server-rejected regardless of backed-up expiry/use state; old verification key material cannot become current; fresh authentication and enrollment are required. |
 | 4 | Reconcile the unresolved intake to a commit/read-back-verified tombstone; replay typed room/session and account/device checkpoints; then verify exact scope and issuance denial. | No purge precedes admission. Room replay purges every restored child; session replay removes only its target and preserves the sibling; room dominance holds. Scoped account authority is purged/revoked and cannot authenticate or receive a new credential before safety reconciliation. |
-| 5 | Reconcile the shared safety generation, global enabled bit, and complete denylist. | The stale backed-up generation/global bit/denylist cannot overwrite the current copy. Global enable cannot clear a room entry, exact-room removal cannot enable globally, and generation change alone only re-evaluates. Gaps, binding conflicts, or mismatches remain globally off and produce a payload-free alert. |
-| 6 | Attempt `CTRL-REENABLE-GATE` before intake/tombstone reconciliation, then evaluate it after reconciliation using a fresh, non-restored, separately audited admin recovery authentication. | The early attempt is denied even if the application store is healthy/empty. Restored admin sessions remain invalid. Traffic stays blocked until durable intake/tombstone replay, remediation, current rights/policy, audit, tabletop, provider-window, and owner approvals pass and the fresh recovery admin records the exact durable global-enable transition without clearing the denylist. |
+| 5 | Reconcile prepared/committed safety state, shared generation, global bit, complete denylist, and every continuity epoch. | Stale backup state cannot overwrite the current head. Prepared relaxation never serves; prepared tightening replays. Global enable cannot clear a room entry, removal cannot enable globally, and generation alone creates no activation. Any unmatched/unreconciled epoch, gap, binding conflict, or mismatch remains off. |
+| 6 | Attempt `CTRL-REENABLE-GATE` before continuity/intake/tombstone reconciliation, then evaluate it after exact replay using a fresh, non-restored, audited recovery admin. | The early attempt is denied even if the application store is healthy/empty. After all gates, the new incarnation commits/read-backs `open(E)`, advances a fresh exact-head global enable from prepared to committed, and separately passes final local activation without clearing the denylist. Old commits/responses and restored admin sessions never activate traffic. |
 
 **Pass result:** Stateful/stateless pre-restore credentials remain server-rejected,
 unresolved intake and pending `hidden` tombstones reconcile/replay before orthogonal
-safety-state reconciliation, and every step precedes traffic. Neither empty application
-state, an old enabled value/denylist, a restored admin session, nor deleted identity/device
-authority becomes current.
+safety-state reconciliation, every prior continuity epoch reconciles, and every step
+precedes traffic. Neither empty application state, an old enabled value/denylist or
+committed relaxation, a restored admin session, nor deleted identity/device authority
+becomes current-incarnation serving authority.
 
 ### Tabletop 4: authenticated worker capable of retaining PCM
 
@@ -580,11 +679,16 @@ also requires the repository owner's final ADR approval and an individual decisi
 every accepted Critical/High residual risk; a blanket approval is invalid.
 
 For the new failure boundaries, Issue #7 owns global-versus-room transition scope,
-canonical binding, cleanup, and noninterference; Issue #11 owns immediate provisional
-visibility containment; Issue #16 owns recovery-boundary intake/tombstone commit and
-read-back, idempotency, purge, and fault injection; Issue #17 owns admin request/
-acknowledgement, unresolved-intake retry, status, and relaxation blocking; and Issues
-#4/#19 own crash/restart/restore and pre-traffic replay drills. Their evidence must cover
-intake-write failure, tombstone commit/read-back failure, both crash windows, lost
-response, empty application state, room-add ambiguity/staleness/write failure, and early
-re-enable without defining Issue #2 runtime schema or wire fields.
+canonical binding, exact-predecessor relaxation, tightening reapplication, local
+current-incarnation activation/revocation, cleanup, and noninterference; Issue #11 owns
+immediate provisional visibility containment; Issue #16 owns prepared journal records,
+conditional committed recovery-head updates, append-only open/clean-close intake-
+continuity evidence, recovery-boundary intake/tombstone commit/read-back, idempotency,
+purge, and fault injection; Issue #17 owns admin request/acknowledgement, durable denial,
+unresolved-intake replay/status, late-response non-authority, and relaxation blocking;
+and Issues #4/#19 own new-incarnation default-off, clean shutdown, crash/restart/restore,
+and pre-traffic replay drills. Their evidence must cover intake-write failure with client
+loss, unmatched/stale/cross-epoch close, tombstone failure, prepare/commit/read-back split,
+crash before and after local activation, old/late responses, empty application state,
+room-add ambiguity/staleness/write failure, both enable/disable and remove/add orders, and
+early re-enable without defining Issue #2 runtime schema or wire fields.

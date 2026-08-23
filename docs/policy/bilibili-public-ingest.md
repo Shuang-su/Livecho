@@ -122,9 +122,18 @@ Every global forced-off path closes local authority gates and issues cleanup for
 active/queued rooms before any safety-journal or recovery-copy await; slow, hung, or
 failed durability cannot extend playback, business-event intake, worker disclosure, or
 pending publication.
-A delayed global-enable or room-removal response cannot clear a newer local global/room
-block: the final fence check and relaxation effect are atomic, and tightening wins in the
-opposite linearization order by immediately closing the path again.
+A global-enable or room-removal transition in durable `PREPARED` phase is only a proposal;
+even a matching `COMMITTED` journal/recovery-head result is durable history, not serving
+authority. Each boot starts without activation and globally off. Only a non-restorable
+current-incarnation activation may apply the exact committed head, after its final local
+compare-and-set proves the same incarnation, unchanged tightening and deletion-intake
+guards, a matching intake-continuity `open(E)`, and no pending intake, taint, or cleanup.
+A delayed proposal, commit, response, or prior-incarnation activation cannot clear a
+newer local global/room block. Global disable revokes current global activation before its
+durability work; `add(R)` instead installs/revokes only `R`'s scoped block/removal effect
+and leaves unrelated active rooms under the existing global activation. If a new intake
+or applicable tightening linearizes before final activation/effect, the relaxation fails
+without opening that path.
 Runtime enforcement belongs to Issue #7; until it exists and is verified, all real
 acquisition stays off.
 
@@ -191,25 +200,42 @@ audio, locators, and pending/public output. On verified room scope, the operator
 denies the room and stops all its active paths. On ambiguous scope, deny the known room or
 remain globally off as defined above. The report remains an unresolved takedown intake
 until its exact selector has a verified durable deletion record; a payload-free audit
-entry alone is not that record. An admin may start idempotent deletion only after exact
-scope resolution, with exactly one typed selector: canonical `room_id` for room metadata
-and all current/historical/pending/late/restored sessions, or immutable `session_id` for
-only the session resolved through the backend's authoritative parent-room index. The
-caller does not have to provide—and cannot override—the session's parent room. None,
-both, conflicting, missing, non-unique, or ambiguous targets start no destructive purge.
+entry alone is not that record. Before accepting any report, the sole current serving
+authority must commit and read back a target-free intake-continuity `open(E)` in the
+independent recovery boundary. If it cannot, the intake endpoint remains closed and the
+system globally off. An admin may start idempotent deletion only after exact scope
+resolution, with exactly one typed selector: canonical `room_id` for room metadata and all
+current/historical/pending/late/restored sessions, or immutable `session_id` for only the
+session resolved through the backend's authoritative parent-room index. The caller does
+not have to provide—and cannot override—the session's parent room. None, both,
+conflicting, missing, non-unique, or ambiguous targets start no destructive purge.
 
 For a valid selector, immediate local containment precedes a commit/read-back barrier:
 the typed payload-free `hidden` tombstone must be durably admitted to the independent
 recovery boundary before Livecho acknowledges the deletion request, reports `hidden` as
 an accepted state, or begins destructive purge. A timeout, lost response, or unavailable
-or uncertain commit keeps the takedown intake open, returns no success, and preserves the
-safe room/global block until the same selector is retried idempotently and read back.
-Neither a process restart, a recovered but empty application store, nor an audit record
-closes that intake or permits re-enable. An operator escalates the safely blocked scope
-to an admin and cannot declare or initiate deletion. Room tombstones dominate child-
-session manifests; session deletion preserves siblings/shared room state. Partial
-deletion remains hidden and denied. Recovery may not serve traffic until typed exact-
-scope deletion manifests, every unresolved intake, and current safety state reconcile
+or uncertain commit keeps the takedown intake open, returns no success, taints the current-
+incarnation intake guard, forbids a clean epoch close, and preserves the safe room/global
+block. The initiating source may retry the same selector, idempotency identity, and
+original time, but Livecho does not depend on that source remaining available. A clean
+`clean-close(E)` is permitted only after one atomic authority fence quiesces serving,
+safety-control, and deletion ingress; every accepted safety-control handler drains and its
+outcome is durably reconciled; late reports are rejected; deletion handlers drain; and
+every valid report maps to its
+verified tombstone with no safety/intake pending or taint. A safety/deletion action that
+linearizes first blocks close until reconciliation; one that arrives after close must be
+rejected or bound to a new verified epoch.
+If the source disappears or the process crashes before target-specific
+durability, unmatched `open(E)` survives restart and blocks all traffic and relaxation;
+because it contains no target, it authorizes no guessed purge. Without exact authoritative
+replay the system remains off indefinitely. Neither a process restart, a recovered but
+empty application store, an audit record, a durable relaxation proposal/commit, nor a
+prior-incarnation activation closes that epoch or permits re-enable. An operator escalates
+the safely blocked scope to an admin and cannot declare or initiate deletion. Room
+tombstones dominate child-session manifests; session deletion preserves siblings/shared
+room state. Partial deletion remains hidden and denied. Recovery may not serve traffic
+until every continuity epoch and exact-scope deletion manifest, every unresolved intake,
+the exact committed safety head, and a fresh current-incarnation activation reconcile
 successfully.
 
 ## Review and enablement record
@@ -225,12 +251,17 @@ Production may be considered only when one signed record proves all of the follo
 - `BILI-ACQ-001` and every required `BILI-RIGHT-*` row is complete;
 - the room, rights holder, platform/channel, Livecho takedown, and disable contacts are
   reachable and tested without disclosing sensitive data;
-- Issues #7 and #16 provide the runtime and persistence controls required by the chosen
-  scope, and the incident/deletion tabletops pass;
+- Issues #7, #16, and #17 provide the runtime, persistence, two-phase relaxation,
+  current-incarnation activation, and intake-continuity controls required by the chosen
+  scope, and the incident/deletion tabletops pass, including first-intake-write failure,
+  source loss, crash/restart, unmatched epoch, and late relaxation cases;
 - every Critical/High residual has a separate, scoped owner decision; and
 - `@Shuang-su` records a dated production-enable approval whose review date has not
   expired.
 
-An admin may technically enable only after those governance prerequisites pass. Any
-missing item, including written permission required by an applicable term, leaves
-`BILI-DEC-001` at **production OFF**.
+An admin may technically prepare and commit an enable transition only after those
+governance prerequisites pass. Serving remains off until the same incarnation freshly
+commits that exact-head transition and installs its non-restorable activation under
+unchanged tightening/intake guards, all prior continuity epochs reconciled, and its
+current verified `open(E)`. Any missing item, including written permission required by an
+applicable term, leaves `BILI-DEC-001` at **production OFF**.

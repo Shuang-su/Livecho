@@ -21,13 +21,13 @@
 
 | Command | Result | Date/commit |
 | --- | --- | --- |
-| `make bootstrap` | Passed; uv checked 10 packages and pnpm 11.21.0 reported the frozen workspace already up to date. | 2026-08-24 / final staged tree after r3839563695 and r3839566055 |
-| `make verify` | Passed; Ruff check/format, workspace lint, mypy, typecheck, 40 pytest tests, pnpm tests, change-artifact gate, and build all succeeded. | 2026-08-24 / final staged tree after r3839563695 and r3839566055 |
-| `git diff --check && git diff --cached --check` | Passed with no whitespace errors on the final staged tree. | 2026-08-24 / final staged tree after r3839563695 and r3839566055 |
-| `git diff --quiet origin/main -- docs/changes/2-architecture-risk-boundaries/intent.md docs/changes/2-architecture-risk-boundaries/spec.md docs/changes/2-architecture-risk-boundaries/plan.md` | Passed; the owner-merged intent/spec/plan are unchanged from `origin/main` (`a44fc1f`). | 2026-08-24 / final staged tree after r3839563695 and r3839566055 |
-| Mermaid CLI render command below | Passed with `@mermaid-js/mermaid-cli` 11.12.0 and system Google Chrome; one 94,811-byte SVG was produced. | 2026-08-24 / final staged tree after r3839563695 and r3839566055 |
-| GitHub Markdown API table-render command below | Passed; 35 delimiter tables rendered as 35 GitHub HTML tables; raw and rendered row-width mismatches: 0. | 2026-08-24 / final staged tree after r3839563695 and r3839566055 |
-| Local-link and stable-ID audit command below | Passed; links 18/18; CTRL 50 rows/30 unique/16 shared with 0 shared later-Issue owner-set mismatches and 0 undefined; DATA 12 with 0 undefined; FLOW-ALLOW-001–020 and FLOW-DENY-001–018 exact; the 13 High threat rows exactly match 13 decision rows, all `NOT ACCEPTED`; Critical rows: 0. | 2026-08-24 / final staged tree after r3839563695 and r3839566055 |
+| `make bootstrap` | Passed; uv checked 10 packages and pnpm 11.21.0 reported the frozen workspace already up to date. | 2026-08-24 / final staged tree after r3839611978 and r3839614028 |
+| `make verify` | Passed; Ruff check/format, workspace lint, mypy, typecheck, 40 pytest tests, pnpm tests, change-artifact gate, and build all succeeded. | 2026-08-24 / final staged tree after r3839611978 and r3839614028 |
+| `git diff --check && git diff --cached --check` | Passed with no whitespace errors on the final staged tree. | 2026-08-24 / final staged tree after r3839611978 and r3839614028 |
+| `git diff --quiet origin/main -- docs/changes/2-architecture-risk-boundaries/intent.md docs/changes/2-architecture-risk-boundaries/spec.md docs/changes/2-architecture-risk-boundaries/plan.md` | Passed; the owner-merged intent/spec/plan are unchanged from `origin/main` (`a44fc1f`). | 2026-08-24 / final staged tree after r3839611978 and r3839614028 |
+| Mermaid CLI render command below | Passed with `@mermaid-js/mermaid-cli` 11.12.0 and system Google Chrome; one 94,811-byte SVG was produced. | 2026-08-24 / final staged tree after r3839611978 and r3839614028 |
+| GitHub Markdown API table-render command below | Passed; 35 delimiter tables rendered as 35 GitHub HTML tables; raw and rendered row-width mismatches: 0. | 2026-08-24 / final staged tree after r3839611978 and r3839614028 |
+| Local-link and stable-ID audit command below | Passed; links 18/18; CTRL 50 rows/30 unique/16 shared with 0 shared later-Issue owner-set mismatches and 0 undefined; DATA 12 with 0 undefined; FLOW-ALLOW-001–020 and FLOW-DENY-001–018 exact; the 13 High threat rows exactly match 13 decision rows, all `NOT ACCEPTED`; Critical rows: 0. | 2026-08-24 / final staged tree after r3839611978 and r3839614028 |
 
 The isolated Mermaid render used no repository dependency or output path:
 
@@ -271,51 +271,69 @@ update; it adds no runtime or deployment resource.
   starts no guessed purge, and room tombstones dominate child manifests. Immediate
   containment is provisional: the existing `hidden` tombstone must commit/read back from
   the independent recovery boundary before acknowledgement, reportable state, or purge;
-  durable intake atomically retains selector, idempotency, and immutable original
-  initiating-request time for tombstone reuse, so unresolved intake, empty application
-  state, crashes, and response loss cannot bypass restore/re-enable or reset the SLA
-  clock. The exact audio ceilings, no-retry-queue rule, three truthful deletion
+  a commit/read-back-verified `open(E)` intake-continuity epoch exists before deletion
+  ingress opens. Durable intake atomically retains selector, idempotency, and immutable
+  original initiating-request time for tombstone reuse. A first target-write failure,
+  source disappearance, and backend crash leave the target-free epoch unmatched, so an
+  empty application store cannot bypass restore/re-enable even when the exact target is
+  unavailable; the epoch authorizes no guessed purge or fourth state. The exact audio
+  ceilings, no-retry-queue rule, three truthful deletion
   states, immutable late-SLA result, provider-window boundary, checkpoint durability, and
   forced-off restore order are explicit. This is not runtime enforcement evidence.
 - **Tabletop 1A — active-room global disable: Passed on paper.** The runbook immediately
   latches off, closes admission/publication/lease/output authority, and issues every
   active/queued-room termination, revocation, clear, and hide action before the first
   journal/recovery-copy await. Slow, hung, failed, or split durability cannot postpone
-  locally controlled cleanup. The pending-tightening fence and atomic final relaxation
-  check/effect prevent a late enable from reopening either race order; pre-/mid-/post-
-  commit crashes and response loss restart default-off and reconcile without losing the
-  complete denylist. Alpha has one active serving authority; a future unacknowledged owner
-  is isolated/terminated and keeps the deployment off.
+  locally controlled cleanup. A relaxation is first a non-effective `PREPARED` proposal;
+  conditional recovery-head promotion makes it `COMMITTED`, but only a non-restorable
+  activation installed by that same live incarnation can serve. Global disable revokes
+  global activation before durability, while `add(R)` blocks only `R` and preserves
+  unrelated-room activation. Both mark the continuity epoch safety-pending until their
+  tightening is durably reconciled. Tabletop races `clean-close(E)` against global disable
+  and room add in both orders, including durability failure plus exit. The atomic serving/
+  safety/deletion-ingress close fence forces a late tightening to reconcile before close
+  or be rejected/bound to a new verified epoch. Prepare/promotion/final-activation races,
+  crashes, and late responses never let a dead incarnation reopen. Alpha has one active
+  serving authority; a future unacknowledged owner is isolated/terminated and keeps the
+  deployment off.
 - **Tabletop 1B — room-scoped denylist: Passed on paper.** With room `A` active, a
   committed `add(B)` denies unrelated room `B` without touching `A`'s session, lease,
   audio/locator RAM, or publication; `add(A)` begins target cleanup before durability.
   Canonical/binding, predecessor-generation, journal, or recovery-copy uncertainty
   escalates to global off and starts all-room cleanup without another durability wait.
-  Disable/add same-predecessor races, add response loss, and add/remove both
-  linearization orders preserve the newest complete snapshot and never reopen a newer
-  block. Global enable preserves the complete denylist, room removal never enables
-  globally, and generation change alone only triggers re-evaluation.
+  Disable/add same-predecessor races reapply a losing tightening to the newest complete
+  head; add response loss and add/remove races before/after durable promotion and local
+  activation never reopen a newer block. Global enable preserves the complete denylist,
+  room removal never enables globally, and generation change alone creates no activation.
 - **Tabletop 2 — typed room/session partial and late deletion: Passed on paper.** Separate
   room and session subcases prove exactly-one selector validation; unknown/conflicting/
   composite rejection without guessed purge; room-wide discovery of initial and stale-
   restored sessions; session-only sibling/shared-state preservation; room-over-session
   tombstone dominance; and shared-projection recomputation. Primary-store outage,
-  intake/tombstone commit/read-back failure, pre-commit crash, post-commit response loss,
-  restart, and empty-store variants return no false success or purge. Durable intake and
-  the tombstone reuse the same selector/idempotency/original-time triple. A failed raw-
+  continuity-epoch open/close failure and close-versus-late-request races, first target-
+  write failure followed by source loss and backend crash, tombstone commit/read-back
+  failure, post-commit response loss, restart, and empty-store variants return no false
+  success or purge. An unmatched epoch
+  blocks every traffic class and relaxation indefinitely unless authoritative replay
+  recovers the original request; it does not name a target or reset the clock. Durable
+  intake and the tombstone reuse the same selector/idempotency/original-time triple. A failed raw-
   object deletion cannot report active
   completion, retry is idempotent, late success records `sla_breached=true`, and final
   state waits for every window and restore check.
 - **Tabletop 3 — stale restore: Passed on paper.** The environment starts isolated and
-  forced off; purges restored verifier/session rows; advances or reconciles a recovery-
+  forced off with a new incarnation and no activation; rejects prepared/split relaxation
+  and a prior incarnation's committed enable/late response; quarantines unmatched
+  continuity epochs; purges restored verifier/session rows; advances or reconciles a recovery-
   protected auth-invalidation generation/key version; rejects stateful/stateless pre-
   restore credentials; reconciles every unresolved intake to a verified pending `hidden`
   tombstone; replays typed room-all-child/exact-session manifests with room dominance plus
   typed account/device checkpoints; rejects empty application state as proof of no target;
   and proves deleted authority cannot receive new credentials before orthogonal global/
   denylist safety reconciliation.
-  Restored admin sessions stay invalid, and only a fresh non-restored separately audited
-  recovery-admin authentication may request re-enable after all other gates pass.
+  Restored admin sessions stay invalid. Only after authoritative continuity replay and all
+  other gates may a fresh non-restored separately audited recovery-admin authentication
+  prepare/commit an exact-head transition whose current incarnation separately installs
+  activation.
 - **Tabletop 4 — malicious authenticated worker: Passed on paper.** Authentication is
   never treated as trusted execution or proof of RAM erasure. Missing third-party rights
   or an individual `RISK-WORKER-AUDIO-RETENTION` decision keeps real PCM off and synthetic
@@ -449,9 +467,36 @@ write fails, the initiating source retains/retries that same triple; once durabl
 pre-tombstone crash, tombstone admission, response-loss retry, and restore reuses the
 unchanged time. Missing or mismatched time fails admission and cannot mint a later clock.
 
-Final independent semantic and mechanical re-reviews found no remaining P1/P2 after this
-fix. Fresh verification passed with 40 pytest tests. The final worktree has 30 stable
-controls, 12 data classes, 13 individually unaccepted High rows, continuous
+Independent semantic and mechanical re-reviews found no remaining P1/P2 in `af5aecd`, and
+fresh verification passed with 40 pytest tests. The delayed remote review of that head
+then found two additional valid blockers:
+
+- P1: [a failed first deletion-intake write still relied on the initiating source to
+  survive and retry](https://github.com/Shuang-su/Livecho/pull/22#discussion_r3839611978).
+  If that source and backend both disappeared, recovery had no durable fact that a request
+  might be missing. The resolution pre-arms each serving incarnation with an append-only,
+  commit/read-back-verified `open(E)` intake-continuity epoch before deletion ingress or
+  activation. A failed exact intake taints the incarnation and forbids `clean-close(E)`;
+  after a crash the unmatched target-free epoch quarantines every traffic class and
+  relaxation even with an empty application store. It cannot report `hidden`, start
+  purge, or guess a selector, and without exact authoritative replay the deployment stays
+  off indefinitely. The initiating source may aid replay but is no longer the safety
+  authority.
+- High/P1: [a durable global-enable candidate could outlive a failed final fence and
+  reopen after crash](https://github.com/Shuang-su/Livecho/pull/22#discussion_r3839614028).
+  The resolution makes a predecessor-bound `PREPARED` proposal non-current and uses a
+  conditional recovery-head promotion as the `COMMITTED` durable linearization point.
+  Even a committed enabled snapshot cannot serve: the same live incarnation must pass a
+  separate final fence/continuity check and install a non-restorable activation. Every
+  restart has a new incarnation and no activation; old commits, capabilities, and delayed
+  responses cannot reopen. Global disable first revokes global activation; room add keeps
+  unrelated activation and changes only its room block. If either loses a durable
+  predecessor race, it reapplies its safe action to the newest complete head; relaxation
+  never automatically rebases.
+
+Final independent deletion-continuity, safety-race, and mechanical re-reviews found no
+remaining P1/P2. Fresh verification passed with 40 pytest tests. The final staged tree has
+30 stable controls, 12 data classes, 13 individually unaccepted High rows, continuous
 `FLOW-ALLOW-001`–`020` and `FLOW-DENY-001`–`018`, no shared-control owner mismatch, 35/35
 GitHub-rendered GFM tables, 18/18 local links, and a successful Mermaid 11.12.0 render.
 
