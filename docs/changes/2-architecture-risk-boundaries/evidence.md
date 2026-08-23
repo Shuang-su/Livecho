@@ -43,6 +43,13 @@ remaining P1/P2; the lifecycle reviewer also confirmed the exact 30-second media
 960,000-byte canonical PCM limit, fixed process cap, single active Alpha lease, and no
 audio retry queue are mutually consistent and testable.
 
+A separate cold final review then found two P2s: the documentation-only acceptance text
+claimed runtime audio enforcement, and deletion completion had no truthful state after a
+late successful retry. The specification now assigns executable audio enforcement to
+Issues #3/#8/#14/#15, and separates active-purge completion from its 24-hour SLA while
+retaining an immutable breach result. Both fixes preserve the fail-closed production
+gates without claiming implementation in this artifact or its documentation follow-up.
+
 ## Deviations
 
 None.

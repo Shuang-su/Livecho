@@ -178,15 +178,17 @@ Deletion is keyed by canonical `room_id` and immutable `session_id`, is idempote
 cascades through normalized rows, indexes, caches, manifests, raw objects/versions, and
 managed exports. It exposes three distinct states: `hidden` immediately blocks public
 visibility and ingest; `active-purge-complete` means every enumerated active store was
-purged within 24 hours; `final-retention-window-satisfied` is permitted only after
-managed export expiry and every enumerated provider-declared backup/object-version
-window has expired or the provider supplies verifiable purge evidence. This state proves
-the documented control/contract boundary, not physical media erasure. A replay-protected
-but still retained backup is reported as such, never as final satisfaction. Any
-unknown/untracked plaintext copy prevents the final state. Backups may remain immutable
-only while inaccessible to application traffic and every restore replays current
-tombstones before opening. Audit counts/keyed manifest digests and failures never contain
-or hash raw/identity/transcript content.
+purged, with a completion timestamp; and `final-retention-window-satisfied` requires
+`active-purge-complete`, managed export expiry, and expiration of every enumerated
+provider-declared backup/object-version window or verifiable provider purge evidence.
+Active purge has a 24-hour SLA, but a late successful retry still transitions to
+`active-purge-complete` with an immutable `sla_breached=true` incident/audit result. This
+final state proves the documented control/contract boundary, not physical media erasure.
+A replay-protected but still retained backup is reported as such, never as final
+satisfaction. Any unknown/untracked plaintext copy prevents the final state. Backups may
+remain immutable only while inaccessible to application traffic and every restore
+replays current tombstones before opening. Audit counts/keyed manifest digests and
+failures never contain or hash raw/identity/transcript content.
 
 ### Threat model and clean-room controls
 
@@ -237,11 +239,11 @@ itself copies none. Model weights and datasets require separate license approval
 - [ ] The lifecycle matrix covers every data class, location, access, retention/deletion
   bounds and triggers, three deletion states, audit content, export/backup behavior, and
   production prerequisite.
-- [ ] Every audio representation enforces a 30-second media-time window, every backend
-  session/worker lease enforces the 960,000-byte canonical-PCM ceiling, each process
-  enforces the fixed audio-memory/concurrency cap, and every persistent/logging/crash
-  path is prohibited; malicious-worker retention is gated and playback credentials
-  remain backend-only.
+- [ ] The approved documents define the 30-second media-time window, 960,000-byte
+  canonical-PCM session/lease ceiling, fixed process/concurrency cap, prohibited
+  persistent/logging/crash paths, malicious-worker gate, and backend-only playback
+  credentials; they assign executable enforcement evidence to Issues #3, #8, #14, and
+  #15 without claiming runtime enforcement in this documentation-only Issue.
 - [ ] A room/session takedown tabletop proves immediate visibility/ingest blocking,
   idempotent active-store purge, partial-failure handling, and deletion replay before
   restored traffic.

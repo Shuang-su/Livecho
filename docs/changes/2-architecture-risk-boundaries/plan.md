@@ -18,9 +18,9 @@
 4. Write `docs/security/data-lifecycle-and-deletion.md` with the normative data-class
    matrix, media-time and per-session/lease/process audio ceilings, zero-persistence
    paths, source-specific retention gates, account/bearer/device/audit/export bounds,
-   three deletion states without physical-erasure claims, 24-hour active-store SLA,
-   backup evidence, tombstones, and restore replay gate. Trace future enforcement to
-   Issues #8, #10, #12, #13, and #16.
+   three deletion states without physical-erasure claims, late-completion SLA-breach
+   semantics, backup evidence, tombstones, and restore replay gate. Trace executable
+   enforcement to Issues #3, #8, #10, #12, #13, #14, #15, and #16.
 5. Write `docs/policy/bilibili-public-ingest.md` with canonical room selection,
    eligibility/denial rules, acquisition channel/terms applicability, written permission
    evidence where required, worker-processing and output-use rights, 90-day/change
@@ -56,7 +56,8 @@
 - Tabletop 1: operator global-disable during an active room revokes the lease, clears
   transient audio/locator state, blocks reconnect, and records a payload-free audit.
 - Tabletop 2: room takedown with one failed object deletion remains hidden/denied,
-  retries idempotently, and cannot report completion.
+  retries idempotently, cannot report active completion while the object remains, and
+  records an immutable SLA breach if eventual completion exceeds 24 hours.
 - Tabletop 3: backup restore replays the latest deletion manifest successfully before
   reconciling the current safety generation/denylist; the environment stays forced off
   until both replays succeed and no viewer or ingest traffic is accepted.
