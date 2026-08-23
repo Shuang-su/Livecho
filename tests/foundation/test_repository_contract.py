@@ -80,7 +80,7 @@ def test_implementation_requires_artifacts_in_the_base(monkeypatch: pytest.Monke
     ]
 
 
-def test_implementation_accepts_complete_base_artifacts(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_implementation_requires_complete_base_artifacts(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("LIVECHO_HEAD_REF", "issue/2-architecture")
     monkeypatch.setattr(check_change_artifacts, "_base_ref", lambda branch: "base-sha")
     monkeypatch.setattr(
@@ -93,18 +93,25 @@ def test_implementation_accepts_complete_base_artifacts(monkeypatch: pytest.Monk
     monkeypatch.setattr(
         check_change_artifacts, "_accepted_artifact_rewrite_errors", lambda base, paths: []
     )
+    base_artifacts = [
+        "docs/changes/2-architecture/intent.md",
+        "docs/changes/2-architecture/spec.md",
+        "docs/changes/2-architecture/plan.md",
+        "docs/changes/2-architecture/evidence.md",
+    ]
     monkeypatch.setattr(
         check_change_artifacts,
         "_base_artifact_paths",
-        lambda base, issue: [
-            "docs/changes/2-architecture/intent.md",
-            "docs/changes/2-architecture/spec.md",
-            "docs/changes/2-architecture/plan.md",
-            "docs/changes/2-architecture/evidence.md",
-        ],
+        lambda base, issue: base_artifacts,
     )
 
     assert check_change_artifacts.lifecycle_errors() == []
+
+    base_artifacts.remove("docs/changes/2-architecture/evidence.md")
+    assert check_change_artifacts.lifecycle_errors() == [
+        "base artifact docs/changes/2-architecture is not accepted for implementation; "
+        "missing: evidence.md"
+    ]
 
 
 def test_issue_one_exception_closes_after_bootstrap(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -139,6 +146,190 @@ def test_resulting_tree_requires_current_issue_artifacts(tmp_path: Path) -> None
     assert check_change_artifacts._current_issue_artifact_errors(2, tmp_path) == [
         "change for Issue 2 requires exactly one complete artifact directory in the resulting tree"
     ]
+
+
+def test_required_artifact_names_are_case_sensitive(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(check_change_artifacts, "REPOSITORY_ROOT", tmp_path)
+    changes_root = tmp_path / "docs" / "changes"
+    change = changes_root / "2-architecture"
+    change.mkdir(parents=True)
+    for filename in REQUIRED_FILES:
+        actual_name = "Intent.md" if filename == "intent.md" else filename
+        (change / actual_name).write_text("artifact\n", encoding="utf-8")
+
+    assert check_change_artifacts.artifact_content_errors(changes_root) == [
+        "missing artifact: docs/changes/2-architecture/intent.md"
+    ]
+
+
+def test_change_artifact_root_names_are_case_sensitive(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    cases = [
+        (("Docs", "changes"), "docs"),
+        (("docs", "Changes"), "docs/changes"),
+    ]
+    for index, (actual_parts, expected_component) in enumerate(cases):
+        repository_root = tmp_path / str(index)
+        repository_root.joinpath(*actual_parts).mkdir(parents=True)
+        monkeypatch.setattr(check_change_artifacts, "REPOSITORY_ROOT", repository_root)
+
+        assert check_change_artifacts.artifact_content_errors(
+            repository_root / "docs" / "changes"
+        ) == [f"change artifact root component must use exact case: {expected_component}"]
+
+
+def test_change_artifact_files_cannot_be_symlinks(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(check_change_artifacts, "REPOSITORY_ROOT", tmp_path)
+    changes_root = tmp_path / "docs" / "changes"
+    change = changes_root / "2-architecture"
+    change.mkdir(parents=True)
+    (tmp_path / "README.md").write_text("not an accepted change artifact\n", encoding="utf-8")
+    for filename in REQUIRED_FILES:
+        (change / filename).symlink_to("../../../README.md")
+    (change / "context.md").symlink_to("../../../README.md")
+
+    assert check_change_artifacts.artifact_content_errors(changes_root) == [
+        *(
+            f"artifact must be a regular file: docs/changes/2-architecture/{filename}"
+            for filename in REQUIRED_FILES
+        ),
+        "change artifacts cannot contain non-regular entries: "
+        "docs/changes/2-architecture/context.md",
+    ]
+
+
+def test_change_artifact_directory_cannot_be_a_symlink(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(check_change_artifacts, "REPOSITORY_ROOT", tmp_path)
+    changes_root = tmp_path / "docs" / "changes"
+    accepted = changes_root / "1-foundation"
+    accepted.mkdir(parents=True)
+    for filename in REQUIRED_FILES:
+        (accepted / filename).write_text("accepted\n", encoding="utf-8")
+    for directory in ("2-architecture", "2-bad_slug"):
+        (changes_root / directory).symlink_to("1-foundation", target_is_directory=True)
+
+    assert check_change_artifacts.artifact_content_errors(changes_root) == [
+        "change artifact directory must be a regular directory: docs/changes/2-architecture",
+        "invalid change directory name: 2-bad_slug",
+    ]
+
+
+def test_change_artifact_root_cannot_traverse_a_symlink(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(check_change_artifacts, "REPOSITORY_ROOT", tmp_path)
+    artifact_store = tmp_path / "artifact-store" / "1-foundation"
+    artifact_store.mkdir(parents=True)
+    for filename in REQUIRED_FILES:
+        (artifact_store / filename).write_text("not in docs/changes\n", encoding="utf-8")
+    (tmp_path / "docs").mkdir()
+    (tmp_path / "docs" / "changes").symlink_to("../artifact-store", target_is_directory=True)
+
+    assert check_change_artifacts.artifact_content_errors(tmp_path / "docs" / "changes") == [
+        "change artifact root component must be a regular directory: docs/changes"
+    ]
+
+
+def test_tracked_artifact_symlinks_fail_when_git_materializes_regular_files(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    subprocess.run(["git", "init", "--quiet"], cwd=tmp_path, check=True)
+    subprocess.run(["git", "config", "core.symlinks", "false"], cwd=tmp_path, check=True)
+    (tmp_path / "README.md").write_text("target\n", encoding="utf-8")
+
+    def stage_symlink(path_text: str, target: str) -> Path:
+        artifact = tmp_path / path_text
+        artifact.parent.mkdir(parents=True, exist_ok=True)
+        artifact.write_text(target, encoding="utf-8")
+        object_id = subprocess.run(
+            ["git", "hash-object", "-w", str(artifact)],
+            cwd=tmp_path,
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+        subprocess.run(
+            [
+                "git",
+                "update-index",
+                "--add",
+                "--cacheinfo",
+                f"120000,{object_id},{path_text}",
+            ],
+            cwd=tmp_path,
+            check=True,
+        )
+        assert artifact.is_file()
+        assert not artifact.is_symlink()
+        return artifact
+
+    for filename in REQUIRED_FILES:
+        stage_symlink(
+            f"docs/changes/2-architecture/{filename}",
+            "../../../README.md",
+        )
+    stage_symlink("docs/changes/2-architecture/context.md", "../../../README.md")
+    stage_symlink("docs/changes/2-bad_slug", "1-foundation")
+    stage_symlink("docs/changes/_evil", "2-architecture")
+    for filename in REQUIRED_FILES:
+        template_artifact = tmp_path / "docs" / "changes" / "_template" / filename
+        template_artifact.parent.mkdir(parents=True, exist_ok=True)
+        template_artifact.write_text("template\n", encoding="utf-8")
+    stage_symlink("docs/changes/_template/intent.md", "../../../README.md")
+
+    monkeypatch.setattr(check_change_artifacts, "REPOSITORY_ROOT", tmp_path)
+    tracked_non_regular = check_change_artifacts._tracked_non_regular_artifact_paths()
+
+    assert check_change_artifacts.artifact_content_errors(
+        tmp_path / "docs" / "changes",
+        tracked_non_regular,
+    ) == [
+        *(
+            f"artifact must be a regular file: docs/changes/2-architecture/{filename}"
+            for filename in REQUIRED_FILES
+        ),
+        "invalid change directory name: 2-bad_slug",
+        "invalid change directory name: _evil",
+        "template artifact must be a regular file: docs/changes/_template/intent.md",
+        "change artifacts cannot contain non-regular entries: "
+        "docs/changes/2-architecture/context.md",
+    ]
+
+
+def test_implementation_does_not_accept_symlink_artifacts_from_base(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    regular_paths = [f"docs/changes/2-architecture/{filename}" for filename in REQUIRED_FILES]
+    monkeypatch.setattr(
+        check_change_artifacts,
+        "_git",
+        lambda *arguments: "\n".join(
+            [
+                *(f"100644 blob deadbeef\t{path}" for path in regular_paths),
+                "100644 blob deadbeef\tdocs/changes/2-architecture/assets/diagram.svg",
+                *(
+                    f"120000 blob deadbeef\tdocs/changes/3-threats/{filename}"
+                    for filename in REQUIRED_FILES
+                ),
+            ]
+        ),
+    )
+
+    assert check_change_artifacts._base_artifact_paths("base-sha", 2) == regular_paths
+    assert check_change_artifacts._base_artifact_paths("base-sha", 3) == []
 
 
 def test_base_artifact_required_files_cannot_be_deleted(

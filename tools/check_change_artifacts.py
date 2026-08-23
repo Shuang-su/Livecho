@@ -18,24 +18,133 @@ ISSUE_BRANCH_PATTERN = re.compile(
 )
 
 
-def artifact_content_errors(changes_root: Path = CHANGES_ROOT) -> list[str]:
+def _is_regular_file(path: Path) -> bool:
+    """Return whether path is a regular file rather than a followed symlink."""
+    return path.is_file() and not path.is_symlink()
+
+
+def _required_file_errors(
+    directory: Path,
+    non_regular_paths: set[Path],
+    label: str = "artifact",
+) -> tuple[list[str], set[Path]]:
+    """Validate one artifact directory's four required files."""
+    errors: list[str] = []
+    reported_non_regular: set[Path] = set()
+    entry_names = {path.name for path in directory.iterdir()}
+    for filename in REQUIRED_FILES:
+        artifact = directory / filename
+        artifact_relative = artifact.relative_to(REPOSITORY_ROOT)
+        artifact_path = artifact_relative.as_posix()
+        if filename not in entry_names:
+            errors.append(f"missing {label}: {artifact_path}")
+            continue
+        if artifact.is_symlink() or artifact_relative in non_regular_paths:
+            errors.append(f"{label} must be a regular file: {artifact_path}")
+            reported_non_regular.add(artifact_relative)
+            continue
+        if not artifact.is_file():
+            errors.append(f"missing {label}: {artifact_path}")
+            continue
+        if not artifact.read_text(encoding="utf-8").strip():
+            errors.append(f"empty {label}: {artifact_path}")
+    return errors, reported_non_regular
+
+
+def artifact_content_errors(
+    changes_root: Path = CHANGES_ROOT,
+    tracked_non_regular: set[Path] | None = None,
+) -> list[str]:
     """Validate every artifact directory currently present in the working tree."""
     errors: list[str] = []
+    tracked_non_regular = tracked_non_regular or set()
+    relative_root = changes_root.relative_to(REPOSITORY_ROOT)
+    relative_component = Path()
+    component_root = REPOSITORY_ROOT
+    for component in relative_root.parts:
+        if not component_root.is_dir():
+            return [f"missing change root: {relative_root.as_posix()}"]
+        relative_component /= component
+        entry_names = {path.name for path in component_root.iterdir()}
+        if component not in entry_names:
+            if any(name.casefold() == component.casefold() for name in entry_names):
+                return [
+                    "change artifact root component must use exact case: "
+                    f"{relative_component.as_posix()}"
+                ]
+            return [f"missing change root: {relative_root.as_posix()}"]
+        component_root /= component
+        if component_root.is_symlink() or relative_component in tracked_non_regular:
+            return [
+                "change artifact root component must be a regular directory: "
+                f"{relative_component.as_posix()}"
+            ]
     if not changes_root.is_dir():
-        return [f"missing change root: {changes_root.relative_to(REPOSITORY_ROOT)}"]
+        return [f"missing change root: {relative_root.as_posix()}"]
 
+    non_regular_paths = set(tracked_non_regular)
+    non_regular_paths.update(
+        path.relative_to(REPOSITORY_ROOT) for path in changes_root.rglob("*") if path.is_symlink()
+    )
+    reported_non_regular: set[Path] = set()
     for directory in sorted(changes_root.iterdir()):
-        if not directory.is_dir() or directory.name.startswith("_"):
+        directory_relative = directory.relative_to(REPOSITORY_ROOT)
+        directory_path = directory_relative.as_posix()
+        non_regular_entry = directory_relative in non_regular_paths
+        if directory.name == "_template":
+            if non_regular_entry or not directory.is_dir():
+                errors.append(
+                    f"change artifact template must be a regular directory: {directory_path}"
+                )
+                if non_regular_entry:
+                    reported_non_regular.add(directory_relative)
+            else:
+                template_errors, template_reported = _required_file_errors(
+                    directory,
+                    non_regular_paths,
+                    label="template artifact",
+                )
+                errors.extend(template_errors)
+                reported_non_regular.update(template_reported)
+            continue
+        if directory.name.startswith("_"):
+            errors.append(f"invalid change directory name: {directory.name}")
+            if non_regular_entry:
+                reported_non_regular.add(directory_relative)
+            continue
+        if non_regular_entry:
+            if CHANGE_DIRECTORY_PATTERN.fullmatch(directory.name):
+                errors.append(
+                    f"change artifact directory must be a regular directory: {directory_path}"
+                )
+            else:
+                errors.append(f"invalid change directory name: {directory.name}")
+            reported_non_regular.add(directory_relative)
+            continue
+        if not directory.is_dir():
+            if directory.name != "README.md" and not directory.name.startswith("."):
+                errors.append(f"invalid change directory name: {directory.name}")
             continue
         if not CHANGE_DIRECTORY_PATTERN.fullmatch(directory.name):
             errors.append(f"invalid change directory name: {directory.name}")
-        for filename in REQUIRED_FILES:
-            artifact = directory / filename
-            if not artifact.is_file():
-                errors.append(f"missing artifact: {artifact.relative_to(REPOSITORY_ROOT)}")
-                continue
-            if not artifact.read_text(encoding="utf-8").strip():
-                errors.append(f"empty artifact: {artifact.relative_to(REPOSITORY_ROOT)}")
+            continue
+        artifact_errors, artifact_reported = _required_file_errors(
+            directory,
+            non_regular_paths,
+        )
+        errors.extend(artifact_errors)
+        reported_non_regular.update(artifact_reported)
+
+    unreported_non_regular = sorted(
+        path.as_posix()
+        for path in non_regular_paths - reported_non_regular
+        if path.is_relative_to(relative_root)
+    )
+    if unreported_non_regular:
+        errors.append(
+            "change artifacts cannot contain non-regular entries: "
+            + ", ".join(unreported_non_regular)
+        )
     return errors
 
 
@@ -68,6 +177,34 @@ def _changed_paths(base_ref: str) -> set[str]:
     return {path for path in (*tracked.splitlines(), *untracked.splitlines()) if path}
 
 
+def _tracked_non_regular_artifact_paths() -> set[Path]:
+    """Find invalid leaves and non-regular entries in the Git index change tree."""
+    index = _git("ls-files", "--stage", "-z", "--", "docs")
+    non_regular: set[Path] = set()
+    regular_modes = {"100644", "100755"}
+    for entry in index.split("\0"):
+        if not entry:
+            continue
+        try:
+            metadata, path_text = entry.split("\t", maxsplit=1)
+            mode = metadata.split(" ", maxsplit=1)[0]
+        except (IndexError, ValueError):
+            continue
+        path = Path(path_text)
+        if path.parts in {("docs",), ("docs", "changes")}:
+            non_regular.add(path)
+            continue
+        if path.parts[:2] != ("docs", "changes"):
+            continue
+        if mode not in regular_modes:
+            non_regular.add(path)
+            continue
+        invalid_directory = len(path.parts) == 3 and path.name != "README.md"
+        if invalid_directory:
+            non_regular.add(path)
+    return non_regular
+
+
 def _base_ref(branch: str) -> str | None:
     configured = os.environ.get("LIVECHO_BASE_SHA", "").strip()
     if configured:
@@ -81,9 +218,28 @@ def _base_ref(branch: str) -> str | None:
 
 
 def _base_artifact_paths(base_ref: str, issue_number: int) -> list[str]:
-    tree = _git("ls-tree", "-r", "--name-only", base_ref, "docs/changes")
+    tree = _git("ls-tree", "-r", base_ref, "docs/changes")
     prefix = f"docs/changes/{issue_number}-"
-    return [path for path in tree.splitlines() if path.startswith(prefix)]
+    paths: list[str] = []
+    required_names = set(REQUIRED_FILES)
+    for entry in tree.splitlines():
+        try:
+            metadata, path = entry.split("\t", maxsplit=1)
+            mode, object_type, _object_id = metadata.split(" ", maxsplit=2)
+        except ValueError:
+            continue
+        artifact = Path(path)
+        if (
+            mode in {"100644", "100755"}
+            and object_type == "blob"
+            and path.startswith(prefix)
+            and len(artifact.parts) == 4
+            and artifact.parts[:2] == ("docs", "changes")
+            and CHANGE_DIRECTORY_PATTERN.fullmatch(artifact.parts[2])
+            and artifact.name in required_names
+        ):
+            paths.append(path)
+    return paths
 
 
 def _current_issue_artifact_errors(
@@ -92,7 +248,7 @@ def _current_issue_artifact_errors(
     directories = sorted(
         path
         for path in changes_root.glob(f"{issue_number}-*")
-        if path.is_dir() and CHANGE_DIRECTORY_PATTERN.fullmatch(path.name)
+        if path.is_dir() and not path.is_symlink() and CHANGE_DIRECTORY_PATTERN.fullmatch(path.name)
     )
     if len(directories) != 1:
         return [
@@ -100,7 +256,12 @@ def _current_issue_artifact_errors(
             "directory in the resulting tree"
         ]
     directory = directories[0]
-    missing = [filename for filename in REQUIRED_FILES if not (directory / filename).is_file()]
+    entry_names = {path.name for path in directory.iterdir()}
+    missing = [
+        filename
+        for filename in REQUIRED_FILES
+        if filename not in entry_names or not _is_regular_file(directory / filename)
+    ]
     if missing:
         return [
             f"resulting artifact {directory.relative_to(REPOSITORY_ROOT)} is missing: "
@@ -135,6 +296,7 @@ def _durable_base_artifact_errors(base_ref: str) -> list[str]:
     tree = _git("ls-tree", "-r", "--name-only", base_ref, "docs/changes")
     required_names = set(REQUIRED_FILES)
     deleted: list[str] = []
+    non_regular: list[str] = []
     for path_text in tree.splitlines():
         path = Path(path_text)
         if (
@@ -142,12 +304,20 @@ def _durable_base_artifact_errors(base_ref: str) -> list[str]:
             and path.parts[:2] == ("docs", "changes")
             and CHANGE_DIRECTORY_PATTERN.fullmatch(path.parts[2])
             and path.name in required_names
-            and not (REPOSITORY_ROOT / path).is_file()
         ):
-            deleted.append(path_text)
+            artifact = REPOSITORY_ROOT / path
+            if artifact.is_symlink():
+                non_regular.append(path_text)
+            elif not artifact.is_file():
+                deleted.append(path_text)
+    errors: list[str] = []
     if deleted:
-        return ["accepted change artifacts cannot be deleted: " + ", ".join(sorted(deleted))]
-    return []
+        errors.append("accepted change artifacts cannot be deleted: " + ", ".join(sorted(deleted)))
+    if non_regular:
+        errors.append(
+            "accepted change artifacts must remain regular files: " + ", ".join(sorted(non_regular))
+        )
+    return errors
 
 
 def _accepted_artifact_rewrite_errors(base_ref: str, changed_paths: set[str]) -> list[str]:
@@ -227,9 +397,7 @@ def lifecycle_errors() -> list[str]:
 
     directory = directories.pop()
     missing = [
-        filename
-        for filename in ACCEPTED_BEFORE_IMPLEMENTATION
-        if f"{directory}/{filename}" not in base_paths
+        filename for filename in REQUIRED_FILES if f"{directory}/{filename}" not in base_paths
     ]
     if missing:
         return [
@@ -241,7 +409,11 @@ def lifecycle_errors() -> list[str]:
 
 def validation_errors() -> list[str]:
     """Return all artifact and lifecycle errors without mutating the repository."""
-    return [*artifact_content_errors(), *lifecycle_errors()]
+    tracked_non_regular = _tracked_non_regular_artifact_paths()
+    return [
+        *artifact_content_errors(tracked_non_regular=tracked_non_regular),
+        *lifecycle_errors(),
+    ]
 
 
 def main() -> int:
