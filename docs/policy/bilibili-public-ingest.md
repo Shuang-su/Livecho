@@ -90,7 +90,16 @@ restriction, or DRM restriction. Eligibility must be reevaluated before initial 
 and every reconnect; a prior success is not cached permission. Livecho must not bypass
 or work around any such restriction.
 
-Any of the following is a denial and an immediate stop trigger:
+`Currently live` is a per-attempt, transient eligibility fact, not a durable safety
+decision. If a selected room is ordinarily offline at the initial check or reconnect, or
+an otherwise eligible broadcast ends normally, Livecho rejects or stops only that bound
+attempt and performs ordinary session/lease/audio/locator/publication teardown. It does
+not prepare or commit a safety transition, advance the safety generation, change the
+global bit or denylist, or require an owner-gated denylist removal. A later broadcast may
+be considered only after every eligibility and rights gate is evaluated again.
+
+Any of the following also denies the attempted action and is an immediate stop/review
+trigger:
 
 - the global switch is off, the room is denied, safety state is missing/stale, or a
   canonical room ID cannot be established;
@@ -111,13 +120,18 @@ Any of the following is a denial and an immediate stop trigger:
   the selected action are unavailable.
 
 There is no public room submission, automatic discovery, historical crawl,
-credentialed fallback, or "best effort" continuation. A denial adds the canonical room
-to the denylist when room-specific and invokes the global disable when scope is unknown
-or platform-wide. A successfully committed room-specific addition blocks and cleans up
-only that canonical room; it does not change the global enable decision or interrupt an
-unrelated eligible room. Canonicalization or active-resource binding ambiguity, or a
-failed/stale/conflicting safety-journal or recovery-copy commit/read-back, escalates the
-room block to global forced-off rather than claiming a scoped transition succeeded.
+credentialed fallback, or "best effort" continuation. An eligibility or prerequisite
+failure is not by itself a denylist mutation. Missing, expired, stale, or incomplete
+prerequisites keep the attempted action off and require review, but do not automatically
+create a durable room entry. An authorized operator/admin may separately invoke
+`add(R)` only for a verified policy, rights, takedown, restriction, or safety incident
+whose affected scope is one exactly bound canonical room. From acceptance of that
+tightening through its commit/read-back, only `R` is provisionally blocked and cleaned;
+the global activation and unrelated eligible rooms remain unchanged. A successfully
+committed addition persists that same room-only result. Canonicalization or active-
+resource binding ambiguity, unknown or platform-wide incident scope, or a failed/stale/
+conflicting safety-journal or recovery-copy commit/read-back invokes global forced-off
+rather than guessing or claiming a scoped transition succeeded.
 Every global forced-off path closes local authority gates and issues cleanup for all
 active/queued rooms before any safety-journal or recovery-copy await; slow, hung, or
 failed durability cannot extend playback, business-event intake, worker disclosure, or
@@ -126,14 +140,16 @@ A global-enable or room-removal transition in durable `PREPARED` phase is only a
 even a matching `COMMITTED` journal/recovery-head result is durable history, not serving
 authority. Each boot starts without activation and globally off. Only a non-restorable
 current-incarnation activation may apply the exact committed head, after its final local
-compare-and-set proves the same incarnation, unchanged tightening and deletion-intake
-guards, a matching intake-continuity `open(E)`, and no pending intake, taint, or cleanup.
+compare-and-set proves the same incarnation, a matching intake-continuity `open(E)`, no
+applicable pending/tainted intake or unfinished cleanup, and unchanged global guards for
+global enable or unchanged `R`-scoped guards for `remove(R)`. An unrelated room-local
+add or deletion intake does not revoke global activation or block unaffected rooms.
 A delayed proposal, commit, response, or prior-incarnation activation cannot clear a
 newer local global/room block. Global disable revokes current global activation before its
 durability work; `add(R)` instead installs/revokes only `R`'s scoped block/removal effect
 and leaves unrelated active rooms under the existing global activation. If a new intake
-or applicable tightening linearizes before final activation/effect, the relaxation fails
-without opening that path.
+or tightening applicable to the relaxation's global or exact-room scope linearizes before
+final activation/effect, that relaxation fails without opening the affected path.
 Runtime enforcement belongs to Issue #7; until it exists and is verified, all real
 acquisition stays off.
 
@@ -197,8 +213,10 @@ the known room, otherwise global off), escalate, and do not guess a destructive 
 The missing per-room and channel-specific contacts are production blockers. On a credible
 session-scoped complaint, an operator/admin stops/hides/blocks that session and its lease,
 audio, locators, and pending/public output. On verified room scope, the operator/admin
-denies the room and stops all its active paths. On ambiguous scope, deny the known room or
-remain globally off as defined above. The report remains an unresolved takedown intake
+may invoke `add(R)` and stops all that room's active paths. If session scope is ambiguous
+but the canonical room is verified, block that room without guessing a destructive
+selector; if no exact room can be bound or scope may be platform-wide, remain globally off
+as defined above. The report remains an unresolved takedown intake
 until its exact selector has a verified durable deletion record; a payload-free audit
 entry alone is not that record. Before accepting any report, the sole current serving
 authority must commit and read back a target-free intake-continuity `open(E)` in the
@@ -210,13 +228,23 @@ session resolved through the backend's authoritative parent-room index. The call
 not have to provide—and cannot override—the session's parent room. None, both,
 conflicting, missing, non-unique, or ambiguous targets start no destructive purge.
 
+An exactly resolved valid request installs only its selector-scoped provisional
+containment while admission is pending. A deterministically invalid request is rejected
+and durably accounted for without changing global activation, the denylist, or unrelated
+room/session service. Neither normal valid intake nor a completed invalid-request denial
+is a global tightening. Intake persistence/read-back failure or uncertainty, loss of proof
+that an exactly identified target remains contained and owned at that scope, an
+independently credible exposure that cannot be safely bounded, or an otherwise tainted
+continuity guard instead invokes global forced-off and blocks every relaxation until
+authoritative reconciliation.
+
 For a valid selector, immediate local containment precedes a commit/read-back barrier:
 the typed payload-free `hidden` tombstone must be durably admitted to the independent
 recovery boundary before Livecho acknowledges the deletion request, reports `hidden` as
 an accepted state, or begins destructive purge. A timeout, lost response, or unavailable
 or uncertain commit keeps the takedown intake open, returns no success, taints the current-
-incarnation intake guard, forbids a clean epoch close, and preserves the safe room/global
-block. The initiating source may retry the same selector, idempotency identity, and
+incarnation intake guard, forbids a clean epoch close, and escalates to global forced-off.
+The initiating source may retry the same selector, idempotency identity, and
 original time, but Livecho does not depend on that source remaining available. A clean
 `clean-close(E)` is permitted only after one atomic authority fence quiesces serving,
 safety-control, and deletion ingress; every accepted safety-control handler drains and its

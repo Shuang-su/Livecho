@@ -21,13 +21,13 @@
 
 | Command | Result | Date/commit |
 | --- | --- | --- |
-| `make bootstrap` | Passed; uv checked 10 packages and pnpm 11.21.0 reported the frozen workspace already up to date. | 2026-08-24 / final staged tree after r3839611978 and r3839614028 |
-| `make verify` | Passed; Ruff check/format, workspace lint, mypy, typecheck, 40 pytest tests, pnpm tests, change-artifact gate, and build all succeeded. | 2026-08-24 / final staged tree after r3839611978 and r3839614028 |
-| `git diff --check && git diff --cached --check` | Passed with no whitespace errors on the final staged tree. | 2026-08-24 / final staged tree after r3839611978 and r3839614028 |
-| `git diff --quiet origin/main -- docs/changes/2-architecture-risk-boundaries/intent.md docs/changes/2-architecture-risk-boundaries/spec.md docs/changes/2-architecture-risk-boundaries/plan.md` | Passed; the owner-merged intent/spec/plan are unchanged from `origin/main` (`a44fc1f`). | 2026-08-24 / final staged tree after r3839611978 and r3839614028 |
-| Mermaid CLI render command below | Passed with `@mermaid-js/mermaid-cli` 11.12.0 and system Google Chrome; one 94,811-byte SVG was produced. | 2026-08-24 / final staged tree after r3839611978 and r3839614028 |
-| GitHub Markdown API table-render command below | Passed; 35 delimiter tables rendered as 35 GitHub HTML tables; raw and rendered row-width mismatches: 0. | 2026-08-24 / final staged tree after r3839611978 and r3839614028 |
-| Local-link and stable-ID audit command below | Passed; links 18/18; CTRL 50 rows/30 unique/16 shared with 0 shared later-Issue owner-set mismatches and 0 undefined; DATA 12 with 0 undefined; FLOW-ALLOW-001–020 and FLOW-DENY-001–018 exact; the 13 High threat rows exactly match 13 decision rows, all `NOT ACCEPTED`; Critical rows: 0. | 2026-08-24 / final staged tree after r3839611978 and r3839614028 |
+| `make bootstrap` | Passed; uv checked 10 packages and pnpm 11.21.0 reported the frozen workspace already up to date. | 2026-08-24 / final staged tree after r3839675466, r3839675474, and r3839675477 |
+| `make verify` | Passed; Ruff check/format, workspace lint, mypy, typecheck, 40 pytest tests, pnpm tests, change-artifact gate, and build all succeeded. | 2026-08-24 / final staged tree after r3839675466, r3839675474, and r3839675477 |
+| `git diff --check && git diff --cached --check` | Passed with no whitespace errors on the final staged tree. | 2026-08-24 / final staged tree after r3839675466, r3839675474, and r3839675477 |
+| `git diff --quiet origin/main -- docs/changes/2-architecture-risk-boundaries/intent.md docs/changes/2-architecture-risk-boundaries/spec.md docs/changes/2-architecture-risk-boundaries/plan.md` | Passed; the owner-merged intent/spec/plan are unchanged from `origin/main` (`a44fc1f`). | 2026-08-24 / final staged tree after r3839675466, r3839675474, and r3839675477 |
+| Mermaid CLI render command below | Passed with `@mermaid-js/mermaid-cli` 11.12.0 and system Google Chrome; one 94,811-byte SVG was produced. | 2026-08-24 / final staged tree after r3839675466, r3839675474, and r3839675477 |
+| GitHub Markdown API table-render command below | Passed; 35 delimiter tables rendered as 35 GitHub HTML tables; raw and rendered row-width mismatches: 0. | 2026-08-24 / final staged tree after r3839675466, r3839675474, and r3839675477 |
+| Local-link and stable-ID audit command below | Passed; links 18/18; CTRL 50 rows/30 unique/16 shared with 0 shared later-Issue owner-set mismatches and 0 undefined; DATA 12 with 0 undefined; FLOW-ALLOW-001–020 and FLOW-DENY-001–018 exact; the 13 High threat rows exactly match 13 decision rows, all `NOT ACCEPTED`; Critical rows: 0. | 2026-08-24 / final staged tree after r3839675466, r3839675474, and r3839675477 |
 
 The isolated Mermaid render used no repository dependency or output path:
 
@@ -286,30 +286,42 @@ update; it adds no runtime or deployment resource.
   journal/recovery-copy await. Slow, hung, failed, or split durability cannot postpone
   locally controlled cleanup. A relaxation is first a non-effective `PREPARED` proposal;
   conditional recovery-head promotion makes it `COMMITTED`, but only a non-restorable
-  activation installed by that same live incarnation can serve. Global disable revokes
-  global activation before durability, while `add(R)` blocks only `R` and preserves
-  unrelated-room activation. Both mark the continuity epoch safety-pending until their
-  tightening is durably reconciled. Tabletop races `clean-close(E)` against global disable
-  and room add in both orders, including durability failure plus exit. The atomic serving/
+  activation installed by that same live incarnation can serve. Global disable raises the
+  global guard and revokes activation before durability, while `add(R)` raises only the
+  room guard and preserves unrelated-room activation. Both record their exact scope as
+  safety-pending until durably reconciled, and both prevent `clean-close(E)`; pending by
+  itself is not a global effect. Tabletop races `clean-close(E)` against global disable and
+  room add in both orders, including durability failure plus exit. The atomic serving/
   safety/deletion-ingress close fence forces a late tightening to reconcile before close
   or be rejected/bound to a new verified epoch. Prepare/promotion/final-activation races,
   crashes, and late responses never let a dead incarnation reopen. Alpha has one active
   serving authority; a future unacknowledged owner is isolated/terminated and keeps the
   deployment off.
 - **Tabletop 1B — room-scoped denylist: Passed on paper.** With room `A` active, a
-  committed `add(B)` denies unrelated room `B` without touching `A`'s session, lease,
-  audio/locator RAM, or publication; `add(A)` begins target cleanup before durability.
-  Canonical/binding, predecessor-generation, journal, or recovery-copy uncertainty
-  escalates to global off and starts all-room cleanup without another durability wait.
+  pending or committed `add(B)` denies unrelated room `B` without touching `A`'s global
+  activation, session, lease, audio/locator RAM, or publication; `add(A)` begins target
+  cleanup before durability. Canonical/binding, predecessor-generation, journal, or
+  recovery-copy failure/uncertainty invokes a distinct global-disable transition, which is
+  the point that revokes global activation and starts all-room cleanup.
   Disable/add same-predecessor races reapply a losing tightening to the newest complete
   head; add response loss and add/remove races before/after durable promotion and local
   activation never reopen a newer block. Global enable preserves the complete denylist,
   room removal never enables globally, and generation change alone creates no activation.
+  Ordinary initial-offline, normal-end, and reconnect-offline outcomes stop and clear only
+  the attempted/current session without changing the journal, generation, or denylist;
+  later live status must pass fresh eligibility but needs no denylist-removal approval.
+  Missing or stale prerequisites deny the attempted action and trigger review, while only
+  an explicit authorized exact-room policy/rights/safety incident can create `add(R)`.
 - **Tabletop 2 — typed room/session partial and late deletion: Passed on paper.** Separate
   room and session subcases prove exactly-one selector validation; unknown/conflicting/
   composite rejection without guessed purge; room-wide discovery of initial and stale-
   restored sessions; session-only sibling/shared-state preservation; room-over-session
-  tombstone dominance; and shared-projection recomputation. Primary-store outage,
+  tombstone dominance; and shared-projection recomputation. A normal valid room/session
+  intake fences concurrent relaxation and installs only selector-scoped provisional
+  containment; a normal invalid request obtains durable denial. Neither case revokes the
+  existing global activation or disrupts a non-target room/session. Intake, denial, or
+  tombstone persistence failure, or inability to prove scoped isolation, instead taints
+  continuity and explicitly escalates to global off. Primary-store outage,
   continuity-epoch open/close failure and close-versus-late-request races, first target-
   write failure followed by source loss and backend crash, tombstone commit/read-back
   failure, post-commit response loss, restart, and empty-store variants return no false
@@ -325,8 +337,9 @@ update; it adds no runtime or deployment resource.
   and a prior incarnation's committed enable/late response; quarantines unmatched
   continuity epochs; purges restored verifier/session rows; advances or reconciles a recovery-
   protected auth-invalidation generation/key version; rejects stateful/stateless pre-
-  restore credentials; reconciles every unresolved intake to a verified pending `hidden`
-  tombstone; replays typed room-all-child/exact-session manifests with room dominance plus
+  restore credentials; reconciles every unresolved valid intake to a verified pending
+  `hidden` tombstone and every invalid request to durable denial; replays typed room-all-
+  child/exact-session manifests with room dominance plus
   typed account/device checkpoints; rejects empty application state as proof of no target;
   and proves deleted authority cannot receive new credentials before orthogonal global/
   denylist safety reconciliation.
@@ -494,11 +507,40 @@ then found two additional valid blockers:
   predecessor race, it reapplies its safe action to the newest complete head; relaxation
   never automatically rebases.
 
-Final independent deletion-continuity, safety-race, and mechanical re-reviews found no
-remaining P1/P2. Fresh verification passed with 40 pytest tests. The final staged tree has
-30 stable controls, 12 data classes, 13 individually unaccepted High rows, continuous
-`FLOW-ALLOW-001`–`020` and `FLOW-DENY-001`–`018`, no shared-control owner mismatch, 35/35
-GitHub-rendered GFM tables, 18/18 local links, and a successful Mermaid 11.12.0 render.
+Independent deletion-continuity, safety-race, and mechanical reviews found no local P1/P2
+before `89b891f`, but the remote review of that head found three additional valid scope
+findings:
+
+- P2: [ordinary offline/not-live status was incorrectly made a durable denylist
+  entry](https://github.com/Shuang-su/Livecho/pull/22#discussion_r3839675466). The
+  resolution separates transient eligibility from explicit safety state: initial offline,
+  normal end, and reconnect offline stop/clear only that attempt or current session and do
+  not change generation, journal, or denylist. Missing/stale prerequisites deny the action
+  and trigger review. Only an authorized, exactly bound room policy/rights/safety incident
+  creates `add(R)`; unknown/platform-wide scope invokes global disable without guessing a
+  room entry.
+- High/P1: [every deletion intake incorrectly revoked global serving
+  activation](https://github.com/Shuang-su/Livecho/pull/22#discussion_r3839675474). The
+  resolution makes `intake-pending` a concurrency/accounting fence, not a global stop.
+  Valid selectors immediately contain only their room/session scope, and normal invalid
+  selectors receive durable denial; both preserve unrelated activation. Intake, denial,
+  tombstone, or scope-isolation failure instead becomes `tainted` and explicitly escalates
+  to global disable, while admitted purge failures remain scoped `hidden` unless isolation
+  can no longer be proved.
+- High/P1: [generic unresolved-tightening wording made a pending room add revoke global
+  activation](https://github.com/Shuang-su/Livecho/pull/22#discussion_r3839675477). The
+  resolution distinguishes the sticky global guard from per-room guard `Q[R]`. A pending
+  exact `add(R)` blocks/cleans only `R`, preserves unrelated activation, and prevents epoch
+  close until reconciled. Binding, timeout, journal/recovery, or result uncertainty invokes
+  a separate global-disable transition; that escalation, not ordinary room pending, revokes
+  global activation and cleans all rooms.
+
+Final independent deletion-scope, offline/denylist, guard-scope, and mechanical reviews
+found no remaining P1/P2 in the resulting tree. Fresh `make bootstrap && make verify`
+passed with 40 pytest tests. The final staged tree has 30 stable controls, 12 data classes,
+13 individually unaccepted High rows, continuous `FLOW-ALLOW-001`–`020` and
+`FLOW-DENY-001`–`018`, no shared-control owner mismatch, 35/35 GitHub-rendered GFM tables,
+18/18 local links, and a successful Mermaid 11.12.0 render producing one 94,811-byte SVG.
 
 ## Deviations
 
