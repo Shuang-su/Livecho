@@ -2,7 +2,7 @@
 
 ## Artifact approval
 
-- Artifact PR: Pending
+- Artifact/foundation PR: [#20](https://github.com/Shuang-su/Livecho/pull/20)
 - Approved by/date: Pending repository-owner merge
 
 ## Automated verification
@@ -19,7 +19,7 @@
 - Roadmap: Issues
   [#1](https://github.com/Shuang-su/Livecho/issues/1)–[#19](https://github.com/Shuang-su/Livecho/issues/19),
   labels, and M0/M1/M2 milestones created
-- PR file-list review: Pending
+- PR file-list review: 36 foundation/documentation files; no product runtime directories
 - GitHub Actions run: Pending
 
 ## Review findings
