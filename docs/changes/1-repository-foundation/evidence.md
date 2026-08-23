@@ -10,7 +10,7 @@
 | Command | Result | Date/commit |
 | --- | --- | --- |
 | `make bootstrap` | Passed; frozen uv and pnpm installs completed | 2026-08-24, PR branch |
-| `make verify` | Passed; ruff, mypy, 25 pytest cases, base/result artifact and pnpm-native workspace gates | 2026-08-24, PR branch |
+| `make verify` | Passed; ruff, mypy, 27 pytest cases, base/result artifact and pnpm-native workspace gates | 2026-08-24, PR branch |
 | `git diff --check` | Passed on the complete staged diff | 2026-08-24, PR branch |
 
 ## Manual evidence

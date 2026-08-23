@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
-from tools import check_change_artifacts
+from tools import check_change_artifacts, check_workspace_scripts
 from tools.check_change_artifacts import (
     REQUIRED_FILES,
     is_artifact_only_change,
@@ -176,6 +177,29 @@ def test_implementation_cannot_rewrite_accepted_decisions(
     ) == ["implementation cannot rewrite accepted artifacts: docs/changes/2-architecture/spec.md"]
 
 
+def test_implementation_lifecycle_rejects_accepted_decision_rewrite(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    changed_paths = {
+        "docs/changes/2-architecture/plan.md",
+        "services/backend/app.py",
+    }
+    monkeypatch.setenv("LIVECHO_HEAD_REF", "codex/issue-2-architecture")
+    monkeypatch.setattr(check_change_artifacts, "_base_ref", lambda branch: "base-sha")
+    monkeypatch.setattr(check_change_artifacts, "_changed_paths", lambda base: changed_paths)
+    monkeypatch.setattr(check_change_artifacts, "_durable_base_artifact_errors", lambda base: [])
+    monkeypatch.setattr(check_change_artifacts, "_current_issue_artifact_errors", lambda issue: [])
+    monkeypatch.setattr(
+        check_change_artifacts,
+        "_git",
+        lambda *arguments: "docs/changes/2-architecture/plan.md",
+    )
+
+    assert check_change_artifacts.lifecycle_errors() == [
+        "implementation cannot rewrite accepted artifacts: docs/changes/2-architecture/plan.md"
+    ]
+
+
 def test_workspace_requires_every_verification_script(tmp_path: Path) -> None:
     write_workspace_config(tmp_path, "apps/*")
     package = tmp_path / "apps" / "web"
@@ -231,6 +255,29 @@ def test_workspace_checker_uses_pnpm_glob_semantics(tmp_path: Path) -> None:
         "workspace packages/admin missing scripts: typecheck, test, build",
         "workspace packages/web missing scripts: typecheck, test, build",
     ]
+
+
+def test_workspace_checker_resolves_relative_pnpm_paths(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    write_workspace_config(tmp_path, "packages/*")
+    package = tmp_path / "packages" / "web"
+    package.mkdir(parents=True)
+    (package / "package.json").write_text(
+        '{"scripts":{"lint":"lint","typecheck":"types","test":"test","build":"build"}}',
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(
+        check_workspace_scripts,
+        "_run_pnpm",
+        lambda repository_root: SimpleNamespace(
+            returncode=0,
+            stdout='[{"path":"packages/web"}]',
+            stderr="",
+        ),
+    )
+
+    assert workspace_errors(tmp_path) == []
 
 
 @pytest.mark.parametrize(

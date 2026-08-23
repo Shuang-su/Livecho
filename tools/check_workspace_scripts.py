@@ -13,18 +13,22 @@ WORKSPACE_CONFIG = "pnpm-workspace.yaml"
 REQUIRED_SCRIPTS = ("lint", "typecheck", "test", "build")
 
 
-def workspace_package_files(repository_root: Path = REPOSITORY_ROOT) -> list[Path]:
-    """Ask pnpm to return manifests using pnpm's own workspace glob semantics."""
-    if not (repository_root / WORKSPACE_CONFIG).is_file():
-        raise ValueError(f"missing {WORKSPACE_CONFIG}")
-
-    result = subprocess.run(
+def _run_pnpm(repository_root: Path) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
         ["pnpm", "list", "--recursive", "--depth", "-1", "--json"],
         cwd=repository_root,
         check=False,
         capture_output=True,
         text=True,
     )
+
+
+def workspace_package_files(repository_root: Path = REPOSITORY_ROOT) -> list[Path]:
+    """Ask pnpm to return manifests using pnpm's own workspace glob semantics."""
+    if not (repository_root / WORKSPACE_CONFIG).is_file():
+        raise ValueError(f"missing {WORKSPACE_CONFIG}")
+
+    result = _run_pnpm(repository_root)
     if result.returncode != 0:
         detail = result.stderr.strip() or f"pnpm exited with status {result.returncode}"
         raise ValueError(f"pnpm workspace discovery failed: {detail}")
@@ -41,7 +45,10 @@ def workspace_package_files(repository_root: Path = REPOSITORY_ROOT) -> list[Pat
         path_text = project.get("path") if isinstance(project, dict) else None
         if not isinstance(path_text, str) or not path_text.strip():
             raise ValueError(f"pnpm workspace project {index} has no path")
-        project_path = Path(path_text).resolve()
+        reported_path = Path(path_text)
+        project_path = (
+            reported_path if reported_path.is_absolute() else repository_root / reported_path
+        ).resolve()
         try:
             project_path.relative_to(repository)
         except ValueError as error:
