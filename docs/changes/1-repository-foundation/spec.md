@@ -46,8 +46,8 @@
 
 ## Acceptance criteria
 
-- [ ] Fresh checkout passes `make bootstrap` and `make verify`.
-- [ ] Foundation tests detect missing artifacts and absent product invariants.
-- [ ] Issue/PR templates and CODEOWNERS render on GitHub.
-- [ ] CI contains no write permission and no production secret dependency.
-- [ ] The diff contains no product runtime behavior.
+- [x] Fresh checkout passes `make bootstrap` and `make verify`.
+- [x] Foundation tests detect missing artifacts and absent product invariants.
+- [x] Issue/PR templates and CODEOWNERS render on GitHub.
+- [x] CI contains no write permission and no production secret dependency.
+- [x] The diff contains no product runtime behavior.

@@ -41,5 +41,5 @@ context.
 
 ## Human decision
 
-- Status: Proposed for repository-owner review
-- Approved by/date: Pending merge of the foundation pull request
+- Status: Approved for squash merge after required checks and review threads pass
+- Approved by/date: @Shuang-su, 2026-08-24 (explicit merge authorization)
