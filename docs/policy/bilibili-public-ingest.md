@@ -136,20 +136,32 @@ Every global forced-off path closes local authority gates and issues cleanup for
 active/queued rooms before any safety-journal or recovery-copy await; slow, hung, or
 failed durability cannot extend playback, business-event intake, worker disclosure, or
 pending publication.
-A global-enable or room-removal transition in durable `PREPARED` phase is only a proposal;
-even a matching `COMMITTED` journal/recovery-head result is durable history, not serving
-authority. Each boot starts without activation and globally off. Only a non-restorable
-current-incarnation activation may apply the exact committed head, after its final local
-compare-and-set proves the same incarnation, a matching intake-continuity `open(E)`, no
-applicable pending/tainted intake or unfinished cleanup, and unchanged global guards for
-global enable or unchanged `R`-scoped guards for `remove(R)`. An unrelated room-local
-add or deletion intake does not revoke global activation or block unaffected rooms.
-A delayed proposal, commit, response, or prior-incarnation activation cannot clear a
-newer local global/room block. Global disable revokes current global activation before its
-durability work; `add(R)` instead installs/revokes only `R`'s scoped block/removal effect
-and leaves unrelated active rooms under the existing global activation. If a new intake
-or tightening applicable to the relaxation's global or exact-room scope linearizes before
-final activation/effect, that relaxation fails without opening the affected path.
+A global-enable or room-removal transition in durable `PREPARED` phase is only a proposal.
+A matching `COMMITTED` global-enable result is durable history, not serving authority;
+each boot starts without activation and globally off. Only a non-restorable current-
+incarnation activation may apply that head after its final local compare-and-set proves
+the same incarnation, matching intake-continuity `open(E)`, no applicable pending/tainted
+intake or unfinished cleanup, and unchanged global guards.
+
+Room removal keeps `R` in the current denylist throughout `PREPARED`. The same live
+incarnation must pass its final exact-head/`Q[R]`/intake/continuity/cleanup/governance
+guard to atomically mint/consume a single-use non-restorable permit while `R` remains
+blocked. Only that permitted request may conditionally promote the proposal and atomically
+remove `R`; there is no fallible post-commit local effect. Guard failure, permit loss, or
+crash before promotion dispatch leaves membership unchanged. After dispatch, crash or an
+unknown result keeps the system off until exact journal/head reconciliation proves a
+matching permitted commit, unchanged membership, or an unresolved split that remains off;
+later global enable cannot guess around that result.
+An unrelated room-local add or deletion intake does not revoke global activation or block
+unaffected rooms. A delayed proposal, commit, response, activation, or permit cannot clear
+a newer local global/room block. Global disable revokes current global activation before
+its durability work; `add(R)` instead installs only `R`'s scoped block, invalidates an
+unissued room-removal permit, and leaves unrelated active rooms under the existing global
+activation. If add/global disable arrives after promotion dispatch, its local block is
+immediate: removal-winning CAS requires tightening replay against the promoted head;
+tightening-winning CAS makes removal fail with membership preserved. Deletion intake that
+wins before permit dispatch prevents it; after dispatch its selector block remains while
+the permitted outcome is reconciled.
 Runtime enforcement belongs to Issue #7; until it exists and is verified, all real
 acquisition stays off.
 
@@ -280,7 +292,7 @@ Production may be considered only when one signed record proves all of the follo
 - the room, rights holder, platform/channel, Livecho takedown, and disable contacts are
   reachable and tested without disclosing sensitive data;
 - Issues #7, #16, and #17 provide the runtime, persistence, two-phase relaxation,
-  current-incarnation activation, and intake-continuity controls required by the chosen
+  post-commit global activation, pre-promotion one-use room-removal permit, and intake-continuity controls required by the chosen
   scope, and the incident/deletion tabletops pass, including first-intake-write failure,
   source loss, crash/restart, unmatched epoch, and late relaxation cases;
 - every Critical/High residual has a separate, scoped owner decision; and

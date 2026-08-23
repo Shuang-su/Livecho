@@ -121,7 +121,11 @@ verification key material cannot be restored from an application-data backup, an
 restore key versions cannot remain in the active verification set.
 
 Every safety transition has an idempotency identity, exact predecessor generation and
-head digest, one action, and the resulting complete orthogonal snapshot. `PREPARED`
+head digest, one action, and the resulting complete orthogonal snapshot, including latest
+per-room add/remove provenance. A room-removal proposal keeps its room in the current
+denylist throughout `PREPARED`; only the same live incarnation's single-use,
+non-restorable removal permit may authorize the conditional promotion that removes it.
+`PREPARED`
 means that the append-only proposal exists; it is never current safety state and never
 permits serving. `COMMITTED` means that a matching journal proposal exists and a
 conditional compare-and-swap advanced the recovery head from that exact predecessor to
@@ -178,7 +182,8 @@ predecessor generation so a stale add cannot clear a newer global disable or los
 room entry. The high-priority local guard family is separate from the one durable
 generation. Global disable atomically increments `G`, revokes the current-incarnation
 global activation, latches global off, and starts all-room cleanup. `add(R)` instead
-increments `Q[R]`, installs/revokes only `R`'s local block/removal effect, and starts `R`
+increments `Q[R]`, installs only `R`'s local block, invalidates an unissued removal permit,
+and starts `R`
 cleanup without changing `G`, revoking global activation, or interrupting unrelated
 rooms. A merely slow but still in-deadline add remains scoped this way, is not acknowledged,
 and prevents a clean epoch close. Neither guard action waits behind an in-flight
@@ -190,19 +195,35 @@ freshness, commit, or read-back becomes failed or unprovable retains `Q[R]` wher
 invokes global disable as a distinct action; only that escalation changes `G` and expands
 cleanup globally.
 
-A `COMMITTED` global-enable or denylist-remove record is durable history and a necessary
-condition, not serving authority. Only after matching journal/recovery read-back may the
-same live incarnation use one short local compare-and-set to recheck the exact committed
-head, captured applicable `G`/`Q[R]` epochs and deletion-intake fence, matching `open(E)`,
-absence of pending/tainted intake and unfinished applicable cleanup, and every governance
-gate, then install current-incarnation global activation or apply the room-removal
-relaxation. That local activation/effect is the serving-effect linearization point and is
-deliberately not persisted. These checks may prevent a new relaxation from completing;
-they do not revoke an already-installed unrelated-room activation. If relaxation wins,
+A `COMMITTED` global-enable record is durable history and a necessary condition, not
+serving authority. Only after matching journal/recovery read-back may the same live
+incarnation use one short local compare-and-set to recheck the exact committed head,
+captured applicable `G` and deletion-intake fence, matching `open(E)`, absence of pending/
+tainted intake and unfinished applicable cleanup, and every governance gate, then install
+current-incarnation global activation. That activation is deliberately not persisted.
+
+Room removal reverses that order. While the current snapshot still contains `R`, the same
+live incarnation checks the exact `PREPARED` proposal and predecessor head, applicable
+`G`/`Q[R]` and deletion-intake fences, continuity epoch, cleanup, and governance gates in
+one local compare-and-set. Success atomically mints and consumes a single-use,
+non-restorable permit to issue exactly one conditional promotion but does not serve or
+unblock `R`. Only that permitted request may advance to
+`COMMITTED`; promotion atomically removes `R` and is the removal's durable/effective
+linearization point, with no fallible post-commit local effect. Guard failure, permit loss,
+or crash before promotion dispatch leaves `R` in the denylist. After dispatch, an unknown
+or crashed result remains globally off until exact journal/head reconciliation proves a
+matching committed removal, an unchanged predecessor that still contains `R`, or an
+unresolved split that stays off. A later tightening applies its safe local guard
+immediately. If removal wins the recovery-head compare-and-swap, a safety tightening
+replays against the promoted head; if that tightening wins, removal fails without rebasing
+and `R` remains. A later deletion intake keeps its exact scoped block while the outcome is
+reconciled. These checks do not revoke an already-installed unrelated-room activation. If
+relaxation wins,
 a later global disable or tainted deletion intake revokes globally, while `add(R)` revokes/
-blocks only `R` and cleans only that room. If an applicable guard or intake wins, the
-relaxation fails and the committed relaxation can never be activated later. A failed/
-ambiguous attempt, a late response, or an old process cannot install activation. At most
+blocks only `R` and cleans only that room. If an applicable guard or intake wins the
+pre-dispatch local compare-and-set, the relaxation fails before room membership changes.
+A failed/ambiguous pre-dispatch attempt, a late response, or an old process cannot mint or
+consume a new permit. At most
 one durable successor may commit for a predecessor. Unprovable ordering, ambiguous
 canonical identity or active-resource binding, a stale/conflicting snapshot, or a failed
 journal/recovery-copy commit or read-back explicitly invokes immediate global disable;
@@ -494,7 +515,7 @@ are protocol no-flow constraints even though they are not separate diagram nodes
 | Private Bucket | Managed high-risk processor isolated from ordinary APIs. | Sanitized authenticated-encrypted raw data after Issue #16, plus a separately protected safety/deletion/revocation/auth-invalidation recovery copy. No audio. |
 | Resend | External email processor. | Minimum invited address and one-time-link content only after Issue #12. |
 | Issue #4 maintenance | Trusted only for one approved offline operation. | Narrow credentials; mutual exclusion; no serving or external-party flows. |
-| Safety recovery copy | Integrity-protected authority over restored application safety, deletion admission, revocation, and authentication invalidation; it never stores or recreates serving activation. | Conditional committed head over the one-generation global-enable/complete-denylist snapshot; append-only open/clean-close intake-continuity evidence; durable intake and commit/read-back-verified `hidden` room-all-session/exact-session tombstones with dominance; unresolved admission blockers; auth generations/key versions; and restricted typed pseudonymous account/device checkpoints only; no direct identity or bearer material. |
+| Safety recovery copy | Integrity-protected authority over restored application safety, deletion admission, revocation, and authentication invalidation; it never stores or recreates global activation or a room-removal permit. | Conditional committed head over the one-generation global-enable/complete-denylist snapshot with latest per-room action provenance; append-only open/clean-close intake-continuity evidence; durable intake and commit/read-back-verified `hidden` room-all-session/exact-session tombstones with dominance; unresolved admission blockers; auth generations/key versions; and restricted typed pseudonymous account/device checkpoints only; no direct identity or bearer material. |
 | Admin export | Separately authorized and audited managed boundary. | Encrypted, time-bounded object; no ordinary API or untracked plaintext route. |
 
 ## Consequences
@@ -566,7 +587,7 @@ are protocol no-flow constraints even though they are not separate diagram nodes
 | --- | --- | --- |
 | `GATE-ADR-OWNER` | Repository owner explicitly approves this final ADR. | **PENDING** |
 | `GATE-PLATFORM-RIGHTS` | Current authoritative terms, acquisition channel, purpose, rights, worker disclosure, output use, takedown contact, and review evidence are approved. | **PENDING; production ingest OFF** |
-| `GATE-SAFETY-RUNTIME` | Default-off without restorable activation; `PREPARED` versus conditionally `COMMITTED` one-generation orthogonal global/denylist state; exactly one active Alpha serving authority (or future synchronous-guard owner acknowledgement/isolation); current-incarnation final activation; distinct global `G` and room `Q[R]` effects; pre-durability global-cleanup start under slow/hung/failing safety I/O; tightening rebase and relaxation non-rebase under both race orders; pending room-add noninterference versus explicit failure escalation; transient offline rejection without durable denylisting; open/clean-close deletion-intake continuity; exact-scope pending/verified deletion versus taint-triggered global revoke; crash/split/read-back/late-response recovery; monotonic journal/recovery copy; stateful/stateless restored-credential rejection; unresolved deletion-admission blocking; deletion/revocation replay; fresh recovery-admin authentication; audit; and re-enable controls have executable evidence. | **PENDING; production auth/ingest OFF** |
+| `GATE-SAFETY-RUNTIME` | Default-off without restorable activation; `PREPARED` versus conditionally `COMMITTED` one-generation orthogonal global/denylist state plus durable latest-room transition provenance; exactly one active Alpha serving authority (or future synchronous-guard owner acknowledgement/isolation); current-incarnation post-commit global activation versus pre-promotion single-use exact-room removal permit; failed-final-guard, permit-loss, crash-before-dispatch, unknown-post-dispatch reconciliation, response-loss, both exact-head CAS winners, and fresh-global-enable negatives; distinct global `G` and room `Q[R]` effects; pre-durability global-cleanup start under slow/hung/failing safety I/O; tightening rebase and relaxation non-rebase under both race orders; pending room-add noninterference versus explicit failure escalation; transient offline rejection without durable denylisting; open/clean-close deletion-intake continuity; exact-scope pending/verified deletion versus taint-triggered global revoke; crash/split/read-back/late-response recovery; monotonic journal/recovery copy; stateful/stateless restored-credential rejection; unresolved deletion-admission blocking; deletion/revocation replay; fresh recovery-admin authentication; audit; and re-enable controls have executable evidence. | **PENDING; production auth/ingest OFF** |
 | `GATE-PERSISTENCE` | Issue #16 implements approved access, sanitization, encryption, retention, exactly-one deletion selectors, durable-intake and `hidden` tombstone commit/read-back barriers, crash/response-loss recovery, room-all-child/session-sibling/dominance proofs, identity revocation checkpoints, independent auth-invalidation state, backup, export, and recovery controls. | **PENDING; production persistence/export OFF** |
 | `GATE-WORKER-PCM` | Rights allow third-party disclosure and the owner individually accepts `RISK-WORKER-AUDIO-RETENTION`. | **NOT MET; High risk NOT ACCEPTED; synthetic only** |
 | `GATE-RESIDUAL-RISK` | Every Critical/High residual in the threat model has an individual owner record with date, scope, compensating control, review date, and disable owner. | **PENDING; no blanket approval** |

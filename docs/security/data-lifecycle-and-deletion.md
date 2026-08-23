@@ -48,7 +48,7 @@ name requirements, not wire fields or runtime schemas.
 | `DATA-DELETION-TOMBSTONE`: room/session deletion manifest/tombstone | Exactly one typed selector (`room` bound to a canonical room or `session` bound to a uniquely resolved immutable session), opaque target reference, deletion state, safety generation, timestamps, and payload-free counts only. Before accepting any request, deletion ingress must have a commit/read-back-verified intake-continuity `open(E)` record. That target-free control evidence is not a tombstone or deletion state. The authenticated intake assigns one immutable original initiating-request time before its first target-specific durability attempt; the durable intake atomically retains that time with selector/idempotency until the existing `hidden` tombstone reuses all three. The tombstone is the sole durable pending-deletion record and must commit to/pass read-back before the request is accepted or acknowledged, `hidden` is reported, or purge starts. Intake is only an unresolved blocker, never a tombstone or fourth state. Tombstone, intake, and continuity evidence are held separately from restorable application data and available to every restart/restore. | A room tombstone dominates every child-session tombstone and replays over room metadata plus every current, historical, pending, late-discovered, or restored session belonging to that room; a later session request cannot narrow or overwrite it. A session tombstone replays only over that session and its derivatives. An unmatched `open(E)` globally blocks restored traffic and every relaxation but contains no target and authorizes no purge. A volatile visibility block, audit event, intake record, clean-looking or empty application store, or admin assertion never substitutes for a tombstone or verified `clean-close(E)`. Retain the tombstone while any live/history store, object version, export, replica, or backup can reintroduce the selected scope and through at least one successful restore verification after the last backup window. It contains no raw, identity, event, transcript, or audio content. |
 | `DATA-IDENTITY-REVOCATION-CHECKPOINT`: account/device deletion or revocation checkpoint | Restricted pseudonymous control data held in the separate encrypted, integrity-protected recovery copy: typed random immutable never-reused internal account/device reference, operation (`deleted` or `revoked`), monotonic control generation, timestamp, and payload-free result. Never email, role, device public key, IP address, bearer/verifier hash, content, or an unkeyed digest of a low-entropy value. | A permanent deletion checkpoint is never converted back to a reversible revocation; a current revocation generation cannot be rolled back by a backup. Retain until the longest enumerated backup/object window that can reintroduce the target has passed and through one successful post-window restore, then delete under an audited rule. Access is narrowly authorized and audited because even opaque references are linkable pseudonymous identity. |
 | `DATA-MANAGED-RAW-EXPORT`: managed raw export and access capability | Disabled until Issue #16. The access capability lasts at most 15 minutes; an encrypted managed export object lasts at most 24 hours. Alpha forbids untracked local plaintext copies by default. | Per-access admin audit. Revoke/delete every managed object in the selected room-wide or exact-session scope within 24 hours. Revoking authorization prevents future access but does not claim erasure of plaintext already disclosed. Introducing such disclosure requires a named High residual, a bounded destination, and owner acceptance. |
-| `DATA-DERIVED-COPY`: cache, index, replica, object version, or backup | Never an independent source of truth. Active copies follow the 24-hour purge SLA. Each production configuration must enumerate its actual schedules, object-version behavior, recovery window, and deletion/purge evidence. | Restart/restore remains offline and globally disabled until protected auth-invalidation state rejects pre-restore credentials, every unmatched intake-continuity epoch and unresolved deletion intake reconciles, every pending `hidden` room-all-session/session-exact tombstone and account/device deletion/revocation record replays, and current safety/denylist state replays successfully. A durable `PREPARED` or prior-incarnation `COMMITTED` relaxation is not serving authority: each boot has no activation until that same incarnation freshly commits the exact-head relaxation and its local guard verifies the matching continuity epoch plus absence of pending intake, taint, or cleanup. Unknown, conflicting, unbounded, or untested provider behavior blocks production persistence and restored authentication. |
+| `DATA-DERIVED-COPY`: cache, index, replica, object version, or backup | Never an independent source of truth. Active copies follow the 24-hour purge SLA. Each production configuration must enumerate its actual schedules, object-version behavior, recovery window, and deletion/purge evidence. | Restart/restore remains offline and globally disabled until protected auth-invalidation state rejects pre-restore credentials, every unmatched intake-continuity epoch and unresolved deletion intake reconciles, every pending `hidden` room-all-session/session-exact tombstone and account/device deletion/revocation record replays, and current safety/denylist state replays successfully. A global-enable `COMMITTED` record is not serving authority: each boot needs that incarnation's fresh activation. A room-removal `PREPARED` record still has its room in the current denylist; only the same incarnation's one-use permit may dispatch conditional promotion that atomically removes membership. A failed guard, lost/prior-incarnation permit, or crash before dispatch leaves the room present. Process loss after dispatch but before a verified result keeps recovery globally off until the exact journal/head proves either a matching permitted `COMMITTED` removal or an unchanged predecessor/`PREPARED` state with the room still present; split or unknown state remains off. Unknown, conflicting, unbounded, or untested provider behavior blocks production persistence and restored authentication. |
 
 ## Audio budget and teardown invariants
 
@@ -145,8 +145,11 @@ opens; if that write or read-back fails, times out, or is ambiguous, the endpoin
 closed and the environment remains globally off. Opening the epoch does not accept a
 deletion, identify a target, report a state, or authorize purge. Before the first target-
 specific durability attempt for each request, the current incarnation installs a sticky
-local intake-pending guard under the same transition authority used by relaxation
-activation. Pending prevents an in-flight relaxation's final effect and `clean-close(E)`;
+local intake-pending guard under the same transition authority used by relaxation.
+Pending fences global enable's final activation and `clean-close(E)`. If pending wins before
+a room-removal promotion request is dispatched, it prevents the permit/dispatch; after
+dispatch it cannot cancel a remotely authorized conditional CAS, so the selector-scoped
+block or taint applies immediately while the exact head outcome is reconciled;
 it does not by itself revoke an already installed global activation or deny non-target
 traffic. Observing a verified selector installs its room/session-scoped provisional block
 under that same authority. An invalid request clears pending only after its payload-free
@@ -168,19 +171,33 @@ restart, restore, and relaxation. It carries no selector, so it can only hold th
 environment off; it can never justify a guessed target or destructive action.
 
 For this gate, a durable safety relaxation in `PREPARED` phase is only an append-only
-proposal. `COMMITTED` means the matching journal transition and conditional recovery-head
-update committed and read back, but it still grants no serving authority. Only the same
-live incarnation may use a short, non-restorable `current-incarnation activation` to
-apply its committed relaxation, and its final local compare-and-set must verify the exact
-committed head, unchanged tightening and intake guards, matching `open(E)`, and no pending
-intake, taint, or cleanup. If that check fails, the committed relaxation can never be
-activated later. A pending intake that wins this check denies the new relaxation without
-revoking an activation that was already installed; a tainted/unaccounted intake revokes
-it. Every boot begins with activation absent and globally off and must freshly prepare and
-commit an exact-head relaxation; a restored or late `PREPARED`/`COMMITTED` record or
-response cannot recreate activation. Global disable revokes the installed global
-activation before durability; `add(R)` instead revokes/blocks only `R`'s room-removal
-effect and preserves unrelated-room activation.
+proposal. Global enable may conditionally advance to `COMMITTED`, but it still grants no
+serving authority. Only the same live incarnation may use a short, non-restorable
+`current-incarnation activation`, and its final local compare-and-set must verify the
+exact committed head, unchanged global and intake guards, matching `open(E)`, and no
+pending intake, taint, or cleanup. A pending intake that wins this check denies the new
+global relaxation without revoking an activation that was already installed; a tainted/
+unaccounted intake revokes it.
+
+Room removal cannot publish an absent-room snapshot before its final guard. Its
+`PREPARED` proposal leaves `R` in the current denylist. The same live incarnation first
+checks the exact proposal/predecessor, applicable `G`/`Q[R]` and intake guards, matching
+epoch, cleanup, and governance, atomically minting/consuming a single-use non-restorable
+permit to dispatch exactly one promotion without unblocking the room. Only that request may
+conditionally promote the proposal and atomically remove membership. Guard/permit failure
+or process loss before dispatch leaves `R` durably denied. After dispatch, an unknown result
+keeps the environment globally off until exact journal/head reconciliation proves a matching
+permitted `COMMITTED` removal or the unchanged predecessor/`PREPARED` state; split or
+unverifiable state remains off. Verified promotion is the successful removal and response
+loss reuses it.
+Every boot begins with global activation absent and globally off; prior-incarnation
+activation or removal permits and late responses cannot authorize a transition. Global
+disable revokes installed global activation before durability; `add(R)` instead blocks
+only `R` and invalidates an unissued removal permit without disturbing unrelated activation.
+After removal dispatch, the scoped block is immediate: if removal wins the exact-head CAS,
+the tightening reloads and replays against the promoted head; if the same-head safety
+tightening wins, removal fails without rebasing and `R` remains. A deletion selector block
+likewise remains effective while the dispatched removal outcome reconciles.
 
 For a verified selector, `CTRL-DELETION-FAIL-CLOSED` first applies immediate provisional
 containment to the selected visibility, ingest, lease, locator, export, and persistence
@@ -277,8 +294,10 @@ media.
    and globally off. Under that verified epoch, authenticate and authorize the admin
    request; an authentication/authorization denial does not enter deletion admission.
 2. At authenticated intake, atomically increment the intake fence and set pending. This
-   prevents a concurrent relaxation's final effect and clean close without revoking
-   existing activation. Require exactly one typed room or session selector; canonicalize
+   fences a concurrent global enable's final activation and clean close without revoking
+   existing activation. Before a room-removal promotion dispatch it prevents the permit;
+   after dispatch the selector-scoped block or taint applies immediately while the exact
+   durable outcome reconciles. Require exactly one typed room or session selector; canonicalize
    the room or resolve the immutable session and parent room from the authoritative index.
    Invalid/missing/non-unique/conflicting scope is durably denied and does not by itself
    revoke activation; separately credible but unbounded exposure triggers the safe block/
@@ -325,8 +344,10 @@ media.
 
 An intentional deletion-ingress shutdown follows the `clean-close(E)` ordering above.
 Neither a durable relaxation proposal nor a committed recovery snapshot may bypass that
-ordering: current-incarnation activation requires an exact committed head, the matching
-epoch, and unchanged clear tightening/intake guards at its final compare-and-set.
+ordering: current-incarnation global activation requires an exact committed head, the
+matching epoch, and unchanged clear global/intake guards at its final compare-and-set;
+room removal requires the equivalent guard before its one-use permit may promote a
+snapshot that no longer contains the room.
 
 A crash after durable valid intake but before verified tombstone admission produces no
 success acknowledgement; startup remains forced off and the unresolved intake supplies the same
@@ -411,7 +432,7 @@ from an unselected provider option.
 | #15 | One-active-room/lease scheduling, standby-without-PCM promotion, and failover without an audio retry queue. |
 | #16 | Postgres/Bucket access, AES-256-GCM and separate keys, audit, managed export, store inventory, idempotent purge, truthful states, provider windows, exactly-one-selector rejection tests, room-all-sessions versus exact-session/sibling proofs, room-tombstone dominance/restore tests, recovery-boundary intake-continuity open/clean-close and tombstone commit/read-back, valid/invalid success preserving non-target activation, intake/denial/tombstone and containment-proof fault injection with global revocation, source-loss/crash-before-commit and commit-before-response recovery, account/device checkpoints, and the independent auth-invalidation/current-verification-material boundary. |
 | #17 | Admin deletion-intake authorization, ingress quiescence, sticky current-incarnation pending-versus-tainted guard, durable invalid denial without global revocation, and confirmation behavior proving failed, timed-out, or ambiguous accounting/admission revokes activation and returns no success, a source loss cannot cleanly close its epoch, no false `hidden` state is exposed, and relaxation remains blocked until exact authoritative reconciliation. |
-| #4/#19 | Startup/restore forced-off deployment behavior and a recovery drill proving unmatched intake-continuity epochs block across restart even with a lost source and empty application store, pending `hidden` tombstones replay, stateful/stateless pre-restore credentials are rejected, old keys and prior-incarnation activation are excluded, and deletion/revocation plus exact `COMMITTED` safety-head reconciliation precede fresh current-incarnation activation and traffic. |
+| #4/#19 | Startup/restore forced-off deployment behavior and a recovery drill proving unmatched intake-continuity epochs block across restart even with a lost source and empty application store, pending `hidden` tombstones replay, stateful/stateless pre-restore credentials are rejected, old keys, prior-incarnation activation, and prior-incarnation room-removal permits are excluded, failed or pre-dispatch room removals retain membership, unknown post-dispatch results require exact globally-off head reconciliation, and deletion/revocation plus exact `COMMITTED` safety-head reconciliation precede fresh current-incarnation activation and traffic. |
 
 Issue #2 supplies no runtime acceptance evidence. A later owner must record the exact
 commands, provider configuration, restore results, residual risks, and source/rights

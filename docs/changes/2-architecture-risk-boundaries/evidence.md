@@ -21,13 +21,13 @@
 
 | Command | Result | Date/commit |
 | --- | --- | --- |
-| `make bootstrap` | Passed; uv checked 10 packages and pnpm 11.21.0 reported the frozen workspace already up to date. | 2026-08-24 / final staged tree after r3839675466, r3839675474, and r3839675477 |
-| `make verify` | Passed; Ruff check/format, workspace lint, mypy, typecheck, 40 pytest tests, pnpm tests, change-artifact gate, and build all succeeded. | 2026-08-24 / final staged tree after r3839675466, r3839675474, and r3839675477 |
-| `git diff --check && git diff --cached --check` | Passed with no whitespace errors on the final staged tree. | 2026-08-24 / final staged tree after r3839675466, r3839675474, and r3839675477 |
-| `git diff --quiet origin/main -- docs/changes/2-architecture-risk-boundaries/intent.md docs/changes/2-architecture-risk-boundaries/spec.md docs/changes/2-architecture-risk-boundaries/plan.md` | Passed; the owner-merged intent/spec/plan are unchanged from `origin/main` (`a44fc1f`). | 2026-08-24 / final staged tree after r3839675466, r3839675474, and r3839675477 |
-| Mermaid CLI render command below | Passed with `@mermaid-js/mermaid-cli` 11.12.0 and system Google Chrome; one 94,811-byte SVG was produced. | 2026-08-24 / final staged tree after r3839675466, r3839675474, and r3839675477 |
-| GitHub Markdown API table-render command below | Passed; 35 delimiter tables rendered as 35 GitHub HTML tables; raw and rendered row-width mismatches: 0. | 2026-08-24 / final staged tree after r3839675466, r3839675474, and r3839675477 |
-| Local-link and stable-ID audit command below | Passed; links 18/18; CTRL 50 rows/30 unique/16 shared with 0 shared later-Issue owner-set mismatches and 0 undefined; DATA 12 with 0 undefined; FLOW-ALLOW-001–020 and FLOW-DENY-001–018 exact; the 13 High threat rows exactly match 13 decision rows, all `NOT ACCEPTED`; Critical rows: 0. | 2026-08-24 / final staged tree after r3839675466, r3839675474, and r3839675477 |
+| `make bootstrap` | Passed; uv checked 10 packages and pnpm 11.21.0 reported the frozen workspace already up to date. | 2026-08-24 / final staged tree after r3839724260 |
+| `make verify` | Passed; Ruff check/format, workspace lint, mypy, typecheck, 40 pytest tests, pnpm tests, change-artifact gate, and build all succeeded. | 2026-08-24 / final staged tree after r3839724260 |
+| `git diff --check && git diff --cached --check` | Passed with no whitespace errors on the final staged tree. | 2026-08-24 / final staged tree after r3839724260 |
+| `git diff --quiet origin/main -- docs/changes/2-architecture-risk-boundaries/intent.md docs/changes/2-architecture-risk-boundaries/spec.md docs/changes/2-architecture-risk-boundaries/plan.md` | Passed; the owner-merged intent/spec/plan are unchanged from `origin/main` (`a44fc1f`). | 2026-08-24 / final staged tree after r3839724260 |
+| Mermaid CLI render command below | Passed with `@mermaid-js/mermaid-cli` 11.12.0 and system Google Chrome; one 94,811-byte SVG was produced. | 2026-08-24 / final staged tree after r3839724260 |
+| GitHub Markdown API table-render command below | Passed; 35 delimiter tables rendered as 35 GitHub HTML tables; raw and rendered row-width mismatches: 0. | 2026-08-24 / final staged tree after r3839724260 |
+| Local-link and stable-ID audit command below | Passed; links 18/18; CTRL 50 rows/30 unique/16 shared with 0 shared later-Issue owner-set mismatches and 0 undefined; DATA 12 with 0 undefined; FLOW-ALLOW-001–020 and FLOW-DENY-001–018 exact; the 13 High threat rows exactly match 13 decision rows, all `NOT ACCEPTED`; Critical rows: 0. | 2026-08-24 / final staged tree after r3839724260 |
 
 The isolated Mermaid render used no repository dependency or output path:
 
@@ -304,9 +304,18 @@ update; it adds no runtime or deployment resource.
   recovery-copy failure/uncertainty invokes a distinct global-disable transition, which is
   the point that revokes global activation and starts all-room cleanup.
   Disable/add same-predecessor races reapply a losing tightening to the newest complete
-  head; add response loss and add/remove races before/after durable promotion and local
-  activation never reopen a newer block. Global enable preserves the complete denylist,
-  room removal never enables globally, and generation change alone creates no activation.
+  head. Global enable uses commit-then-activation; room removal instead keeps membership
+  throughout `PREPARED`, atomically mints/consumes a same-incarnation one-use permit only
+  after its final guard passes, and uses that permit for the conditional promotion that
+  removes the room. Final-guard/permit failure and crash before promotion dispatch leave the
+  entry durably present. Crash or uncertainty after dispatch keeps the environment off until
+  the exact head proves matching `COMMITTED`, unchanged predecessor/`PREPARED`, or an
+  unresolved split; response loss after verified promotion reuses a successful removal.
+  Add/intake races before dispatch prevent the permit, while after dispatch their scoped
+  blocks apply immediately and the exact-head CAS winner determines whether tightening
+  replays against the promoted head or removal fails without rebasing.
+  Global enable preserves the complete denylist, room removal never enables globally, and
+  generation change alone creates no activation.
   Ordinary initial-offline, normal-end, and reconnect-offline outcomes stop and clear only
   the attempted/current session without changing the journal, generation, or denylist;
   later live status must pass fresh eligibility but needs no denylist-removal approval.
@@ -468,7 +477,8 @@ authority atomically latches off, closes local admission/publication/lease/outpu
 and starts every active/queued-room cleanup before the first durability await. Cleanup
 continues independently under slow, hung, failed, split, or ambiguous I/O; failure keeps
 the deployment off, alerts, retries, and blocks relaxation. A high-priority tightening
-fence plus atomic final relaxation check/effect closes late enable/remove races in both
+fence plus post-commit global-activation check and pre-promotion room-removal permit closes
+late enable/remove races in both
 linearization orders. The paper tests also cover future-owner fence failure, crash and
 response loss, disable/add predecessor races, and room-scoped noninterference.
 
@@ -535,7 +545,25 @@ findings:
   a separate global-disable transition; that escalation, not ordinary room pending, revokes
   global activation and cleans all rooms.
 
-Final independent deletion-scope, offline/denylist, guard-scope, and mechanical reviews
+The remote review of the resulting head then found one further valid P1:
+[a committed room removal could lose its final local effect and later be opened by fresh
+global enable](https://github.com/Shuang-su/Livecho/pull/22#discussion_r3839724260). The
+resolution gives the two relaxations deliberately different orderings. Global enable
+remains `PREPARED` → conditionally `COMMITTED` → non-restorable current-incarnation
+activation. Room removal keeps `R` in the durable denylist throughout `PREPARED`; the same
+live incarnation's final exact-head/guard/continuity/governance compare-and-set atomically
+mints and consumes a one-use non-restorable permit to issue exactly one conditional
+promotion. That promotion atomically removes `R` and is the durable/effective removal,
+with no fallible post-commit room effect. Failed guards, lost or prior-incarnation permits,
+and crashes before promotion dispatch therefore leave `R` present. After dispatch, an
+unknown result forces global-off exact-head reconciliation: matching `COMMITTED` is the
+valid removal, unchanged predecessor/`PREPARED` retains `R`, and split/unverifiable state
+stays off. Verified promotion plus response loss is idempotent success. Later
+add/intake/global-disable actions apply their safe scope immediately; a removal-winning CAS
+requires replay against the promoted head, while a safety-tightening winner makes the
+removal fail without rebasing and retains `R`.
+
+Final independent deletion-scope, offline/denylist, guard-scope, removal-ordering, and mechanical reviews
 found no remaining P1/P2 in the resulting tree. Fresh `make bootstrap && make verify`
 passed with 40 pytest tests. The final staged tree has 30 stable controls, 12 data classes,
 13 individually unaccepted High rows, continuous `FLOW-ALLOW-001`–`020` and
