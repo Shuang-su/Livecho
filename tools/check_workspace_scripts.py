@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-import re
+import subprocess
 import sys
 from pathlib import Path
 from typing import Any
@@ -11,63 +11,45 @@ from typing import Any
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 WORKSPACE_CONFIG = "pnpm-workspace.yaml"
 REQUIRED_SCRIPTS = ("lint", "typecheck", "test", "build")
-YAML_LIST_ITEM = re.compile(r"^\s*-\s*(?P<value>.+?)\s*$")
-
-
-def workspace_patterns(repository_root: Path = REPOSITORY_ROOT) -> list[str]:
-    """Read the packages list from pnpm-workspace.yaml, failing closed."""
-    config = repository_root / WORKSPACE_CONFIG
-    if not config.is_file():
-        raise ValueError(f"missing {WORKSPACE_CONFIG}")
-
-    patterns: list[str] = []
-    in_packages = False
-    for line_number, raw_line in enumerate(config.read_text(encoding="utf-8").splitlines(), 1):
-        stripped = raw_line.strip()
-        if not in_packages:
-            if stripped == "packages:":
-                in_packages = True
-            continue
-        if stripped and not raw_line[0].isspace():
-            break
-        if not stripped or stripped.startswith("#"):
-            continue
-        match = YAML_LIST_ITEM.fullmatch(raw_line)
-        if match is None:
-            raise ValueError(f"unsupported packages syntax on line {line_number}")
-        value = match.group("value").split(" #", 1)[0].strip().strip("'\"")
-        if not value:
-            raise ValueError(f"empty workspace pattern on line {line_number}")
-        relative = Path(value.removeprefix("!"))
-        if relative.is_absolute() or ".." in relative.parts:
-            raise ValueError(f"workspace pattern escapes repository: {value}")
-        patterns.append(value)
-    if not in_packages or not patterns:
-        raise ValueError("pnpm-workspace.yaml must contain a non-empty packages list")
-    return patterns
 
 
 def workspace_package_files(repository_root: Path = REPOSITORY_ROOT) -> list[Path]:
-    """Return manifests selected by the actual pnpm workspace patterns."""
+    """Ask pnpm to return manifests using pnpm's own workspace glob semantics."""
+    if not (repository_root / WORKSPACE_CONFIG).is_file():
+        raise ValueError(f"missing {WORKSPACE_CONFIG}")
+
+    result = subprocess.run(
+        ["pnpm", "list", "--recursive", "--depth", "-1", "--json"],
+        cwd=repository_root,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        detail = result.stderr.strip() or f"pnpm exited with status {result.returncode}"
+        raise ValueError(f"pnpm workspace discovery failed: {detail}")
+    try:
+        projects: Any = json.loads(result.stdout)
+    except json.JSONDecodeError as error:
+        raise ValueError(f"pnpm returned invalid workspace JSON: {error}") from error
+    if not isinstance(projects, list):
+        raise ValueError("pnpm workspace discovery did not return a project list")
+
+    repository = repository_root.resolve()
     manifests: set[Path] = set()
-    for configured_pattern in workspace_patterns(repository_root):
-        excluded = configured_pattern.startswith("!")
-        pattern = configured_pattern.removeprefix("!")
-        matches = list(repository_root.glob(pattern))
-        if excluded:
-            excluded_roots = [path for path in matches if path.is_dir()]
-            manifests = {
-                manifest
-                for manifest in manifests
-                if not any(
-                    manifest.parent == root or root in manifest.parents for root in excluded_roots
-                )
-            }
-            continue
-        for path in matches:
-            manifest = path if path.name == "package.json" else path / "package.json"
-            if manifest.is_file():
-                manifests.add(manifest)
+    for index, project in enumerate(projects):
+        path_text = project.get("path") if isinstance(project, dict) else None
+        if not isinstance(path_text, str) or not path_text.strip():
+            raise ValueError(f"pnpm workspace project {index} has no path")
+        project_path = Path(path_text).resolve()
+        try:
+            project_path.relative_to(repository)
+        except ValueError as error:
+            raise ValueError(f"pnpm workspace escapes repository: {project_path}") from error
+        manifest = project_path / "package.json"
+        if not manifest.is_file():
+            raise ValueError(f"pnpm workspace has no package.json: {project_path}")
+        manifests.add(manifest)
     return sorted(manifests)
 
 

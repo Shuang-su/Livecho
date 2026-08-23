@@ -64,6 +64,9 @@ def test_implementation_requires_artifacts_in_the_base(monkeypatch: pytest.Monke
     )
     monkeypatch.setattr(check_change_artifacts, "_durable_base_artifact_errors", lambda base: [])
     monkeypatch.setattr(check_change_artifacts, "_current_issue_artifact_errors", lambda issue: [])
+    monkeypatch.setattr(
+        check_change_artifacts, "_accepted_artifact_rewrite_errors", lambda base, paths: []
+    )
     monkeypatch.setattr(check_change_artifacts, "_base_artifact_paths", lambda base, issue: [])
 
     assert check_change_artifacts.lifecycle_errors() == [
@@ -82,6 +85,9 @@ def test_implementation_accepts_complete_base_artifacts(monkeypatch: pytest.Monk
     )
     monkeypatch.setattr(check_change_artifacts, "_durable_base_artifact_errors", lambda base: [])
     monkeypatch.setattr(check_change_artifacts, "_current_issue_artifact_errors", lambda issue: [])
+    monkeypatch.setattr(
+        check_change_artifacts, "_accepted_artifact_rewrite_errors", lambda base, paths: []
+    )
     monkeypatch.setattr(
         check_change_artifacts,
         "_base_artifact_paths",
@@ -144,6 +150,32 @@ def test_base_artifact_required_files_cannot_be_deleted(
     ]
 
 
+def test_implementation_cannot_rewrite_accepted_decisions(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        check_change_artifacts,
+        "_git",
+        lambda *arguments: "\n".join(
+            [
+                "docs/changes/2-architecture/intent.md",
+                "docs/changes/2-architecture/spec.md",
+                "docs/changes/2-architecture/plan.md",
+                "docs/changes/2-architecture/evidence.md",
+            ]
+        ),
+    )
+
+    assert check_change_artifacts._accepted_artifact_rewrite_errors(
+        "base-sha",
+        {
+            "docs/changes/2-architecture/spec.md",
+            "docs/changes/2-architecture/evidence.md",
+            "services/backend/app.py",
+        },
+    ) == ["implementation cannot rewrite accepted artifacts: docs/changes/2-architecture/spec.md"]
+
+
 def test_workspace_requires_every_verification_script(tmp_path: Path) -> None:
     write_workspace_config(tmp_path, "apps/*")
     package = tmp_path / "apps" / "web"
@@ -181,6 +213,23 @@ def test_workspace_checker_follows_new_configured_roots(tmp_path: Path) -> None:
 
     assert workspace_errors(tmp_path) == [
         "workspace services/backend missing scripts: typecheck, test, build"
+    ]
+
+
+def test_workspace_checker_uses_pnpm_glob_semantics(tmp_path: Path) -> None:
+    write_workspace_config(tmp_path, "packages/{web,admin}")
+    for package_name in ("web", "admin"):
+        package = tmp_path / "packages" / package_name
+        package.mkdir(parents=True)
+        (package / "package.json").write_text(
+            '{"name":"@livecho/' + package_name + '","version":"0.0.0","private":true,'
+            '"scripts":{"lint":"lint"}}',
+            encoding="utf-8",
+        )
+
+    assert workspace_errors(tmp_path) == [
+        "workspace packages/admin missing scripts: typecheck, test, build",
+        "workspace packages/web missing scripts: typecheck, test, build",
     ]
 
 

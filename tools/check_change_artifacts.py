@@ -128,6 +128,20 @@ def _durable_base_artifact_errors(base_ref: str) -> list[str]:
     return []
 
 
+def _accepted_artifact_rewrite_errors(base_ref: str, changed_paths: set[str]) -> list[str]:
+    """Keep accepted decisions immutable while an implementation PR is in flight."""
+    tree = _git("ls-tree", "-r", "--name-only", base_ref, "docs/changes")
+    accepted_names = set(ACCEPTED_BEFORE_IMPLEMENTATION)
+    rewritten = sorted(
+        path_text
+        for path_text in tree.splitlines()
+        if Path(path_text).name in accepted_names and path_text in changed_paths
+    )
+    if rewritten:
+        return ["implementation cannot rewrite accepted artifacts: " + ", ".join(rewritten)]
+    return []
+
+
 def _is_empty_repository_bootstrap(base_ref: str) -> bool:
     protected_paths = _git(
         "ls-tree",
@@ -169,6 +183,10 @@ def lifecycle_errors() -> list[str]:
         return ["Issue 1 bootstrap exception is closed after the foundation reaches main"]
     if is_artifact_only_change(issue_number, changed_paths):
         return []
+
+    rewrite_errors = _accepted_artifact_rewrite_errors(base_ref, changed_paths)
+    if rewrite_errors:
+        return rewrite_errors
 
     base_paths = _base_artifact_paths(base_ref, issue_number)
     directories = {path.rsplit("/", 1)[0] for path in base_paths}
