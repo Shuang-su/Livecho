@@ -340,9 +340,10 @@ def test_uv_version_matches_local_docs_and_ci(tmp_path: Path) -> None:
         text=True,
     )
     assert mismatch.returncode == 2
+    normalized_error = " ".join(mismatch.stderr.split())
     assert (
         f"Required uv version `==0.0.0` does not match the running version `{running_version}`"
-        in mismatch.stderr
+        in normalized_error
     )
 
 
