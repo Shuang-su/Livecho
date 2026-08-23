@@ -19,7 +19,7 @@ owner decisions are complete.
 | --- | --- | --- |
 | `DEC-ARCH-001` | Use one modular-monolith backend as the sole online application authority during Alpha. | Proposed; owner approval pending |
 | `DEC-MAINT-001` | Permit the Issue #4 maintenance job only as a mutually exclusive, non-serving, narrowly credentialed runbook actor. | Proposed; owner approval pending |
-| `DEC-SAFETY-001` | Start and restore without serving activation; preserve orthogonal global/room safety scope, a recovery-visible deletion-intake continuity guard, and durable deletion admission; reject stateful/stateless pre-restore credentials; and reconcile deletion/revocation checkpoints before a current-incarnation re-enable. | Proposed; runtime evidence pending |
+| `DEC-SAFETY-001` | Start and restore without serving activation; preserve orthogonal global/room safety scope, recovery-visible safety/deletion/identity-control intake continuity, durable deletion admission, and durable account/device checkpoint or denial outcomes; reject stateful/stateless pre-restore credentials; and reconcile every result before a current-incarnation re-enable. | Proposed; runtime evidence pending |
 | `DEC-WORKER-001` | Treat every community worker as untrusted; synthetic frames are the production default, and real PCM is a separately gated exception. | Proposed; `RISK-WORKER-AUDIO-RETENTION` is not accepted |
 | `DEC-DATA-001` | Keep normalized data restricted by default and raw business payloads outside ordinary API paths; production persistence awaits Issue #16. | Proposed; runtime evidence pending |
 | `DEC-EXPORT-001` | Allow raw access only through a separately authorized, managed, encrypted, and audited admin-export boundary after Issue #16. | Proposed; capability disabled |
@@ -115,8 +115,9 @@ canonical-room denylist decisions. An integrity-protected current recovery copy 
 stored outside restorable application-data backups. In addition to the complete safety
 snapshot and deletion state, that boundary holds durable deletion-intake records,
 commit/read-back-verified `hidden` room/session tombstones, unresolved deletion-admission
-blockers, typed pseudonymous account/device checkpoints, and a monotonic authentication-
-invalidation generation or signing/verifier key version. Those values and the current
+blockers, typed pseudonymous account/device checkpoints and durable invalid/unauthorized
+identity-control denials, append-only epoch predecessor/high-watermark evidence, and a
+monotonic authentication-invalidation generation or signing/verifier key version. Those values and the current
 verification key material cannot be restored from an application-data backup, and pre-
 restore key versions cannot remain in the active verification set.
 
@@ -136,20 +137,26 @@ result is not a committed relaxation and leaves the serving gate off. This is an
 idempotent single-writer protocol over the already required journal and recovery copy,
 not a claim that process RAM and two stores can commit atomically.
 
-Before a serving incarnation may accept deletion ingress or install serving activation,
+Before a serving incarnation may accept deletion or account/device-control ingress or
+install serving activation,
 it must commit and read back an append-only `open(E)` serving/intake-continuity epoch in
 the same recovery boundary. The epoch remains open while that incarnation can receive
-safety tightening or deletion requests. It may gain `clean-close(E)` evidence only after
-the same logical authority atomically quiesces serving, safety-control, and deletion
+safety tightening, room/session deletion requests, or account/device deletion or
+revocation controls. It may gain `clean-close(E)` evidence only after the same logical
+authority atomically quiesces serving, safety-control, deletion, and identity-control
 ingress; every accepted safety-control handler is drained and its outcome durably
-reconciled; every deletion request
-seen in `E` is drained; each valid request is bound to its commit/read-back-verified
-`hidden` tombstone; and each invalid request has a durable denial. The close must itself
+reconciled; every deletion request seen in `E` is drained, with each valid request bound to
+its commit/read-back-verified `hidden` tombstone and each invalid request bound to durable
+denial; and every account/device control seen in `E` is drained, with each valid action
+bound to its commit/read-back-verified typed pseudonymous checkpoint and each invalid or
+unauthorized action bound to durable denial. The close must itself
 commit/read back against the epoch predecessor/high-watermark while that ingress fence
 remains closed. If a tightening/request linearizes first, close waits for reconciliation;
 if close linearizes first, the action is rejected or bound to a new verified epoch. Each
-accepted safety handler or deletion intake creates a scope-labelled pending entry that
-prevents `clean-close(E)` until it has a durable outcome; pending is continuity accounting,
+accepted safety handler, deletion intake, or identity-control intake creates a scope-
+labelled pending entry and advances the epoch's high-watermark before its governed effect
+or outcome write; that entry prevents `clean-close(E)` until it has a durable outcome;
+pending is continuity accounting,
 not an instruction to revoke every serving path. A global disable makes `G` sticky and
 revokes global activation. A well-bound `add(R)` that is still pending within its bounded
 control deadline makes only `Q[R]` sticky, blocks/cleans `R`, and leaves unrelated-room
@@ -159,10 +166,16 @@ timeout, unknown result, or read-back ambiguity in deletion admission taints the
 guard and revokes global activation; the same failure classes for `add(R)` explicitly
 invoke a separate global-disable transition, whose `G` action then revokes globally. If the recovery
 boundary is unavailable and the process then dies, the previously durable unmatched
-`open(E)` remains the recovery-visible blocker. A later process cannot infer that no
+`open(E)` remains the recovery-visible blocker. For an account/device action, pending is
+installed before target authority is stopped or a checkpoint is attempted. A valid action
+stops only its exact target immediately and clears pending only after its typed checkpoint
+commits and reads back; an invalid or unauthorized action changes no target authority and
+clears pending only after durable denial. A failed or ambiguous identity intake,
+checkpoint, or denial taints the epoch, preserves target denial where applicable, revokes
+global activation, and keeps restore traffic off. A later process cannot infer that no
 request existed, rely on the initiating client to retry, or clear the guard without exact
-authoritative safety/intake replay and reconciliation; absent that evidence, production
-remains off.
+authoritative safety, deletion, and identity-control replay and reconciliation; absent that
+evidence, production remains off.
 
 An operator or admin may disable globally or add a canonical room to the denylist. A
 global disable changes the global bit and starts cleanup for every active/queued room
@@ -198,13 +211,13 @@ cleanup globally.
 A `COMMITTED` global-enable record is durable history and a necessary condition, not
 serving authority. Only after matching journal/recovery read-back may the same live
 incarnation use one short local compare-and-set to recheck the exact committed head,
-captured applicable `G` and deletion-intake fence, matching `open(E)`, absence of pending/
+captured applicable `G` and control-intake fence, matching `open(E)`, absence of pending/
 tainted intake and unfinished applicable cleanup, and every governance gate, then install
 current-incarnation global activation. That activation is deliberately not persisted.
 
 Room removal reverses that order. While the current snapshot still contains `R`, the same
 live incarnation checks the exact `PREPARED` proposal and predecessor head, applicable
-`G`/`Q[R]` and deletion-intake fences, continuity epoch, cleanup, and governance gates in
+`G`/`Q[R]` and applicable control-intake fences, continuity epoch, cleanup, and governance gates in
 one local compare-and-set. Success atomically mints and consumes a single-use,
 non-restorable permit to issue exactly one conditional promotion but does not serve or
 unblock `R`. Only that permitted request may advance to
@@ -235,23 +248,40 @@ Every process start and every restore creates a new never-reused serving incarna
 has no activation, and ignores any backed-up `enabled` value. Neither a `COMMITTED`
 relaxation from a prior incarnation nor its delayed success response may recreate
 activation. Before an environment can accept authentication, ingest, worker, or viewer
-traffic, the Issue #4
-recovery path must verify the separate recovery copy; advance or reconcile its protected
-authentication-invalidation generation/key version; purge every restored magic-link,
-enrollment-token, session-verifier, and session row; replay typed room-all-session or
-exact-session deletion with room-tombstone dominance plus typed account/device deletion/
-revocation checkpoints; prove that no unresolved deletion intake or admission failure is
-pending; reconcile every prior intake-continuity epoch; reconcile the newest complete
-safety snapshot; and commit/read back the current incarnation's `open(E)` before deletion
-ingress or activation. A restored empty store,
-volatile containment, or audit-only evidence cannot prove that deletion admission is
-complete. A pre-restore credential must remain rejected by the server even if its
-plaintext still exists in a mailbox or client. Re-enable also requires a fresh, non-
-restored, separately audited admin recovery authentication, current platform/rights
-evidence, incident remediation where applicable, tabletop evidence, and a recorded owner
-decision. Even when the durable global bit already says enabled, the new incarnation must
-commit a fresh exact-head global-enable transition and pass the local final activation
-compare-and-set; reconciliation alone never opens traffic.
+traffic, the Issue #4 recovery path must keep the new incarnation quarantined and first
+verify the separate recovery copy. Failure to establish that copy's authenticity,
+integrity, freshness, or single non-rolled-back authority terminates the activation attempt:
+the environment remains offline and must repair or recover an authoritative copy rather
+than replay, close an epoch, or infer safety from restored application data. A copy that
+passes those checks but exposes unmatched `open(E)`, a stale/cross-epoch close, or a safety,
+deletion, or identity-control action without its required durable outcome is instead a
+trusted recovery blocker: traffic remains isolated while offline reconciliation continues.
+
+That reconciliation must fence the old authority; authoritatively replay every accepted
+safety, deletion, and account/device deletion or revocation control through each unmatched
+epoch's exact predecessor/high-watermark; recover valid deletions to verified tombstones
+and invalid deletions to durable denials; and recover valid identity actions to typed
+pseudonymous checkpoints and invalid or unauthorized actions to durable denials. It then
+applies every tombstone and checkpoint, advances or reconciles the protected authentication-
+invalidation generation/key version, purges restored credentials and old verification
+authority, and proves that no deleted target can authenticate or receive new authority.
+Only after those results apply does it reconcile the newest complete orthogonal safety
+snapshot. Only after the old owner is fenced, authoritative replay is complete, every
+accepted handler has its required durable outcome, and safety is reconciled may it commit/
+read back `clean-close(E)` for the old epoch against the exact predecessor/high-watermark. Failed, stale,
+cross-epoch, or ambiguous close remains unmatched/off; a zero-event close still requires
+authoritative zero-event proof. After every old epoch is sealed, the new incarnation must
+commit/read back a fresh `open(E)` before deletion or identity-control ingress or
+activation.
+
+A restored empty store, volatile containment, or audit-only evidence cannot prove that an
+action or admission is complete. A pre-restore credential must remain rejected by the
+server even if its plaintext still exists in a mailbox or client. Re-enable also requires
+a fresh, non-restored, separately audited admin recovery authentication, current platform/
+rights evidence, incident remediation where applicable, tabletop evidence, and a recorded
+owner decision. Even when the durable global bit already says enabled, the new incarnation
+must commit a fresh exact-head global-enable transition and pass the local final activation
+compare-and-set; replay, epoch close/open, and reconciliation alone never open traffic.
 
 ### `DEC-WORKER-001`: community workers are hostile-capable processors
 
@@ -482,8 +512,8 @@ authorizes and audits a bounded managed object through `EG`. `FLOW-DENY-001` and
 | `FLOW-ALLOW-008` | The owning Issue has implemented the data class and access rule. | Restricted normalized/minimal identity/control and payload-free audit only. | Do not persist. |
 | `FLOW-ALLOW-009` | Issue #16 and current source/rights gates pass. | Credential-, locator-, identity-, and audio-stripped; compressed and authenticated-encrypted. | Do not archive; never spill to another path. |
 | `FLOW-ALLOW-010` | Issue #12 authorizes an invite. | Minimum invited address and one-time-link content only. | Do not send; never log plaintext bearer material. |
-| `FLOW-ALLOW-011` | Safety, deletion/revocation, and authentication-invalidation updates can be integrity-protected and ordered. | `PREPARED` proposals and a conditionally advanced `COMMITTED` recovery head; one-generation global/denylist snapshot; append-only intake-continuity epochs; durable deletion intake plus verified `hidden` room/session tombstones with room dominance; auth-invalidation generation/key version; and typed pseudonymous account/device checkpoints only. | Never restore serving activation; keep provisional containment, report no admitted deletion, start no purge, and remain globally off on an unmatched continuity epoch, unknown scope/binding, or failed/ambiguous commit/read-back. |
-| `FLOW-ALLOW-012`–`FLOW-ALLOW-016` | An approved, mutually exclusive Issue #4 runbook is active. | Narrow operation-specific access; unresolved intake reconciliation, restored stateful/stateless credential invalidation, and deletion/revocation replay precede safety reconciliation and traffic. | Abort, remain offline and globally off, alert. |
+| `FLOW-ALLOW-011` | Safety, deletion/revocation, and authentication-invalidation updates can be integrity-protected and ordered. | `PREPARED` proposals and a conditionally advanced `COMMITTED` recovery head; one-generation global/denylist snapshot; append-only safety/deletion/identity-control intake-continuity epochs and predecessor/high-watermarks; durable deletion intake plus verified `hidden` room/session tombstones with room dominance; auth-invalidation generation/key version; and typed pseudonymous account/device checkpoints plus durable invalid/unauthorized denials only. | Never restore serving activation. A trusted unmatched epoch keeps traffic isolated while exact authoritative offline replay continues; an untrusted recovery copy aborts activation. Unknown binding or failed/ambiguous required outcome remains globally off, with no guessed admission, purge, checkpoint, denial, clean close, or activation. |
+| `FLOW-ALLOW-012`–`FLOW-ALLOW-016` | An approved, mutually exclusive Issue #4 runbook is active. | Narrow operation-specific access; authoritative safety/deletion/identity-control replay, resulting tombstone/checkpoint application, restored stateful/stateless credential invalidation, safety reconciliation, old-epoch clean close, and new-epoch open precede traffic in that order. | Abort activation/traffic admission, remain offline and globally off, preserve recovery blockers, alert, and repair or retry offline reconciliation. |
 | `FLOW-ALLOW-017`–`FLOW-ALLOW-020` | Issue #16 managed export and admin authorization/audit controls pass. | 15-minute capability; encrypted managed object no longer than 24 hours. | Deny or delete/revoke; no local plaintext fallback. |
 
 ### No-flow registry
@@ -515,7 +545,7 @@ are protocol no-flow constraints even though they are not separate diagram nodes
 | Private Bucket | Managed high-risk processor isolated from ordinary APIs. | Sanitized authenticated-encrypted raw data after Issue #16, plus a separately protected safety/deletion/revocation/auth-invalidation recovery copy. No audio. |
 | Resend | External email processor. | Minimum invited address and one-time-link content only after Issue #12. |
 | Issue #4 maintenance | Trusted only for one approved offline operation. | Narrow credentials; mutual exclusion; no serving or external-party flows. |
-| Safety recovery copy | Integrity-protected authority over restored application safety, deletion admission, revocation, and authentication invalidation; it never stores or recreates global activation or a room-removal permit. | Conditional committed head over the one-generation global-enable/complete-denylist snapshot with latest per-room action provenance; append-only open/clean-close intake-continuity evidence; durable intake and commit/read-back-verified `hidden` room-all-session/exact-session tombstones with dominance; unresolved admission blockers; auth generations/key versions; and restricted typed pseudonymous account/device checkpoints only; no direct identity or bearer material. |
+| Safety recovery copy | Integrity-protected authority over restored application safety, deletion admission, revocation, and authentication invalidation; it never stores or recreates global activation or a room-removal permit. | Conditional committed head over the one-generation global-enable/complete-denylist snapshot with latest per-room action provenance; append-only safety/deletion/identity-control open/clean-close continuity plus predecessor/high-watermark evidence; durable intake and commit/read-back-verified `hidden` room-all-session/exact-session tombstones with dominance; unresolved action blockers; auth generations/key versions; and restricted typed pseudonymous account/device checkpoints plus durable invalid/unauthorized denials only; no direct identity or bearer material. |
 | Admin export | Separately authorized and audited managed boundary. | Encrypted, time-bounded object; no ordinary API or untracked plaintext route. |
 
 ## Consequences
@@ -557,14 +587,16 @@ are protocol no-flow constraints even though they are not separate diagram nodes
 - Issues #7 and #10 own platform resolution, real-time event validation, and ingest
   behavior under the fail-closed policy.
 - Issue #8 owns executable decoder and bounded-RAM/no-persistence evidence.
-- Issues #12 and #13 own account/device cascade, stateful and stateless credential
-  invalidation, fresh recovery-admin authentication, and negative acceptance tests;
+- Issues #12 and #13 own account/device pending-before-effect behavior, cascade, typed
+  checkpoint/durable-denial outcomes, stateful and stateless credential invalidation,
+  fresh recovery-admin authentication, and negative acceptance tests;
   Issues #14/#15 own lease and scheduling controls.
 - Issue #16 owns normalized/raw persistence, managed export, invalid-selector rejection,
   durable intake plus `hidden` tombstone commit/read-back admission, pre/post-commit crash
-  and response-loss proofs, room-all-child/session-sibling/dominance proofs, identity
-  checkpoints, the orthogonal global/room safety snapshot, backup inventory, independent
-  auth-invalidation state, and exact-scope restore-replay evidence.
+  and response-loss proofs, room-all-child/session-sibling/dominance proofs, identity-
+  control intake-continuity high-watermarks, checkpoints/denials and crash replay, the
+  orthogonal global/room safety snapshot, backup inventory, independent auth-invalidation
+  state, and exact-scope restore-replay evidence.
 - Issues #4 and #19 own isolated restore sequencing, deployment, monitoring, recovery,
   and final Alpha evidence.
 
@@ -587,8 +619,8 @@ are protocol no-flow constraints even though they are not separate diagram nodes
 | --- | --- | --- |
 | `GATE-ADR-OWNER` | Repository owner explicitly approves this final ADR. | **PENDING** |
 | `GATE-PLATFORM-RIGHTS` | Current authoritative terms, acquisition channel, purpose, rights, worker disclosure, output use, takedown contact, and review evidence are approved. | **PENDING; production ingest OFF** |
-| `GATE-SAFETY-RUNTIME` | Default-off without restorable activation; `PREPARED` versus conditionally `COMMITTED` one-generation orthogonal global/denylist state plus durable latest-room transition provenance; exactly one active Alpha serving authority (or future synchronous-guard owner acknowledgement/isolation); current-incarnation post-commit global activation versus pre-promotion single-use exact-room removal permit; failed-final-guard, permit-loss, crash-before-dispatch, unknown-post-dispatch reconciliation, response-loss, both exact-head CAS winners, and fresh-global-enable negatives; distinct global `G` and room `Q[R]` effects; pre-durability global-cleanup start under slow/hung/failing safety I/O; tightening rebase and relaxation non-rebase under both race orders; pending room-add noninterference versus explicit failure escalation; transient offline rejection without durable denylisting; open/clean-close deletion-intake continuity; exact-scope pending/verified deletion versus taint-triggered global revoke; crash/split/read-back/late-response recovery; monotonic journal/recovery copy; stateful/stateless restored-credential rejection; unresolved deletion-admission blocking; deletion/revocation replay; fresh recovery-admin authentication; audit; and re-enable controls have executable evidence. | **PENDING; production auth/ingest OFF** |
-| `GATE-PERSISTENCE` | Issue #16 implements approved access, sanitization, encryption, retention, exactly-one deletion selectors, durable-intake and `hidden` tombstone commit/read-back barriers, crash/response-loss recovery, room-all-child/session-sibling/dominance proofs, identity revocation checkpoints, independent auth-invalidation state, backup, export, and recovery controls. | **PENDING; production persistence/export OFF** |
+| `GATE-SAFETY-RUNTIME` | Default-off without restorable activation; `PREPARED` versus conditionally `COMMITTED` one-generation orthogonal global/denylist state plus durable latest-room transition provenance; exactly one active Alpha serving authority (or future synchronous-guard owner acknowledgement/isolation); current-incarnation post-commit global activation versus pre-promotion single-use exact-room removal permit; failed-final-guard, permit-loss, crash-before-dispatch, unknown-post-dispatch reconciliation, response-loss, both exact-head CAS winners, and fresh-global-enable negatives; distinct global `G` and room `Q[R]` effects; pre-durability global-cleanup start under slow/hung/failing safety I/O; tightening rebase and relaxation non-rebase under both race orders; pending room-add noninterference versus explicit failure escalation; transient offline rejection without durable denylisting; open/clean-close safety/deletion/identity-control continuity with pending/high-watermark before account/device authority effects, valid checkpoint and invalid/unauthorized denial outcomes, and crash-before-outcome replay; exact-scope pending/verified deletion versus taint-triggered global revoke; trusted-unmatched offline replay versus untrusted-copy activation abort; replay→apply→safety-reconcile→old-close→new-open→fresh-activation ordering; crash/split/read-back/late-response recovery; monotonic journal/recovery copy; stateful/stateless restored-credential rejection; unresolved action blocking; fresh recovery-admin authentication; audit; and re-enable controls have executable evidence. | **PENDING; production auth/ingest OFF** |
+| `GATE-PERSISTENCE` | Issue #16 implements approved access, sanitization, encryption, retention, exactly-one deletion selectors, durable-intake and `hidden` tombstone commit/read-back barriers, crash/response-loss recovery, room-all-child/session-sibling/dominance proofs, identity-control epoch high-watermarks, revocation checkpoints, durable denials and crash replay, independent auth-invalidation state, backup, export, and recovery controls. | **PENDING; production persistence/export OFF** |
 | `GATE-WORKER-PCM` | Rights allow third-party disclosure and the owner individually accepts `RISK-WORKER-AUDIO-RETENTION`. | **NOT MET; High risk NOT ACCEPTED; synthetic only** |
 | `GATE-RESIDUAL-RISK` | Every Critical/High residual in the threat model has an individual owner record with date, scope, compensating control, review date, and disable owner. | **PENDING; no blanket approval** |
 

@@ -21,13 +21,13 @@
 
 | Command | Result | Date/commit |
 | --- | --- | --- |
-| `make bootstrap` | Passed; uv checked 10 packages and pnpm 11.21.0 reported the frozen workspace already up to date. | 2026-08-24 / final staged tree after r3839724260 |
-| `make verify` | Passed; Ruff check/format, workspace lint, mypy, typecheck, 40 pytest tests, pnpm tests, change-artifact gate, and build all succeeded. | 2026-08-24 / final staged tree after r3839724260 |
-| `git diff --check && git diff --cached --check` | Passed with no whitespace errors on the final staged tree. | 2026-08-24 / final staged tree after r3839724260 |
-| `git diff --quiet origin/main -- docs/changes/2-architecture-risk-boundaries/intent.md docs/changes/2-architecture-risk-boundaries/spec.md docs/changes/2-architecture-risk-boundaries/plan.md` | Passed; the owner-merged intent/spec/plan are unchanged from `origin/main` (`a44fc1f`). | 2026-08-24 / final staged tree after r3839724260 |
-| Mermaid CLI render command below | Passed with `@mermaid-js/mermaid-cli` 11.12.0 and system Google Chrome; one 94,811-byte SVG was produced. | 2026-08-24 / final staged tree after r3839724260 |
-| GitHub Markdown API table-render command below | Passed; 35 delimiter tables rendered as 35 GitHub HTML tables; raw and rendered row-width mismatches: 0. | 2026-08-24 / final staged tree after r3839724260 |
-| Local-link and stable-ID audit command below | Passed; links 18/18; CTRL 50 rows/30 unique/16 shared with 0 shared later-Issue owner-set mismatches and 0 undefined; DATA 12 with 0 undefined; FLOW-ALLOW-001–020 and FLOW-DENY-001–018 exact; the 13 High threat rows exactly match 13 decision rows, all `NOT ACCEPTED`; Critical rows: 0. | 2026-08-24 / final staged tree after r3839724260 |
+| `make bootstrap` | Passed; uv checked 10 packages and pnpm 11.21.0 reported the frozen workspace already up to date. | 2026-08-24 / final staged tree after r3839780067 and r3839780071 |
+| `make verify` | Passed; Ruff check/format, workspace lint, mypy, typecheck, 40 pytest tests, pnpm tests, change-artifact gate, and build all succeeded. | 2026-08-24 / final staged tree after r3839780067 and r3839780071 |
+| `git diff --check && git diff --cached --check` | Passed with no whitespace errors on the final staged tree. | 2026-08-24 / final staged tree after r3839780067 and r3839780071 |
+| `git diff --quiet origin/main -- docs/changes/2-architecture-risk-boundaries/intent.md docs/changes/2-architecture-risk-boundaries/spec.md docs/changes/2-architecture-risk-boundaries/plan.md` | Passed; the owner-merged intent/spec/plan are unchanged from `origin/main` (`a44fc1f`). | 2026-08-24 / final staged tree after r3839780067 and r3839780071 |
+| Mermaid CLI render command below | Passed with `@mermaid-js/mermaid-cli` 11.12.0 and system Google Chrome; one 94,811-byte SVG was produced. | 2026-08-24 / final staged tree after r3839780067 and r3839780071 |
+| GitHub Markdown API table-render command below | Passed; 35 delimiter tables rendered as 35 GitHub HTML tables; raw and rendered row-width mismatches: 0. | 2026-08-24 / final staged tree after r3839780067 and r3839780071 |
+| Local-link and stable-ID audit command below | Passed; links 18/18; CTRL 50 rows/30 unique/16 shared with 0 shared later-Issue owner-set mismatches and 0 undefined; DATA 12 with 0 undefined; FLOW-ALLOW-001–020 and FLOW-DENY-001–018 exact; the 13 High threat rows exactly match 13 decision rows, all `NOT ACCEPTED`; Critical rows: 0. | 2026-08-24 / final staged tree after r3839780067 and r3839780071 |
 
 The isolated Mermaid render used no repository dependency or output path:
 
@@ -271,10 +271,14 @@ update; it adds no runtime or deployment resource.
   starts no guessed purge, and room tombstones dominate child manifests. Immediate
   containment is provisional: the existing `hidden` tombstone must commit/read back from
   the independent recovery boundary before acknowledgement, reportable state, or purge;
-  a commit/read-back-verified `open(E)` intake-continuity epoch exists before deletion
-  ingress opens. Durable intake atomically retains selector, idempotency, and immutable
+  a commit/read-back-verified `open(E)` intake-continuity epoch exists before room/session
+  or account/device deletion/revocation ingress opens. Account/device intake joins the
+  same high-watermark before local authority is revoked and cannot clear pending until its
+  typed checkpoint commits and reads back or an invalid request receives durable denial.
+  Durable room/session intake atomically retains selector, idempotency, and immutable
   original initiating-request time for tombstone reuse. A first target-write failure,
-  source disappearance, and backend crash leave the target-free epoch unmatched, so an
+  source disappearance, and backend crash—or the equivalent identity-checkpoint first-
+  write window—leave the target-free epoch unmatched, so an
   empty application store cannot bypass restore/re-enable even when the exact target is
   unavailable; the epoch authorizes no guessed purge or fourth state. The exact audio
   ceilings, no-retry-queue rule, three truthful deletion
@@ -335,8 +339,11 @@ update; it adds no runtime or deployment resource.
   write failure followed by source loss and backend crash, tombstone commit/read-back
   failure, post-commit response loss, restart, and empty-store variants return no false
   success or purge. An unmatched epoch
-  blocks every traffic class and relaxation indefinitely unless authoritative replay
-  recovers the original request; it does not name a target or reset the clock. Durable
+  keeps every traffic class and relaxation quarantined while offline authoritative replay
+  recovers the original request; it does not name a target or reset the clock. Replay
+  unavailable or incomplete leaves the environment off indefinitely, while complete replay
+  may durably reconcile every outcome and clean-close the old epoch without ever admitting
+  traffic. Durable
   intake and the tombstone reuse the same selector/idempotency/original-time triple. A failed raw-
   object deletion cannot report active
   completion, retry is idempotent, late success records `sla_breached=true`, and final
@@ -344,18 +351,24 @@ update; it adds no runtime or deployment resource.
 - **Tabletop 3 — stale restore: Passed on paper.** The environment starts isolated and
   forced off with a new incarnation and no activation; rejects prepared/split relaxation
   and a prior incarnation's committed enable/late response; quarantines unmatched
-  continuity epochs; purges restored verifier/session rows; advances or reconciles a recovery-
+  continuity epochs without terminating the offline recovery loop; purges restored
+  verifier/session rows; advances or reconciles a recovery-
   protected auth-invalidation generation/key version; rejects stateful/stateless pre-
   restore credentials; reconciles every unresolved valid intake to a verified pending
-  `hidden` tombstone and every invalid request to durable denial; replays typed room-all-
-  child/exact-session manifests with room dominance plus
-  typed account/device checkpoints; rejects empty application state as proof of no target;
+  `hidden` tombstone and every invalid request to durable denial; replays a valid account/
+  device request that crashed after local revocation but before checkpoint durability into
+  its verified typed checkpoint; replays typed room-all-child/exact-session manifests with
+  room dominance plus all typed account/device checkpoints; rejects empty application state
+  as proof of no target;
   and proves deleted authority cannot receive new credentials before orthogonal global/
   denylist safety reconciliation.
-  Restored admin sessions stay invalid. Only after authoritative continuity replay and all
-  other gates may a fresh non-restored separately audited recovery-admin authentication
-  prepare/commit an exact-head transition whose current incarnation separately installs
-  activation.
+  Restored admin sessions stay invalid. A trusted unmatched epoch with complete replay is
+  clean-closed only after its bound high-watermark has durable safety, tombstone, checkpoint,
+  or denial outcomes; replay gaps or close failure stay quarantined, while a missing/tampered/
+  rolled-back recovery authority stops activation without guessed replay. Only after old
+  epochs reconcile, a new `open(E)` commits/read-backs, and all other gates pass may a fresh
+  non-restored separately audited recovery-admin authentication prepare/commit an exact-head
+  transition whose current incarnation separately installs activation.
 - **Tabletop 4 — malicious authenticated worker: Passed on paper.** Authentication is
   never treated as trusted execution or proof of RAM erasure. Missing third-party rights
   or an individual `RISK-WORKER-AUDIO-RETENTION` decision keeps real PCM off and synthetic
@@ -563,7 +576,30 @@ add/intake/global-disable actions apply their safe scope immediately; a removal-
 requires replay against the promoted head, while a safety-tightening winner makes the
 removal fail without rebasing and retains `R`.
 
-Final independent deletion-scope, offline/denylist, guard-scope, removal-ordering, and mechanical reviews
+The next current-head review found two additional valid P1 findings. First,
+[account/device deletion or revocation could lose its request before the first checkpoint
+write](https://github.com/Shuang-su/Livecho/pull/22#discussion_r3839780067). The resolution
+places that ingress under the same pre-armed, commit/read-back-verified `open(E)` continuity
+epoch as room/session deletion. Authenticated identity intake joins the epoch high-watermark
+and sets pending before local authority is revoked; only a verified typed checkpoint or
+durable invalid denial clears it. A checkpoint write/read-back failure or crash leaves the
+epoch unsealable, so authoritative replay must reproduce the exact typed operation and
+checkpoint before authentication, issuance, traffic, or re-enable; unavailable replay
+keeps the environment off without guessing a target.
+
+Second, [restore terminated when it encountered the very unmatched epoch it was meant to
+reconcile](https://github.com/Shuang-su/Livecho/pull/22#discussion_r3839780071). The recovery
+procedure now distinguishes an untrusted recovery authority from a trusted copy containing
+replay-required blockers. Missing, tampered, rolled-back, or conflicting authority stops
+activation and permits no guessed action. A trusted unmatched epoch instead keeps every
+traffic class isolated while the narrow offline loop continues through authoritative
+handler replay, durable tombstone/checkpoint/denial outcomes, safety-head reconciliation,
+and high-watermark-bound `clean-close(E)`. Replay or close failure remains off and retryable;
+only after all prior epochs close may the new incarnation open its own epoch and seek fresh
+admin-approved activation.
+
+Final independent deletion-scope, offline-recovery, identity-continuity, guard-scope,
+removal-ordering, and mechanical reviews
 found no remaining P1/P2 in the resulting tree. Fresh `make bootstrap && make verify`
 passed with 40 pytest tests. The final staged tree has 30 stable controls, 12 data classes,
 13 individually unaccepted High rows, continuous `FLOW-ALLOW-001`–`020` and

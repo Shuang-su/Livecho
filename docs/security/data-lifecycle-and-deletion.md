@@ -28,10 +28,10 @@ name requirements, not wire fields or runtime schemas.
 | `CTRL-AUTH-EXPIRY` | Bearer credentials have the maximum lifetimes, single-use rules, verifier storage, revocation, and purge behavior below. | Issues #12 and #13 |
 | `CTRL-AUDIT-PAYLOAD-FREE` | Security, safety-control, raw-access, and deletion audit records contain control metadata but no protected payload. | Issues #12, #13, #16, #17, and #19 |
 | `CTRL-DELETION-STATE` | A deletion selects exactly one typed target—canonical room or immutable session—and uses the existing durable `hidden` tombstone as its pending-deletion record before acceptance or purge; it enforces room-over-session dominance and exact-scope idempotent cascade and reports three truthful states with immutable late-SLA evidence. | Issue #16 |
-| `CTRL-DELETION-FAIL-CLOSED` | The deletion ingress opens and reads back a recovery-visible intake-continuity epoch before accepting requests. Pending fences relaxation/clean close without revoking existing activation: a verified selector is provisionally contained at exact room/session scope, and an invalid selector clears through durable denial. The valid request is not accepted and purge does not start until the `hidden` tombstone commits to and reads back from the independent recovery boundary. Failed/ambiguous required accounting or admission, or unprovable scoped isolation, taints the current incarnation, revokes global activation, prevents a clean epoch close, and remains off and unresolved across restart even if the initiating source disappears. | Issues #11, #16, and #17 |
+| `CTRL-DELETION-FAIL-CLOSED` | The deletion/revocation ingress opens and reads back a recovery-visible intake-continuity epoch before accepting room/session or account/device requests. Pending fences relaxation and clean close without revoking unrelated serving: a verified room/session selector is provisionally contained at exact scope, an accepted account/device operation immediately blocks that target's authority, and an invalid/unauthorized request clears through durable denial. A valid room/session request requires the verified `hidden` tombstone; a valid account/device request requires its typed checkpoint. Failed/ambiguous required accounting or admission, or unprovable scoped isolation, prevents a clean epoch close and remains off and unresolved across restart even if the initiating source disappears. | Issues #11, #12, #13, #16, and #17 |
 | `CTRL-BACKUP-EVIDENCE` | Every cache, replica, object version, export, and backup window is enumerated and evidenced; an unknown bound blocks production persistence or restored authentication. | Issues #4, #12, #13, #16, and #19 |
-| `CTRL-RESTORE-REPLAY` | A restore is offline and globally disabled until stateful/stateless pre-restore credentials are rejected, every unmatched intake-continuity epoch and unresolved deletion intake is reconciled, every pending `hidden` tombstone and deletion/revocation checkpoint is replayed, current safety state is verified, and a fresh current-incarnation activation independently passes. | Issues #4, #12, #13, #16, and #19 |
-| `CTRL-IDENTITY-RESTORE-REVOCATION` | Typed pseudonymous account/device checkpoints and auth-invalidation state survive application backups, and every stateful/stateless pre-restore credential is server-rejected before any traffic or authentication. | Issues #4, #12, #13, #16, and #19 |
+| `CTRL-RESTORE-REPLAY` | A restore keeps every ordinary/external/scheduled traffic and credential-issuance path isolated while authoritative replay resolves every safety, room/session, and account/device handler; restored credentials are rejected and every tombstone/checkpoint is applied; current safety state reconciles; every old epoch clean-closes; and the new incarnation commits/read-backs its fresh `open(E)` before any fresh activation. A trustworthy unmatched epoch does not end recovery: the sole mutually exclusive offline recovery actor may continue that sequence while every serving path stays isolated; absent proof at any step, isolation persists. | Issues #4, #12, #13, #16, and #19 |
+| `CTRL-IDENTITY-RESTORE-REVOCATION` | Before account/device deletion or revocation intake, the current authority has a verified `open(E)`. Authenticated intake enters the existing pending fence before authorization/result validation, local authority revocation, or the first checkpoint write, and resolves only to a read-back-verified typed checkpoint or durable invalid/unauthorized denial. Required checkpoint/denial failure or crash leaves the epoch unsealable; restore rejects every old credential and new issuance while authoritative replay recovers the request. | Issues #4, #12, #13, #16, #17, and #19 |
 
 ## Normative lifecycle matrix
 
@@ -41,14 +41,14 @@ name requirements, not wire fields or runtime schemas.
 | `DATA-PLAYBACK-SECRET`: playback URL/token/cookie or upstream credential | Trusted backend ingest memory only during the active connect or refresh operation. Never persisted and never sent to a worker or browser. | Stop use, close the in-scope platform session, and clear the local reference after use, refresh, stop, global disable, a denylist match for its owning canonical room, or error. Global disable starts this cleanup before any safety durability await. An unrelated verified room transition does not touch it. Request upstream revocation only where supported. Every diagnostic redacts both key and value. |
 | `DATA-NORMALIZED-EVENT`: normalized event and room/session metadata | Restricted by default. Production Postgres persistence is disabled until Issue #16 implements these controls and a current per-source/per-field record approves purpose, publication, retention/review, and deletion triggers. There is no platform-independent default TTL. Missing or expired evidence stops new persistence and publication. | Anonymous APIs expose only the approved normalized live subset; invited history requires separate authorization. A room selector hides/blocks the canonical room and purges room metadata plus every current/historical/pending/late/restored session; a session selector hides/blocks and purges only the uniquely resolved immutable session and preserves siblings/shared room state. Active stores must purge within 24 hours. |
 | `DATA-RAW-BUSINESS`: sanitized raw business payload | Production persistence is disabled until the normalized-data gates and Issue #16 sanitization, key, encryption, audit, manifest, and deletion controls pass. If enabled, raw data may exist only in the private Bucket after credentials, playback locators, excess identity, and every audio representation are rejected or removed, then compressed and encrypted with AES-256-GCM using separate keys. It has no platform-independent TTL. | Admin-only managed export with per-access audit. Never an ordinary/public API response or browser cache. Delete every object/version in the selected room-wide or session-only scope from active storage within 24 hours. Sanitization, encryption, key, audit, manifest, or storage failure prevents archival and must not spill raw data into Postgres, logs, queues, or temporary files. |
-| `DATA-ACCOUNT-IDENTITY`: invite/account identity | Disabled until Issue #12. Then only the invited email, role, and minimum account/revocation state may remain while the account is active. | Subject or admin access only. Revoke access immediately. An approved account deletion purges identifying active-store fields within 24 hours and writes the typed pseudonymous recovery checkpoint required by `CTRL-IDENTITY-RESTORE-REVOCATION`; an application-data restore must not recreate the account or its authority. |
+| `DATA-ACCOUNT-IDENTITY`: invite/account identity | Disabled until Issue #12. Then only the invited email, role, and minimum account/revocation state may remain while the account is active. | Subject or admin access only. Under a verified `open(E)`, authenticated deletion/revocation intake enters pending before authorization/result validation and any immediate target-authority revocation. A valid account deletion purges identifying active-store fields within 24 hours and resolves to the typed pseudonymous recovery checkpoint required by `CTRL-IDENTITY-RESTORE-REVOCATION`; invalid/unauthorized intake resolves to durable denial without target mutation. An application-data restore must not recreate the account or its authority. |
 | `DATA-AUTH-BEARER`: authentication, enrollment, and session bearer secret | Disabled until its owning Issue. A magic link is single-use and valid for at most 15 minutes; a worker enrollment token is single-use and valid for at most 24 hours; a session cookie is individually revocable and valid for at most 30 days. The database stores only a verifier hash plus expiry/use state. Plaintext exists only in the intended Resend email or initiating client flow, never in a database, log, telemetry event, or URL analytics. | Expiry, use, or revocation immediately prevents future server acceptance; this does not claim erasure of plaintext in an email/client. Account/device deletion revokes related tokens and sessions immediately and purges active verifier/session rows within 24 hours. Every restore purges/revokes all restored magic-link, enrollment-token, session-verifier, and session rows and advances/reconciles a recovery-protected monotonic auth-invalidation generation or non-restorable signing/verifier key version. All pre-restore stateful/stateless credentials remain server-rejected, and current verification secret material is never restored from an application backup. Issue #12 owns account authentication/session evidence; Issue #13 owns worker enrollment evidence. |
-| `DATA-WORKER-DEVICE`: device identity and aggregate worker statistics | Disabled until Issue #13. Then limited to device public key, status, allowlisted capabilities, online/processed duration, success rate, RTF, and recent health while registered. | A contributor sees only that contributor's aggregates; an admin manages devices. Revoke immediately. Device/account deletion purges identifying active-store fields within 24 hours and writes a typed pseudonymous recovery checkpoint; a restore must replay it before accepting device authentication or traffic. |
+| `DATA-WORKER-DEVICE`: device identity and aggregate worker statistics | Disabled until Issue #13. Then limited to device public key, status, allowlisted capabilities, online/processed duration, success rate, RTF, and recent health while registered. | A contributor sees only that contributor's aggregates; an admin manages devices. Under a verified `open(E)`, authenticated deletion/revocation intake enters pending before authorization/result validation and any immediate target-authority revocation. Device/account deletion purges identifying active-store fields within 24 hours and resolves to a typed pseudonymous recovery checkpoint; invalid/unauthorized intake resolves to durable denial without target mutation. Restore must reconcile the epoch and replay the checkpoint before device authentication, issuance, or traffic. |
 | `DATA-AUDIT`: security, control, deletion, and raw-access audit | Append-only actor/control result, timestamps, object class, safety generation, opaque manifest reference/count, and integrity metadata for 365 days. It contains no account/device checkpoint target, event body, email, public key, secret, playback locator, audio, transcript, or digest of low-entropy/raw values. Any opaque actor reference remains restricted pseudonymous data. Keyed integrity digests cover canonical manifest/control records, never deleted content. | Restricted admin/auditor access. After 365 days, purge active audit rows within 24 hours unless a documented incident hold names an owner and expiry. The payload-free field contract is also defined by `CTRL-AUDIT-PAYLOAD-FREE` in the incident runbook. |
 | `DATA-DELETION-TOMBSTONE`: room/session deletion manifest/tombstone | Exactly one typed selector (`room` bound to a canonical room or `session` bound to a uniquely resolved immutable session), opaque target reference, deletion state, safety generation, timestamps, and payload-free counts only. Before accepting any request, deletion ingress must have a commit/read-back-verified intake-continuity `open(E)` record. That target-free control evidence is not a tombstone or deletion state. The authenticated intake assigns one immutable original initiating-request time before its first target-specific durability attempt; the durable intake atomically retains that time with selector/idempotency until the existing `hidden` tombstone reuses all three. The tombstone is the sole durable pending-deletion record and must commit to/pass read-back before the request is accepted or acknowledged, `hidden` is reported, or purge starts. Intake is only an unresolved blocker, never a tombstone or fourth state. Tombstone, intake, and continuity evidence are held separately from restorable application data and available to every restart/restore. | A room tombstone dominates every child-session tombstone and replays over room metadata plus every current, historical, pending, late-discovered, or restored session belonging to that room; a later session request cannot narrow or overwrite it. A session tombstone replays only over that session and its derivatives. An unmatched `open(E)` globally blocks restored traffic and every relaxation but contains no target and authorizes no purge. A volatile visibility block, audit event, intake record, clean-looking or empty application store, or admin assertion never substitutes for a tombstone or verified `clean-close(E)`. Retain the tombstone while any live/history store, object version, export, replica, or backup can reintroduce the selected scope and through at least one successful restore verification after the last backup window. It contains no raw, identity, event, transcript, or audio content. |
-| `DATA-IDENTITY-REVOCATION-CHECKPOINT`: account/device deletion or revocation checkpoint | Restricted pseudonymous control data held in the separate encrypted, integrity-protected recovery copy: typed random immutable never-reused internal account/device reference, operation (`deleted` or `revoked`), monotonic control generation, timestamp, and payload-free result. Never email, role, device public key, IP address, bearer/verifier hash, content, or an unkeyed digest of a low-entropy value. | A permanent deletion checkpoint is never converted back to a reversible revocation; a current revocation generation cannot be rolled back by a backup. Retain until the longest enumerated backup/object window that can reintroduce the target has passed and through one successful post-window restore, then delete under an audited rule. Access is narrowly authorized and audited because even opaque references are linkable pseudonymous identity. |
+| `DATA-IDENTITY-REVOCATION-CHECKPOINT`: account/device deletion or revocation checkpoint | Restricted pseudonymous control data held in the separate encrypted, integrity-protected recovery copy: typed random immutable never-reused internal account/device reference, operation (`deleted` or `revoked`), monotonic control generation, timestamp, and payload-free result. Never email, role, device public key, IP address, bearer/verifier hash, content, or an unkeyed digest of a low-entropy value. It is the valid account/device intake outcome; target-free `open(E)` continuity evidence never substitutes for or invents a checkpoint. | Pending clears only after checkpoint commit/read-back, or durable denial for invalid/unauthorized intake. A permanent deletion checkpoint is never converted back to a reversible revocation; a current revocation generation cannot be rolled back by a backup. Retain until the longest enumerated backup/object window that can reintroduce the target has passed and through one successful post-window restore, then delete under an audited rule. Access is narrowly authorized and audited because even opaque references are linkable pseudonymous identity. |
 | `DATA-MANAGED-RAW-EXPORT`: managed raw export and access capability | Disabled until Issue #16. The access capability lasts at most 15 minutes; an encrypted managed export object lasts at most 24 hours. Alpha forbids untracked local plaintext copies by default. | Per-access admin audit. Revoke/delete every managed object in the selected room-wide or exact-session scope within 24 hours. Revoking authorization prevents future access but does not claim erasure of plaintext already disclosed. Introducing such disclosure requires a named High residual, a bounded destination, and owner acceptance. |
-| `DATA-DERIVED-COPY`: cache, index, replica, object version, or backup | Never an independent source of truth. Active copies follow the 24-hour purge SLA. Each production configuration must enumerate its actual schedules, object-version behavior, recovery window, and deletion/purge evidence. | Restart/restore remains offline and globally disabled until protected auth-invalidation state rejects pre-restore credentials, every unmatched intake-continuity epoch and unresolved deletion intake reconciles, every pending `hidden` room-all-session/session-exact tombstone and account/device deletion/revocation record replays, and current safety/denylist state replays successfully. A global-enable `COMMITTED` record is not serving authority: each boot needs that incarnation's fresh activation. A room-removal `PREPARED` record still has its room in the current denylist; only the same incarnation's one-use permit may dispatch conditional promotion that atomically removes membership. A failed guard, lost/prior-incarnation permit, or crash before dispatch leaves the room present. Process loss after dispatch but before a verified result keeps recovery globally off until the exact journal/head proves either a matching permitted `COMMITTED` removal or an unchanged predecessor/`PREPARED` state with the room still present; split or unknown state remains off. Unknown, conflicting, unbounded, or untested provider behavior blocks production persistence and restored authentication. |
+| `DATA-DERIVED-COPY`: cache, index, replica, object version, or backup | Never an independent source of truth. Active copies follow the 24-hour purge SLA. Each production configuration must enumerate its actual schedules, object-version behavior, recovery window, and deletion/purge evidence. | Restart/restore remains offline and globally disabled until protected auth-invalidation state rejects pre-restore credentials, every unmatched intake-continuity epoch and unresolved room/session or account/device intake reconciles, every pending `hidden` room-all-session/session-exact tombstone and typed account/device checkpoint replays, every invalid intake has durable denial, and current safety/denylist state replays successfully. A trustworthy intact recovery copy with an unmatched epoch permits only the mutually exclusive offline recovery actor to continue authoritative ingress replay and clean-close; it never admits serving or credential issuance. A missing, tampered, conflicting, or unreadable recovery copy provides no replay or close authority: the offline actor halts and the environment stays isolated. A global-enable `COMMITTED` record is not serving authority: each boot needs that incarnation's fresh activation. A room-removal `PREPARED` record still has its room in the current denylist; only the same incarnation's one-use permit may dispatch conditional promotion that atomically removes membership. A failed guard, lost/prior-incarnation permit, or crash before dispatch leaves the room present. Process loss after dispatch but before a verified result keeps recovery globally off until the exact journal/head proves either a matching permitted `COMMITTED` removal or an unchanged predecessor/`PREPARED` state with the room still present; split or unknown state remains off. Unknown, conflicting, unbounded, or untested provider behavior blocks production persistence and restored authentication. |
 
 ## Audio budget and teardown invariants
 
@@ -77,14 +77,32 @@ community-worker audio is synthetic only.
 ## Identity revocation and restore rollback
 
 `CTRL-IDENTITY-RESTORE-REVOCATION` prevents an older application-data backup from
-recreating deleted authority. Before an account/device deletion or revocation is reported
-complete, its typed checkpoint must be committed to the separate encrypted, integrity-
-protected recovery boundary and pass read-back verification. A permanent deletion
-checkpoint can never become a reversible revocation, and neither form may be overwritten
-by a lower generation. Typed internal IDs are random, immutable, and never reused. An
-account deletion cascades to its roles, invites, devices, statistics, tokens, and sessions;
-a device deletion invalidates only that device's authority plus its enrollment/session
-state unless the account is also targeted.
+recreating deleted authority. The same commit/read-back-verified, target-free `open(E)`
+used for room/session deletion continuity must exist before account/device deletion or
+revocation ingress accepts a request. After authentication, binding the request to the
+epoch and entering the existing `intake-pending` fence are one local operation under the
+same authority that orders ingress against `clean-close(E)`. Authorization, exact target,
+and typed-result validation occur under that pending fence. Pending must win before the
+target's local authentication, token/session issuance, enrollment, or worker authority is
+revoked and before the first target-specific recovery write begins. A valid request
+resolves pending only when its typed checkpoint commits to the separate encrypted,
+integrity-protected recovery boundary and passes read-back; an invalid request resolves
+only through durable denial, and an unauthorized request does likewise without target
+mutation. Neither outcome changes the room/session tombstone states.
+
+A permanent deletion checkpoint can never become a reversible revocation, and neither
+form may be overwritten by a lower generation. Typed internal IDs are random, immutable,
+and never reused. An account deletion cascades to its roles, invites, devices, statistics,
+tokens, and sessions; a device deletion invalidates only that device's authority plus its
+enrollment/session state unless the account is also targeted. For a valid request,
+checkpoint write/read-back failure or uncertainty reports no completion, keeps the exact
+target locally revoked, leaves intake pending, atomically taints/revokes global activation,
+and makes `open(E)` unsealable. A required denial failure likewise leaves pending and the
+epoch unsealable but invents no target or revocation. If the initiating source disappears
+or the process crashes before a verified checkpoint or denial, the unmatched epoch—not an
+empty checkpoint view, application row, or audit event—keeps every restored external
+traffic and credential-issuance path isolated. The target-free epoch is no checkpoint and
+authorizes no guessed identity operation.
 
 The checkpoint is linkable pseudonymous control data, not anonymous data. It contains no
 email, role, device public key, IP address, verifier hash, bearer, event, transcript, or
@@ -92,29 +110,51 @@ other user content, and never uses an unkeyed digest of a low-entropy value. Acc
 narrowly authorized, encrypted, integrity protected, and audited by opaque manifest
 reference/count. If commit, read-back, integrity, or access control fails, the affected
 authentication path and restored environment remain disabled; an application-database
-row is never the sole record of a deletion or revocation.
+row is never the sole record of a deletion or revocation. A trustworthy unmatched epoch
+does not terminate the mutually exclusive offline recovery procedure. While external and
+scheduled traffic plus new authority issuance stay isolated, authoritative ingress replay
+continues: a recovered valid account/device request commits and reads back its exact typed
+checkpoint, while a recovered invalid request produces durable denial. Only after every
+safety, room/session, and account/device request observed under the combined epoch
+high-watermark has its required durable outcome may quiesced ingress commit/read back
+`clean-close(E)`. If exact authoritative replay is unavailable or the epoch cannot be
+sealed, isolation persists indefinitely.
 
 Every restore must, while isolated and forced off:
 
-1. purge or revoke every restored magic-link, worker-enrollment, session-verifier, and
-   session row regardless of its backed-up expiry or use flag, and advance a recovery-
-   protected monotonic auth invalidation generation or signing/verifier key version so a
-   stateless pre-restore credential is also rejected; the current version/root and current
-   verification secret material live outside application-data backups, and restored old
-   key material is never made current or retained in the active verification set;
-2. replay every current typed pseudonymous account/device checkpoint to purge or keep
-   revoked the restored account, role, invite, device, statistics, verifier, and session
-   rows;
-3. verify that presenting every sampled pre-restore link/cookie/token is rejected and
-   that deleted accounts/devices cannot receive newly issued authority; and
-4. only then continue with room/session deletion replay and safety-state reconciliation.
+1. verify the independent recovery authority and load every intake-continuity epoch. A
+   missing, tampered, rolled-back, conflicting, or unreadable recovery copy supplies no
+   replay or close authority, so the activation attempt stops without traffic or guessed
+   action. A trustworthy unmatched epoch instead remains a blocker while the sole mutually
+   exclusive offline recovery actor continues authoritative replay through its combined
+   high-watermark: every safety handler reaches a durable outcome, every valid room/session
+   intake reaches its verified tombstone, every valid account/device intake reaches its
+   typed checkpoint, and every invalid or unauthorized intake reaches durable denial;
+2. apply every replayed and current room/session tombstone and typed account/device
+   checkpoint. Purge or revoke every restored magic-link, worker-enrollment, session-
+   verifier, and session row regardless of backed-up expiry/use state; advance the recovery-
+   protected auth-invalidation generation or signing/verifier key version; and keep current
+   verification material outside application backups and restored old keys outside the
+   active verification set;
+3. verify exact room/session scope and dominance, account/device cascade, rejection of
+   sampled pre-restore links/cookies/tokens, and denial of new authority to every deleted or
+   revoked target;
+4. reconcile every replayed safety handler, prepared/split/unknown transition, and the
+   complete current safety head without restoring a prior-incarnation activation or permit;
+5. only after every replayed outcome is durable and applied and safety is reconciled,
+   quiesce the shared ingress fence and commit/read back `clean-close(E)` for every old epoch
+   against its exact predecessor/high-watermark. Failed, stale, cross-epoch, ambiguous, or
+   incomplete replay/close keeps the applicable epoch unmatched and the environment isolated;
+6. while still isolated, commit and read back the new incarnation's fresh `open(E)`; and
+7. only after all other gates pass may a fresh, non-restored, separately audited recovery
+   admin request the exact-head re-enable transition whose current incarnation must still
+   install its non-restorable activation independently.
 
 This intentionally requires fresh authentication and enrollment after a restore. It is
 safer than attempting to distinguish a legitimately current bearer from state rolled
 back by the backup. It does not claim erasure of plaintext still present in an email or
-client; it guarantees server rejection. A fresh, non-restored, separately audited admin
-recovery authentication may request re-enable after every other gate passes, avoiding a
-dependency on the invalid restored admin session. Issue #12 owns account/session behavior,
+client; it guarantees server rejection. The ordered steps above avoid any dependency on an
+invalid restored admin session. Issue #12 owns account/session behavior,
 Issue #13 owns device and enrollment behavior, Issue #16 owns the separate checkpoint and
 auth-invalidation inventory, and Issues #4/#19 own the pre-traffic restore proof.
 
@@ -139,36 +179,43 @@ begin guessed purge. The caller never has to provide a room for a session select
 cannot override the backend's authoritative parent-room lookup.
 
 The sole current serving authority must establish an append-only intake-continuity epoch
-in the independent recovery boundary before deletion ingress can accept an authenticated
-request. Its target-free `open(E)` evidence must commit and read back before the endpoint
-opens; if that write or read-back fails, times out, or is ambiguous, the endpoint remains
-closed and the environment remains globally off. Opening the epoch does not accept a
-deletion, identify a target, report a state, or authorize purge. Before the first target-
-specific durability attempt for each request, the current incarnation installs a sticky
-local intake-pending guard under the same transition authority used by relaxation.
+in the independent recovery boundary before room/session deletion or account/device
+deletion/revocation ingress can accept an authenticated request. Its target-free `open(E)`
+evidence must commit and read back before either endpoint opens; if that write or read-back
+fails, times out, or is ambiguous, the endpoints remain closed and the environment remains
+globally off. Opening the epoch does not accept a request, identify a target, report a
+state, authorize purge, or create an account/device checkpoint. Before target-local effect
+or the first target-specific durability attempt for each accepted request, the current
+incarnation installs the existing sticky local intake-pending guard under the same
+transition authority used by relaxation and clean close.
 Pending fences global enable's final activation and `clean-close(E)`. If pending wins before
 a room-removal promotion request is dispatched, it prevents the permit/dispatch; after
 dispatch it cannot cancel a remotely authorized conditional CAS, so the selector-scoped
 block or taint applies immediately while the exact head outcome is reconciled;
 it does not by itself revoke an already installed global activation or deny non-target
 traffic. Observing a verified selector installs its room/session-scoped provisional block
-under that same authority. An invalid request clears pending only after its payload-free
-denial is durable, without creating a tombstone or changing global activation.
+under that same authority; accepting a verified account/device operation blocks only that
+target's authentication and issuance authority. An invalid request clears pending only
+after its payload-free denial is durable, without creating a tombstone/checkpoint or
+changing global activation.
 
 A `clean-close(E)` may be appended and read back only after the same logical authority
-atomically quiesces serving, safety-control, and deletion ingress; every accepted safety-
-control handler is drained and its outcome durably reconciled; late deletion requests are
-rejected; every accepted deletion handler is drained; each invalid request has a durable
-denial; each valid request has reconciled to
-its commit/read-back-verified `hidden` tombstone; and no safety/intake-pending guard or
-taint remains. The close binds the epoch predecessor and observed-request high-watermark
-and commits/read-backs while the ingress fence remains closed. If a safety/deletion
-request linearizes before quiescence, close waits for that reconciliation; if quiescence/
-close linearizes first, the request is rejected or must wait for a new commit/read-back-
-verified epoch. A missing,
-failed, ambiguous, stale, or cross-epoch close leaves `open(E)` unmatched and blocks every
-restart, restore, and relaxation. It carries no selector, so it can only hold the
-environment off; it can never justify a guessed target or destructive action.
+atomically quiesces serving, safety-control, and both deletion/revocation ingress paths;
+every accepted safety-control handler is drained and its outcome durably reconciled; late
+requests are rejected; every accepted handler is drained; each invalid request has a
+durable denial; each valid room/session request has its commit/read-back-verified `hidden`
+tombstone; each valid account/device request has its commit/read-back-verified typed
+checkpoint; and no safety/intake-pending guard or taint remains. The close binds the epoch
+predecessor and the combined safety, room/session, and account/device request high-
+watermark, then commits/read-backs while every ingress fence remains closed. If a safety/
+deletion/revocation request linearizes before quiescence, close waits for that
+reconciliation; if quiescence/close linearizes first, the request is rejected or must wait
+for a new commit/read-back-verified epoch. A missing, failed, ambiguous, stale, or cross-
+epoch close leaves `open(E)` unmatched and blocks ordinary/scheduled traffic, credential
+issuance, and relaxation. It carries no selector, so it can never justify a guessed target
+or destructive action. If the epoch and recovery copy are trustworthy, the mutually
+exclusive offline recovery actor may continue authoritative replay and attempt clean
+close while those external paths remain isolated.
 
 For this gate, a durable safety relaxation in `PREPARED` phase is only an append-only
 proposal. Global enable may conditionally advance to `COMMITTED`, but it still grants no
@@ -358,13 +405,21 @@ triple disappear. It blocks traffic and relaxation without naming or purging a t
 Exact authoritative replay must recover and admit a valid request's original triple or
 replay an invalid request and produce durable denial; if neither applicable proof exists,
 the environment stays off. A crash after tombstone commit but before acknowledgement is
-recovered by the same idempotent retry and existing tombstone. Every restart/restore must
-reject an unmatched continuity epoch, admit/replay valid pending `hidden` tombstones, and
-reproduce invalid denials before safety
-reconciliation. Recovery of an application store, an empty tombstone view, an audit row,
-an old `COMMITTED` relaxation, or a prior-incarnation activation never clears an
-unresolved request or authorizes re-enable; verified recovery-boundary admission or denial,
-scope reconciliation, and fresh current-incarnation activation are required.
+recovered by the same idempotent retry and existing tombstone. The corresponding account/
+device crash after local target revocation but before checkpoint commit/read-back, including
+a failed first target-specific recovery write, also leaves no completion and an unmatched,
+unsealable epoch. Authoritative replay must resolve a recovered valid identity request to
+its exact typed checkpoint or a recovered invalid request to durable denial; it must never
+infer either result from an empty checkpoint view or issue fresh authority. Every restart/
+restore keeps serving and issuance isolated for an unmatched continuity epoch, admits/
+replays valid pending `hidden` tombstones and typed identity checkpoints, and reproduces
+invalid denials before safety reconciliation. A trustworthy intact epoch permits the sole
+mutually exclusive offline recovery actor to continue that replay and attempt clean-close;
+loss of authoritative replay leaves isolation in place. Recovery of an application store,
+an empty tombstone/checkpoint view, an audit row, an old `COMMITTED` relaxation, or a prior-
+incarnation activation never clears an unresolved request or authorizes re-enable; verified
+recovery-boundary admission, checkpoint, or denial, combined ingress reconciliation, and
+fresh current-incarnation activation are required.
 
 Audit counts, keyed manifest digests, and failure metadata must never contain or hash
 raw, identity, transcript, event-body, secret, locator, or audio content. Backups may
@@ -410,13 +465,18 @@ window for every store and Issue #19 verifies restore replay. A provider-declare
 is a control boundary, not proof of physical erasure.
 
 If any provider's maximum backup, recovery, object-version, or deletion window remains
-unknown; if a current deletion/revocation checkpoint cannot be made available to all
-restarts/restores; if an intake-continuity epoch is unmatched; or if a failed or ambiguous
-deletion intake lacks a verified durable tombstone, production persistence, restored
-authentication, and every relaxation remain disabled. A recovered or empty application
-store, an audit row, a durable `PREPARED`/`COMMITTED` relaxation, or a prior-incarnation
-activation is not evidence that no pending target exists. Do not guess a target or a value
-from an unselected provider option.
+unknown; if a current tombstone, account/device checkpoint, durable denial, or intake-
+continuity epoch cannot be made available to all restarts/restores; or if failed or
+ambiguous intake remains unresolved, production persistence, restored authentication,
+credential issuance, and every relaxation remain disabled. A trustworthy intact but
+unmatched epoch keeps those paths isolated while the sole mutually exclusive offline
+recovery actor continues authoritative replay and attempts `clean-close(E)`; it does not
+end the recovery procedure early. A missing, tampered, conflicting, or unreadable recovery
+copy supplies no authority to replay or seal; the offline actor halts while isolation
+persists. A recovered or empty application store, an
+audit row, a durable `PREPARED`/`COMMITTED` relaxation, or a prior-incarnation activation
+is not evidence that no pending target exists. Do not guess a target or a value from an
+unselected provider option.
 
 ## Implementation ownership and acceptance evidence
 
@@ -426,13 +486,13 @@ from an unselected provider option.
 | #8 | Measured backend/decoder/transport memory ceilings, no persistent/crash path, prompt eviction, and teardown tests. |
 | #10 | Restricted normalization/public projection plus raw sanitization that rejects credentials, locators, excess identity, and audio. |
 | #11 | Immediate provisional selector-scoped visibility containment while durable deletion admission is pending, sibling/non-target noninterference, and global escalation when containment cannot be proven, without presenting provisional containment as a fourth deletion state. |
-| #12 | Invite/account fields, 15-minute single-use magic link, 30-day revocable session, role checks, identity/token deletion, typed pseudonymous account checkpoint, stateful/stateless pre-restore credential rejection, and fresh recovery-admin authentication. |
-| #13 | 24-hour single-use enrollment token, device identity/statistics minimization, typed revocation/purge checkpoint, restored credential/device-authority rejection, and no new issuance to deleted targets. |
+| #12 | Invite/account fields, 15-minute single-use magic link, 30-day revocable session, role checks, account deletion/revocation intake under verified `open(E)`, pending-before-local-revocation ordering, valid typed pseudonymous checkpoint versus invalid durable denial, first-write/read-back/crash recovery, stateful/stateless pre-restore credential rejection, and fresh recovery-admin authentication. |
+| #13 | 24-hour single-use enrollment token, device identity/statistics minimization, device deletion/revocation intake under verified `open(E)`, pending-before-local-revocation ordering, valid typed checkpoint versus invalid durable denial, first-write/read-back/crash recovery, restored credential/device-authority rejection, and no new issuance to deleted targets. |
 | #14 | One active lease's bounded frame acceptance, cancellation/timeout/disconnect clearing, and rejection of late output. |
 | #15 | One-active-room/lease scheduling, standby-without-PCM promotion, and failover without an audio retry queue. |
-| #16 | Postgres/Bucket access, AES-256-GCM and separate keys, audit, managed export, store inventory, idempotent purge, truthful states, provider windows, exactly-one-selector rejection tests, room-all-sessions versus exact-session/sibling proofs, room-tombstone dominance/restore tests, recovery-boundary intake-continuity open/clean-close and tombstone commit/read-back, valid/invalid success preserving non-target activation, intake/denial/tombstone and containment-proof fault injection with global revocation, source-loss/crash-before-commit and commit-before-response recovery, account/device checkpoints, and the independent auth-invalidation/current-verification-material boundary. |
-| #17 | Admin deletion-intake authorization, ingress quiescence, sticky current-incarnation pending-versus-tainted guard, durable invalid denial without global revocation, and confirmation behavior proving failed, timed-out, or ambiguous accounting/admission revokes activation and returns no success, a source loss cannot cleanly close its epoch, no false `hidden` state is exposed, and relaxation remains blocked until exact authoritative reconciliation. |
-| #4/#19 | Startup/restore forced-off deployment behavior and a recovery drill proving unmatched intake-continuity epochs block across restart even with a lost source and empty application store, pending `hidden` tombstones replay, stateful/stateless pre-restore credentials are rejected, old keys, prior-incarnation activation, and prior-incarnation room-removal permits are excluded, failed or pre-dispatch room removals retain membership, unknown post-dispatch results require exact globally-off head reconciliation, and deletion/revocation plus exact `COMMITTED` safety-head reconciliation precede fresh current-incarnation activation and traffic. |
+| #16 | Postgres/Bucket access, AES-256-GCM and separate keys, audit, managed export, store inventory, idempotent purge, truthful states, provider windows, exactly-one-selector rejection tests, room-all-sessions versus exact-session/sibling proofs, room-tombstone dominance/restore tests, shared recovery-boundary intake-continuity `open(E)`/combined-high-watermark `clean-close(E)`, tombstone/checkpoint/denial commit-read-back, valid/invalid success preserving non-target activation, intake/denial/tombstone/checkpoint and containment-proof fault injection with global revocation, source-loss/crash-before-first-write and commit-before-response recovery, and the independent auth-invalidation/current-verification-material boundary. |
+| #17 | Admin room/session and account/device deletion/revocation intake authorization, ingress quiescence, sticky current-incarnation pending-versus-tainted guard, durable invalid denial without global revocation, pending-before-target-effect ordering, and confirmation behavior proving failed, timed-out, or ambiguous accounting/admission/checkpoint persistence revokes activation and returns no success, a source loss cannot cleanly close its epoch, no false `hidden`/checkpoint state is exposed, and relaxation remains blocked until exact authoritative reconciliation. |
+| #4/#19 | Startup/restore forced-off deployment behavior and a recovery drill proving unmatched intake-continuity epochs block serving and issuance across restart even with a lost source and empty application store, but a trustworthy intact epoch lets only the mutually exclusive offline recovery actor replay valid room/session intake to tombstones, valid account/device intake to typed checkpoints, and invalid intake to durable denial through combined-ingress clean-close. Also prove missing/tampered/conflicting recovery evidence keeps isolation, stateful/stateless pre-restore credentials are rejected, old keys, prior-incarnation activation, and prior-incarnation room-removal permits are excluded, failed or pre-dispatch room removals retain membership, unknown post-dispatch results require exact globally-off head reconciliation, and deletion/revocation plus exact `COMMITTED` safety-head reconciliation precede fresh current-incarnation activation and traffic. |
 
 Issue #2 supplies no runtime acceptance evidence. A later owner must record the exact
 commands, provider configuration, restore results, residual risks, and source/rights

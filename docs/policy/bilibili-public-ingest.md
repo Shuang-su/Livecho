@@ -259,24 +259,30 @@ incarnation intake guard, forbids a clean epoch close, and escalates to global f
 The initiating source may retry the same selector, idempotency identity, and
 original time, but Livecho does not depend on that source remaining available. A clean
 `clean-close(E)` is permitted only after one atomic authority fence quiesces serving,
-safety-control, and deletion ingress; every accepted safety-control handler drains and its
-outcome is durably reconciled; late reports are rejected; deletion handlers drain; and
-every valid report maps to its
-verified tombstone with no safety/intake pending or taint. A safety/deletion action that
+safety-control, room/session deletion, and account/device deletion/revocation ingress;
+every accepted safety-control handler drains and its outcome is durably reconciled; late
+reports are rejected; room/session and identity/device handlers drain; every valid report
+maps to its verified tombstone; every valid identity/device request maps to its verified
+typed checkpoint; and every invalid request maps to durable denial, with no safety/intake
+pending or taint. A safety/deletion/revocation action that
 linearizes first blocks close until reconciliation; one that arrives after close must be
 rejected or bound to a new verified epoch.
 If the source disappears or the process crashes before target-specific
-durability, unmatched `open(E)` survives restart and blocks all traffic and relaxation;
-because it contains no target, it authorizes no guessed purge. Without exact authoritative
+durability, unmatched `open(E)` survives restart and blocks all ordinary traffic and
+relaxation; because it contains no target, it authorizes no guessed purge. A trusted
+recovery copy containing that blocker keeps the environment isolated while the narrow,
+mutually exclusive offline recovery actor continues exact authoritative replay; it does
+not terminate reconciliation merely because the epoch is unmatched. Without complete
 replay the system remains off indefinitely. Neither a process restart, a recovered but
 empty application store, an audit record, a durable relaxation proposal/commit, nor a
 prior-incarnation activation closes that epoch or permits re-enable. An operator escalates
 the safely blocked scope to an admin and cannot declare or initiate deletion. Room
 tombstones dominate child-session manifests; session deletion preserves siblings/shared
 room state. Partial deletion remains hidden and denied. Recovery may not serve traffic
-until every continuity epoch and exact-scope deletion manifest, every unresolved intake,
-the exact committed safety head, and a fresh current-incarnation activation reconcile
-successfully.
+until every continuity epoch, exact-scope deletion manifest, identity/device checkpoint,
+and unresolved room/session or identity/device intake has a durable outcome; the exact
+committed safety head reconciles; old epochs clean-close; a new verified `open(E)` exists;
+and a fresh current-incarnation activation succeeds.
 
 ## Review and enablement record
 
@@ -293,8 +299,9 @@ Production may be considered only when one signed record proves all of the follo
   reachable and tested without disclosing sensitive data;
 - Issues #7, #16, and #17 provide the runtime, persistence, two-phase relaxation,
   post-commit global activation, pre-promotion one-use room-removal permit, and intake-continuity controls required by the chosen
-  scope, and the incident/deletion tabletops pass, including first-intake-write failure,
-  source loss, crash/restart, unmatched epoch, and late relaxation cases;
+  scope, and the incident/deletion tabletops pass, including room/session and identity/
+  device first-intake-write failure, source loss, crash/restart, offline unmatched-epoch
+  replay/clean-close, and late relaxation cases;
 - every Critical/High residual has a separate, scoped owner decision; and
 - `@Shuang-su` records a dated production-enable approval whose review date has not
   expired.
