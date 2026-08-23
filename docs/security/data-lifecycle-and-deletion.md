@@ -27,27 +27,28 @@ name requirements, not wire fields or runtime schemas.
 | `CTRL-RAW-BOUNDARY` | Sanitized raw payloads may enter only an authenticated-encryption path and a private managed boundary; ordinary APIs never receive them. | Issues #10 and #16 |
 | `CTRL-AUTH-EXPIRY` | Bearer credentials have the maximum lifetimes, single-use rules, verifier storage, revocation, and purge behavior below. | Issues #12 and #13 |
 | `CTRL-AUDIT-PAYLOAD-FREE` | Security, safety-control, raw-access, and deletion audit records contain control metadata but no protected payload. | Issues #12, #13, #16, #17, and #19 |
-| `CTRL-DELETION-STATE` | A deletion selects exactly one typed target—canonical room or immutable session—enforces room-over-session dominance and exact-scope idempotent cascade, and reports three truthful states with immutable late-SLA evidence. | Issue #16 |
+| `CTRL-DELETION-STATE` | A deletion selects exactly one typed target—canonical room or immutable session—and uses the existing durable `hidden` tombstone as its pending-deletion record before acceptance or purge; it enforces room-over-session dominance and exact-scope idempotent cascade and reports three truthful states with immutable late-SLA evidence. | Issue #16 |
+| `CTRL-DELETION-FAIL-CLOSED` | A verified selector is provisionally contained immediately, but its request is not accepted and purge does not start until the `hidden` tombstone commits to and reads back from the independent recovery boundary; failed or ambiguous admission remains off and unresolved. | Issues #11, #16, and #17 |
 | `CTRL-BACKUP-EVIDENCE` | Every cache, replica, object version, export, and backup window is enumerated and evidenced; an unknown bound blocks production persistence or restored authentication. | Issues #4, #12, #13, #16, and #19 |
-| `CTRL-RESTORE-REPLAY` | A restore is offline and globally disabled until stateful/stateless pre-restore credentials are rejected and current deletion/revocation checkpoints and safety state are replayed and verified. | Issues #4, #12, #13, #16, and #19 |
+| `CTRL-RESTORE-REPLAY` | A restore is offline and globally disabled until stateful/stateless pre-restore credentials are rejected, every pending `hidden` tombstone and deletion/revocation checkpoint is replayed, unresolved deletion intake is reconciled, and current safety state is verified. | Issues #4, #12, #13, #16, and #19 |
 | `CTRL-IDENTITY-RESTORE-REVOCATION` | Typed pseudonymous account/device checkpoints and auth-invalidation state survive application backups, and every stateful/stateless pre-restore credential is server-rejected before any traffic or authentication. | Issues #4, #12, #13, #16, and #19 |
 
 ## Normative lifecycle matrix
 
 | Data ID and class | Location and lifetime | Access and deletion rule |
 | --- | --- | --- |
-| `DATA-AUDIO-EPHEMERAL`: PCM, encoded audio, audio base64, stream buffers, and audio-bearing derivatives | Conforming backend, decoder, transport, and worker RAM only. Every representation covers at most 30 seconds of monotonic PTS/media time. Missing, conflicting, or non-monotonic duration metadata disqualifies data from every retained buffer. For s16le/16 kHz/mono audio, each backend room/session and each active worker lease separately has a hard aggregate ceiling of 960,000 bytes across rings, in-flight copies, and overlap. Alpha permits one active room and one active audio lease; standby workers receive no PCM until promotion. Each process has a 16,777,216-byte (16 MiB) aggregate ceiling across **all** audio-bearing buffers, including decoder and transport internals. Issues #3 and #8 may set lower limits. There is no audio retry queue: a retry may reference only data still within the existing ring/in-flight budget. Audio must never enter disk, temporary files, databases, queues, logs, telemetry, crash/core dumps, fixtures, caches, or object storage. | Evict consumed frames immediately. Clear audio on segment, session, or lease completion; cancellation; timeout; disconnect; disable; denylist; and teardown. Conforming workers must clear RAM, but a hostile host can copy it; `RISK-WORKER-AUDIO-RETENTION` remains a High residual and is not an erasure guarantee. Transcripts are restricted normalized events and must not embed a recoverable audio representation. |
-| `DATA-PLAYBACK-SECRET`: playback URL/token/cookie or upstream credential | Trusted backend ingest memory only during the active connect or refresh operation. Never persisted and never sent to a worker or browser. | Stop use, close the platform session, and clear the local reference after use, refresh, stop, disable, or error. Request upstream revocation only where supported. Every diagnostic redacts both key and value. |
+| `DATA-AUDIO-EPHEMERAL`: PCM, encoded audio, audio base64, stream buffers, and audio-bearing derivatives | Conforming backend, decoder, transport, and worker RAM only. Every representation covers at most 30 seconds of monotonic PTS/media time. Missing, conflicting, or non-monotonic duration metadata disqualifies data from every retained buffer. For s16le/16 kHz/mono audio, each backend room/session and each active worker lease separately has a hard aggregate ceiling of 960,000 bytes across rings, in-flight copies, and overlap. Alpha permits one active room and one active audio lease; standby workers receive no PCM until promotion. Each process has a 16,777,216-byte (16 MiB) aggregate ceiling across **all** audio-bearing buffers, including decoder and transport internals. Issues #3 and #8 may set lower limits. There is no audio retry queue: a retry may reference only data still within the existing ring/in-flight budget. Audio must never enter disk, temporary files, databases, queues, logs, telemetry, crash/core dumps, fixtures, caches, or object storage. | Evict consumed frames immediately. Clear in-scope audio on segment, session, or lease completion; cancellation; timeout; disconnect; global disable; a denylist match for its owning canonical room; and teardown. A verified denylist transition for another room does not clear this room's buffers. Conforming workers must clear RAM, but a hostile host can copy it; `RISK-WORKER-AUDIO-RETENTION` remains a High residual and is not an erasure guarantee. Transcripts are restricted normalized events and must not embed a recoverable audio representation. |
+| `DATA-PLAYBACK-SECRET`: playback URL/token/cookie or upstream credential | Trusted backend ingest memory only during the active connect or refresh operation. Never persisted and never sent to a worker or browser. | Stop use, close the in-scope platform session, and clear the local reference after use, refresh, stop, global disable, a denylist match for its owning canonical room, or error. An unrelated verified room transition does not touch it. Request upstream revocation only where supported. Every diagnostic redacts both key and value. |
 | `DATA-NORMALIZED-EVENT`: normalized event and room/session metadata | Restricted by default. Production Postgres persistence is disabled until Issue #16 implements these controls and a current per-source/per-field record approves purpose, publication, retention/review, and deletion triggers. There is no platform-independent default TTL. Missing or expired evidence stops new persistence and publication. | Anonymous APIs expose only the approved normalized live subset; invited history requires separate authorization. A room selector hides/blocks the canonical room and purges room metadata plus every current/historical/pending/late/restored session; a session selector hides/blocks and purges only the uniquely resolved immutable session and preserves siblings/shared room state. Active stores must purge within 24 hours. |
 | `DATA-RAW-BUSINESS`: sanitized raw business payload | Production persistence is disabled until the normalized-data gates and Issue #16 sanitization, key, encryption, audit, manifest, and deletion controls pass. If enabled, raw data may exist only in the private Bucket after credentials, playback locators, excess identity, and every audio representation are rejected or removed, then compressed and encrypted with AES-256-GCM using separate keys. It has no platform-independent TTL. | Admin-only managed export with per-access audit. Never an ordinary/public API response or browser cache. Delete every object/version in the selected room-wide or session-only scope from active storage within 24 hours. Sanitization, encryption, key, audit, manifest, or storage failure prevents archival and must not spill raw data into Postgres, logs, queues, or temporary files. |
 | `DATA-ACCOUNT-IDENTITY`: invite/account identity | Disabled until Issue #12. Then only the invited email, role, and minimum account/revocation state may remain while the account is active. | Subject or admin access only. Revoke access immediately. An approved account deletion purges identifying active-store fields within 24 hours and writes the typed pseudonymous recovery checkpoint required by `CTRL-IDENTITY-RESTORE-REVOCATION`; an application-data restore must not recreate the account or its authority. |
 | `DATA-AUTH-BEARER`: authentication, enrollment, and session bearer secret | Disabled until its owning Issue. A magic link is single-use and valid for at most 15 minutes; a worker enrollment token is single-use and valid for at most 24 hours; a session cookie is individually revocable and valid for at most 30 days. The database stores only a verifier hash plus expiry/use state. Plaintext exists only in the intended Resend email or initiating client flow, never in a database, log, telemetry event, or URL analytics. | Expiry, use, or revocation immediately prevents future server acceptance; this does not claim erasure of plaintext in an email/client. Account/device deletion revokes related tokens and sessions immediately and purges active verifier/session rows within 24 hours. Every restore purges/revokes all restored magic-link, enrollment-token, session-verifier, and session rows and advances/reconciles a recovery-protected monotonic auth-invalidation generation or non-restorable signing/verifier key version. All pre-restore stateful/stateless credentials remain server-rejected, and current verification secret material is never restored from an application backup. Issue #12 owns account authentication/session evidence; Issue #13 owns worker enrollment evidence. |
 | `DATA-WORKER-DEVICE`: device identity and aggregate worker statistics | Disabled until Issue #13. Then limited to device public key, status, allowlisted capabilities, online/processed duration, success rate, RTF, and recent health while registered. | A contributor sees only that contributor's aggregates; an admin manages devices. Revoke immediately. Device/account deletion purges identifying active-store fields within 24 hours and writes a typed pseudonymous recovery checkpoint; a restore must replay it before accepting device authentication or traffic. |
 | `DATA-AUDIT`: security, control, deletion, and raw-access audit | Append-only actor/control result, timestamps, object class, safety generation, opaque manifest reference/count, and integrity metadata for 365 days. It contains no account/device checkpoint target, event body, email, public key, secret, playback locator, audio, transcript, or digest of low-entropy/raw values. Any opaque actor reference remains restricted pseudonymous data. Keyed integrity digests cover canonical manifest/control records, never deleted content. | Restricted admin/auditor access. After 365 days, purge active audit rows within 24 hours unless a documented incident hold names an owner and expiry. The payload-free field contract is also defined by `CTRL-AUDIT-PAYLOAD-FREE` in the incident runbook. |
-| `DATA-DELETION-TOMBSTONE`: room/session deletion manifest/tombstone | Exactly one typed selector (`room` bound to a canonical room or `session` bound to a uniquely resolved immutable session), opaque target reference, deletion state, safety generation, timestamps, and payload-free counts only. It must be held separately from restorable application data and be available to every restore. | A room tombstone dominates every child-session tombstone and replays over room metadata plus every current, historical, pending, late-discovered, or restored session belonging to that room; a later session request cannot narrow or overwrite it. A session tombstone replays only over that session and its derivatives. Retain while any live/history store, object version, export, replica, or backup can reintroduce the selected scope and through at least one successful restore verification after the last backup window. It contains no raw, identity, event, transcript, or audio content. |
+| `DATA-DELETION-TOMBSTONE`: room/session deletion manifest/tombstone | Exactly one typed selector (`room` bound to a canonical room or `session` bound to a uniquely resolved immutable session), opaque target reference, deletion state, safety generation, timestamps, and payload-free counts only. The existing tombstone in `hidden` state is the sole durable pending-deletion record. It must commit to and pass read-back from the independent recovery boundary before the request is accepted or acknowledged, `hidden` is reported as a deletion state, or purge starts. A durable intake record in that boundary may retain the valid selector before admission only as an unresolved blocker; it is neither a tombstone nor a fourth state. The tombstone is held separately from restorable application data and available to every restart and restore. | A room tombstone dominates every child-session tombstone and replays over room metadata plus every current, historical, pending, late-discovered, or restored session belonging to that room; a later session request cannot narrow or overwrite it. A session tombstone replays only over that session and its derivatives. A volatile visibility block, audit event, intake record, or empty application store never substitutes for this record. Retain it while any live/history store, object version, export, replica, or backup can reintroduce the selected scope and through at least one successful restore verification after the last backup window. It contains no raw, identity, event, transcript, or audio content. |
 | `DATA-IDENTITY-REVOCATION-CHECKPOINT`: account/device deletion or revocation checkpoint | Restricted pseudonymous control data held in the separate encrypted, integrity-protected recovery copy: typed random immutable never-reused internal account/device reference, operation (`deleted` or `revoked`), monotonic control generation, timestamp, and payload-free result. Never email, role, device public key, IP address, bearer/verifier hash, content, or an unkeyed digest of a low-entropy value. | A permanent deletion checkpoint is never converted back to a reversible revocation; a current revocation generation cannot be rolled back by a backup. Retain until the longest enumerated backup/object window that can reintroduce the target has passed and through one successful post-window restore, then delete under an audited rule. Access is narrowly authorized and audited because even opaque references are linkable pseudonymous identity. |
 | `DATA-MANAGED-RAW-EXPORT`: managed raw export and access capability | Disabled until Issue #16. The access capability lasts at most 15 minutes; an encrypted managed export object lasts at most 24 hours. Alpha forbids untracked local plaintext copies by default. | Per-access admin audit. Revoke/delete every managed object in the selected room-wide or exact-session scope within 24 hours. Revoking authorization prevents future access but does not claim erasure of plaintext already disclosed. Introducing such disclosure requires a named High residual, a bounded destination, and owner acceptance. |
-| `DATA-DERIVED-COPY`: cache, index, replica, object version, or backup | Never an independent source of truth. Active copies follow the 24-hour purge SLA. Each production configuration must enumerate its actual schedules, object-version behavior, recovery window, and deletion/purge evidence. | Restore remains offline and globally disabled until protected auth-invalidation state rejects pre-restore credentials and typed room-all-session/session-exact plus account/device deletion/revocation records and current safety/denylist state replay successfully. Unknown, conflicting, unbounded, or untested provider behavior blocks production persistence and restored authentication. |
+| `DATA-DERIVED-COPY`: cache, index, replica, object version, or backup | Never an independent source of truth. Active copies follow the 24-hour purge SLA. Each production configuration must enumerate its actual schedules, object-version behavior, recovery window, and deletion/purge evidence. | Restart/restore remains offline and globally disabled until protected auth-invalidation state rejects pre-restore credentials, every pending `hidden` room-all-session/session-exact tombstone and account/device deletion/revocation record replays, every unresolved deletion intake reconciles, and current safety/denylist state replays successfully. Unknown, conflicting, unbounded, or untested provider behavior blocks production persistence and restored authentication. |
 
 ## Audio budget and teardown invariants
 
@@ -136,6 +137,31 @@ when proven; otherwise global off), escalate, and do not begin guessed purge. Th
 never has to provide a room for a session selector and cannot override the backend's
 authoritative parent-room lookup.
 
+For a verified selector, `CTRL-DELETION-FAIL-CLOSED` first applies immediate provisional
+containment to the selected visibility, ingest, lease, locator, export, and persistence
+paths. Provisional containment is deliberately not a fourth deletion state: it protects
+the target while the existing `DATA-DELETION-TOMBSTONE` is durably admitted. The
+initiating takedown/incident intake must retain the exact selector and remain unresolved
+until that tombstone has committed to and passed read-back from the independent recovery
+boundary. Only then is the request accepted or acknowledged, `hidden` reportable as a
+deletion state, and destructive purge permitted. A payload-free audit event, a volatile
+block, or the absence of a row in an application store is not admission evidence.
+
+A durable intake record in that same recovery boundary retains a valid selector and its
+idempotency identity until tombstone admission succeeds. It is an unresolved admission
+blocker, not a deletion state, tombstone, or authorization to purge; the `hidden`
+tombstone remains the sole durable pending-deletion record. If the intake record itself
+cannot be durably written and read back, no request is acknowledged and the initiating
+admin/incident source must retain and retry it while the environment remains off.
+
+If commit or read-back fails, times out, or has an ambiguous result, the safest identified
+scope remains contained and the environment remains globally off. No success is returned
+and no purge begins. Retry uses the same selector and idempotency identity: if the first
+commit succeeded but its response was lost, retry reuses the same tombstone, original
+request time, and evidence; if it did not commit, retry creates it before progressing.
+An intake that has not obtained verified admission remains a re-enable blocker across
+process restart and restore.
+
 The idempotency key includes selector type plus opaque target reference. Each request
 cascades across normalized/transcript rows, indexes, caches, manifests, raw objects and
 versions, managed exports/capabilities, replicas, leases, and every other enumerated path
@@ -148,16 +174,19 @@ a session deletion reveals no selected data without deleting or hiding sibling s
 The only externally reportable states are:
 
 1. `hidden`: immediately applies the selector-specific block and hides every selected
-   public, ordinary, history, cache, and pending-publication path. This state is entered
-   after a valid selector and before destructive work; it persists through any later
-   ownership/store ambiguity and every partial failure. Pre-selector ambiguity uses the
-   safe containment posture above and never invents a typed manifest.
+   public, ordinary, history, cache, and pending-publication path. The state becomes
+   accepted and reportable only when its typed tombstone commits to and reads back from
+   the independent recovery boundary, and always before destructive work. It persists
+   through any later ownership/store ambiguity and every partial failure. Pre-selector
+   ambiguity and pre-admission persistence failure use the safe containment posture above
+   and never invent a fourth state or claim a durable typed manifest.
 2. `active-purge-complete`: every room child session/path or exact-session derivative in
    scope has been enumerated, purged, and verified, and a session-only proof confirms
    sibling sessions and shared room state were not deleted. It records an immutable
-   completion timestamp. The service-level objective is 24 hours from request acceptance.
-   A successful retry after that deadline still enters this state, but permanently records
-   `sla_breached=true`; lateness must never be hidden by resetting a request time.
+   completion timestamp. The service-level objective is 24 hours from the original
+   initiating request time retained by the durable intake/tombstone, including admission
+   delay. A successful retry after that deadline still enters this state, but permanently
+   records `sla_breached=true`; lateness must never be hidden by resetting a request time.
 3. `final-retention-window-satisfied`: requires `active-purge-complete`, expiry or
    verified deletion of every managed export, and expiry of every enumerated
    provider-declared backup/object-version window or verifiable provider purge
@@ -177,26 +206,47 @@ media.
    or session selector; canonicalize the room or resolve the immutable session and parent
    room from the authoritative index without accepting a missing/non-unique/conflicting
    match. Invalid scope triggers the safe block/escalation above but no guessed purge.
-2. Atomically enter `hidden` for the selected scope. A room selector blocks that room's
-   new ingest/reconnect, all its session visibility, leases, exports, and persistence. A
-   session selector blocks only that session's visibility/derivatives and stops its
-   ingest, lease, audio, locator, and export paths if active. Write the typed tombstone
-   and a payload-free audit result.
-3. Enumerate the selected scope against the versioned store inventory captured by Issue
+2. Immediately provisionally contain the verified scope while its durable admission is
+   pending. A room selector blocks that room's new ingest/reconnect, all its session
+   visibility, leases, exports, and persistence. A session selector blocks only that
+   session's visibility/derivatives and stops its ingest, lease, audio, locator, and export
+   paths if active. Write/read back a durable intake record in the same recovery boundary
+   so the selector and idempotency identity survive until verified admission; this record
+   is only an unresolved admission blocker, and containment is not a fourth deletion state.
+   If intake durability itself fails, return no success and require the initiating source
+   to retain and retry the request while global off remains in force.
+3. Commit the existing typed `hidden` tombstone to the independent recovery boundary and
+   verify read-back before acknowledging acceptance, reporting `hidden`, or starting
+   purge. A failed, timed-out, or ambiguous commit keeps global off, returns no success,
+   leaves the intake unresolved, and starts no destructive work. An audit record or empty
+   application store cannot substitute. Retry the same idempotency identity so a commit
+   whose response was lost reuses the tombstone and original request time.
+4. Enumerate the selected scope against the versioned store inventory captured by Issue
    #16. For a room selector, enumerate every session for that canonical room on every
    retry/replay; for a session selector, enumerate only that uniquely resolved session.
    Purge normalized rows, indexes, caches, replicas, raw objects/versions, manifests,
    managed exports, and derived/shared projections using idempotent operations.
-4. Verify every active store and scope boundary. A room manifest cannot complete while
+5. Verify every active store and scope boundary. A room manifest cannot complete while
    any child session/path is unenumerated or unchecked; a session manifest cannot complete
    without proving its derivatives are gone and siblings/shared room state remain. An
    ownership ambiguity or partial failure keeps the safe block, records only a payload-
    free code/count, schedules idempotent retry, and forbids active completion.
-5. Enter `active-purge-complete` only after all active checks pass, preserving the
+6. Enter `active-purge-complete` only after all active checks pass, preserving the
    original request time and the truthful SLA result.
-6. Track every backup, object-version, and export window. Enter
+7. Track every backup, object-version, and export window. Enter
    `final-retention-window-satisfied` only when all stated conditions above are proven;
    retain the tombstone through one successful post-window restore verification.
+
+A crash after durable intake but before verified tombstone admission produces no success
+acknowledgement; startup remains forced off and the unresolved intake supplies the same
+selector for retry before any traffic or re-enable. A crash before intake durability also
+produces no acknowledgement and requires the initiating source to retry. A crash after
+commit but before the acknowledgement is recovered by the same
+idempotent retry and existing tombstone. Every restart/restore must replay pending
+`hidden` tombstones before safety reconciliation. Recovery of an application store, or an
+empty tombstone view in that store, never clears an unresolved intake or authorizes
+re-enable; verified recovery-boundary admission, replay, and scope reconciliation are
+required.
 
 Audit counts, keyed manifest digests, and failure metadata must never contain or hash
 raw, identity, transcript, event-body, secret, locator, or audio content. Backups may
@@ -242,9 +292,11 @@ window for every store and Issue #19 verifies restore replay. A provider-declare
 is a control boundary, not proof of physical erasure.
 
 If any provider's maximum backup, recovery, object-version, or deletion window remains
-unknown, or if a current deletion/revocation checkpoint cannot be made available to all
-restores, production persistence and restored authentication remain disabled. Do not
-guess a value from an unselected provider option.
+unknown; if a current deletion/revocation checkpoint cannot be made available to all
+restarts/restores; or if a failed or ambiguous deletion intake lacks a verified durable
+tombstone, production persistence, restored authentication, and re-enable remain
+disabled. A recovered or empty application store is not evidence that no pending target
+exists. Do not guess a value from an unselected provider option.
 
 ## Implementation ownership and acceptance evidence
 
@@ -253,12 +305,14 @@ guess a value from an unselected provider option.
 | #3 | Protocol limits and golden fixtures for bounded frame metadata, monotonic media time, and rejection without persistence. |
 | #8 | Measured backend/decoder/transport memory ceilings, no persistent/crash path, prompt eviction, and teardown tests. |
 | #10 | Restricted normalization/public projection plus raw sanitization that rejects credentials, locators, excess identity, and audio. |
+| #11 | Immediate provisional selector-scoped visibility containment while durable deletion admission is pending, without presenting that containment as a fourth deletion state. |
 | #12 | Invite/account fields, 15-minute single-use magic link, 30-day revocable session, role checks, identity/token deletion, typed pseudonymous account checkpoint, stateful/stateless pre-restore credential rejection, and fresh recovery-admin authentication. |
 | #13 | 24-hour single-use enrollment token, device identity/statistics minimization, typed revocation/purge checkpoint, restored credential/device-authority rejection, and no new issuance to deleted targets. |
 | #14 | One active lease's bounded frame acceptance, cancellation/timeout/disconnect clearing, and rejection of late output. |
 | #15 | One-active-room/lease scheduling, standby-without-PCM promotion, and failover without an audio retry queue. |
-| #16 | Postgres/Bucket access, AES-256-GCM and separate keys, audit, managed export, store inventory, idempotent purge, truthful states, provider windows, exactly-one-selector rejection tests, room-all-sessions versus exact-session/sibling proofs, room-tombstone dominance/restore tests, account/device checkpoints, and the independent auth-invalidation/current-verification-material boundary. |
-| #4/#19 | Startup/restore forced-off deployment behavior and a recovery drill proving stateful/stateless pre-restore credential rejection, old-key exclusion, fresh non-restored recovery-admin authentication, and deletion/revocation plus safety replay before traffic. |
+| #16 | Postgres/Bucket access, AES-256-GCM and separate keys, audit, managed export, store inventory, idempotent purge, truthful states, provider windows, exactly-one-selector rejection tests, room-all-sessions versus exact-session/sibling proofs, room-tombstone dominance/restore tests, recovery-boundary tombstone commit/read-back, commit/read-back fault injection, crash-before-commit and commit-before-response recovery, account/device checkpoints, and the independent auth-invalidation/current-verification-material boundary. |
+| #17 | Admin deletion-intake authorization and confirmation behavior proving failed, timed-out, or ambiguous admission returns no success, retains the exact intake for idempotent retry, exposes no false `hidden` state, and blocks re-enable until verified tombstone reconciliation. |
+| #4/#19 | Startup/restore forced-off deployment behavior and a recovery drill proving pending `hidden` tombstone replay, unresolved-intake blocking across restart, empty-application-store rejection, stateful/stateless pre-restore credential rejection, old-key exclusion, fresh non-restored recovery-admin authentication, and deletion/revocation plus safety replay before traffic. |
 
 Issue #2 supplies no runtime acceptance evidence. A later owner must record the exact
 commands, provider configuration, restore results, residual risks, and source/rights

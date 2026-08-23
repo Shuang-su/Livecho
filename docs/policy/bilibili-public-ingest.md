@@ -113,8 +113,13 @@ Any of the following is a denial and an immediate stop trigger:
 There is no public room submission, automatic discovery, historical crawl,
 credentialed fallback, or "best effort" continuation. A denial adds the canonical room
 to the denylist when room-specific and invokes the global disable when scope is unknown
-or platform-wide. Runtime enforcement belongs to Issue #7; until it exists and is
-verified, all real acquisition stays off.
+or platform-wide. A successfully committed room-specific addition blocks and cleans up
+only that canonical room; it does not change the global enable decision or interrupt an
+unrelated eligible room. Canonicalization or active-resource binding ambiguity, or a
+failed/stale/conflicting safety-journal or recovery-copy commit/read-back, escalates the
+room block to global forced-off rather than claiming a scoped transition succeeded.
+Runtime enforcement belongs to Issue #7; until it exists and is verified, all real
+acquisition stays off.
 
 ## Worker disclosure and audio boundary
 
@@ -177,17 +182,28 @@ The missing per-room and channel-specific contacts are production blockers. On a
 session-scoped complaint, an operator/admin stops/hides/blocks that session and its lease,
 audio, locators, and pending/public output. On verified room scope, the operator/admin
 denies the room and stops all its active paths. On ambiguous scope, deny the known room or
-remain globally off as defined above. Each path opens a payload-free audit entry. An admin
-must then start idempotent deletion only after exact scope resolution, with exactly one
-typed selector: canonical `room_id` for room metadata and all current/historical/pending/
-late/restored sessions, or immutable `session_id` for only the session resolved through
-the backend's authoritative parent-room index. The caller does not have to provide—and
-cannot override—the session's parent room. None, both, conflicting, missing, non-unique,
-or ambiguous targets start no destructive purge. An operator escalates the safely blocked
-scope to an admin and cannot declare or initiate deletion. Room tombstones dominate
-child-session manifests; session deletion preserves siblings/shared room state. Partial
+remain globally off as defined above. The report remains an unresolved takedown intake
+until its exact selector has a verified durable deletion record; a payload-free audit
+entry alone is not that record. An admin may start idempotent deletion only after exact
+scope resolution, with exactly one typed selector: canonical `room_id` for room metadata
+and all current/historical/pending/late/restored sessions, or immutable `session_id` for
+only the session resolved through the backend's authoritative parent-room index. The
+caller does not have to provide—and cannot override—the session's parent room. None,
+both, conflicting, missing, non-unique, or ambiguous targets start no destructive purge.
+
+For a valid selector, immediate local containment precedes a commit/read-back barrier:
+the typed payload-free `hidden` tombstone must be durably admitted to the independent
+recovery boundary before Livecho acknowledges the deletion request, reports `hidden` as
+an accepted state, or begins destructive purge. A timeout, lost response, or unavailable
+or uncertain commit keeps the takedown intake open, returns no success, and preserves the
+safe room/global block until the same selector is retried idempotently and read back.
+Neither a process restart, a recovered but empty application store, nor an audit record
+closes that intake or permits re-enable. An operator escalates the safely blocked scope
+to an admin and cannot declare or initiate deletion. Room tombstones dominate child-
+session manifests; session deletion preserves siblings/shared room state. Partial
 deletion remains hidden and denied. Recovery may not serve traffic until typed exact-
-scope deletion manifests and current safety state replay successfully.
+scope deletion manifests, every unresolved intake, and current safety state reconcile
+successfully.
 
 ## Review and enablement record
 
