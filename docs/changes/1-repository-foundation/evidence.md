@@ -10,7 +10,7 @@
 | Command | Result | Date/commit |
 | --- | --- | --- |
 | `make bootstrap` | Passed; frozen uv and pnpm installs completed | 2026-08-24, PR branch |
-| `make verify` | Passed; ruff, mypy, 3 pytest tests, artifact check, pnpm workspace checks | 2026-08-24, PR branch |
+| `make verify` | Passed; ruff, mypy, 9 pytest cases, artifact check, pnpm workspace checks | 2026-08-24, PR branch |
 | `git diff --check` | Passed on the complete staged diff | 2026-08-24, PR branch |
 
 ## Manual evidence
@@ -30,7 +30,10 @@
 ## Review findings
 
 Owner review is pending. `@codex review` was requested on PR #20; automated review is
-advisory and cannot approve or merge the change.
+advisory and cannot approve or merge the change. Cursor Bugbot correctly found that the
+foundation test covered only three AGENTS.md invariants. The test was expanded to cover
+audio, arbitrary worker execution, credential isolation, raw archive access, protocol
+idempotency, public-ingest boundaries, and CUDA mock-only status individually.
 
 ## Deviations
 
