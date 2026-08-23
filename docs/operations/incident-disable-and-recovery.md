@@ -12,8 +12,8 @@ ingest or persistence is enabled.
 The invariant is simple: uncertainty means **OFF**. Production ingest starts globally
 disabled, and every process start, deployment, restart, backup restore, or disaster
 recovery fork begins with a local forced-off latch. A backed-up `enabled` value is never
-inherited. No viewer or ingest traffic may reach a restored environment until the
-recovery gates in this record succeed.
+inherited. No authentication, viewer, ingest, worker, callback, or scheduled-job traffic
+may reach a restored environment until the recovery gates in this record succeed.
 
 Stable control identifiers name requirements for later Issues; they are not wire fields,
 database schemas, CLI names, or claims of runtime implementation.
@@ -26,15 +26,17 @@ database schemas, CLI names, or claims of runtime implementation.
 | `CTRL-SAFETY-GENERATION` | Disable, enable, denylist-add, and denylist-remove decisions use a monotonic generation, append-only journal, and integrity-protected recovery copy outside restorable application-data backups. | Issues #4, #7, #16, #17, and #19 |
 | `CTRL-ROOM-DENYLIST` | Eligibility and every reconnect use the canonical platform room ID; ambiguity or a denylist match denies operation. | Issues #7, #16, and #17 |
 | `CTRL-DISABLE-CLEANUP` | Disablement stops platform activity, leases, transient audio/locators, reconnects, and publication without depending on the failing ingest path. | Issues #7, #8, #11, #14, #15, #16, #17, and #19 |
-| `CTRL-RESTORE-REPLAY` | An offline restore replays deletion tombstones before reconciling current safety/denylist state and admitting traffic. | Issues #4, #16, and #19 |
+| `CTRL-RESTORE-REPLAY` | An offline restore rejects stateful/stateless pre-restore credentials, replays deletion/revocation checkpoints, and only then reconciles current safety/denylist state before admitting traffic. | Issues #4, #12, #13, #16, and #19 |
+| `CTRL-IDENTITY-RESTORE-REVOCATION` | Typed pseudonymous account/device checkpoints and auth-invalidation state survive application backups; every stateful/stateless pre-restore credential is server-rejected before authentication or traffic. | Issues #4, #12, #13, #16, and #19 |
 | `CTRL-REENABLE-GATE` | Only an admin may technically enable/remove, and only after current owner approval and every incident, rights, deletion, journal, recovery, and tabletop prerequisite passes. | Issues #7, #16, #17, and #19 |
 | `CTRL-AUDIT-PAYLOAD-FREE` | Every safety, incident, deletion, and raw-access result is append-only and auditable without protected payload. | Issues #12, #13, #16, #17, and #19 |
 | `CTRL-DELETION-FAIL-CLOSED` | A takedown hides and blocks immediately; partial purge never reports completion and remains blocked through idempotent retry. | Issues #11, #16, and #17 |
 | `CTRL-WORKER-SYNTHETIC-ONLY` | Community workers receive synthetic audio unless the explicit rights and named High-residual gates for real PCM have passed. | Issues #8, #9, #14, and #15 |
 
 `CTRL-AUDIO-RAM-ONLY`, `CTRL-BACKUP-EVIDENCE`, `CTRL-RESTORE-REPLAY`,
-`CTRL-AUDIT-PAYLOAD-FREE`, and `CTRL-DELETION-FAIL-CLOSED` use the stable data classes,
-control definitions, and three-state deletion model in
+`CTRL-IDENTITY-RESTORE-REVOCATION`, `CTRL-AUDIT-PAYLOAD-FREE`, and
+`CTRL-DELETION-FAIL-CLOSED` use the stable data classes, control definitions, and
+three-state room/session deletion model in
 `docs/security/data-lifecycle-and-deletion.md`.
 
 ## Roles and authorized actions
@@ -64,7 +66,7 @@ current approval of the triggering policy/risk decision.
 - the global ingest decision;
 - the canonical room-ID denylist;
 - an append-only sequence of disable, enable, add, and remove decisions;
-- the current deletion-tombstone/replay checkpoint; and
+- the current room/session deletion and account/device revocation checkpoints; and
 - integrity metadata and references to any required owner approval.
 
 The journal stores the payload-free fields below, not platform responses, room content,
@@ -73,12 +75,17 @@ predecessor generation. A stale, duplicated, rolled-back, missing, or conflictin
 generation cannot replace a newer decision. An empty restored database is not evidence
 that generation zero is current.
 
-Issue #16 must maintain an integrity-protected current recovery copy containing enough
-of the latest safety/denylist state, journal integrity head, and tombstone checkpoint to
-detect stale application-data backups. That copy must be stored and authorized
-separately from restorable application-data backups. It is a safety dependency, not a
-general raw-data backup, and must contain no event, identity, transcript, audio, secret,
-or playback content.
+Issue #16 must maintain an encrypted, integrity-protected current recovery copy containing
+enough of the latest safety/denylist state, journal integrity head, room/session deletion
+checkpoint, typed pseudonymous account/device checkpoints, and monotonic authentication-
+invalidation generation or key version to detect stale application-data backups. A
+checkpoint target is a random immutable never-reused internal reference, not an email,
+role, public key, bearer, canonical room ID, or unkeyed digest of a low-entropy value.
+These references remain linkable pseudonymous data, so access is narrowly authorized and
+audited by opaque manifest reference/count. The copy and current verification key
+material are stored separately from restorable application-data backups. It is a safety
+dependency, not a general raw-data backup, and contains no direct identity field, event,
+transcript, audio, bearer/verifier, playback locator, or other user content.
 
 ### Safe transition rules
 
@@ -163,6 +170,43 @@ The states prove the documented control boundary, not physical-media erasure. Un
 provider windows or untracked plaintext prevent final satisfaction and, under
 `CTRL-BACKUP-EVIDENCE`, block production persistence.
 
+## Account/device deletion or revocation and restored credential procedure
+
+`CTRL-IDENTITY-RESTORE-REVOCATION` applies when an admin deletes or revokes an account or
+device:
+
+1. Record a typed operation (`deleted` or `revoked`) and scope. Account deletion revokes
+   and cascades through roles, invites, devices, aggregate statistics, tokens, verifiers,
+   and sessions. Device deletion affects only that device, its enrollment/session state,
+   and device-scoped statistics unless the account is also targeted.
+2. Stop new authentication, token/session issuance, enrollment, and worker assignment for
+   the target immediately. A permanent deletion may never be downgraded to a reversible
+   revocation, and a lower generation may never replace either operation.
+3. Commit the typed pseudonymous checkpoint to the separate recovery copy and verify its
+   read-back and integrity **before** reporting deletion/revocation complete. A failure
+   disables the affected authentication path and every restore traffic class.
+4. Purge identifying active-store fields and verifier/session rows within 24 hours. The
+   checkpoint contains only the typed random immutable never-reused internal target
+   reference, operation, target class, monotonic generation, timestamp, and payload-free
+   result; never email, public key, role, IP address, verifier hash, bearer, or user
+   content.
+5. Retain the checkpoint while any enumerated backup can reintroduce the identity/device
+   and through one successful restore verification after the last such window, then
+   delete it under an audited rule.
+
+Every restore purges/revokes **all** restored magic-link, worker-enrollment, session-
+verifier, and session rows before accepting any authentication, callback, worker, or
+viewer traffic, even when backed-up expiry/use state appears current. It also advances or
+reconciles the recovery-protected monotonic auth-invalidation generation or signing/
+verifier key version; the current version/root and verification secret material cannot
+come from the application-data backup, and pre-restore key versions cannot remain in the
+active verification set. Thus every stateless and stateful pre-restore credential remains
+server-rejected even if plaintext persists in a mailbox/client. The
+restore then replays account/device checkpoints, removes restored roles/invites/devices/
+statistics and issuance authority in scope, and proves deleted targets cannot receive
+new credentials. Fresh post-restore authentication and enrollment are required; no
+restored bearer or admin session is grandfathered.
+
 ## Startup, restore, and disaster recovery
 
 `CTRL-RESTORE-REPLAY` is a pre-traffic gate, not a background cleanup:
@@ -170,28 +214,41 @@ provider windows or untracked plaintext prevent final satisfaction and, under
 1. Isolate the new/restored environment from viewer, ingest, worker, scheduled-job, and
    callback traffic. Start every process with the local forced-off latch regardless of
    any restored setting.
-2. Verify the integrity and freshness of the separate safety/deletion recovery copy.
-   Missing, stale, rolled-back, conflicting, or unverifiable state ends the procedure
-   with global ingest disabled.
-3. Load the latest tombstone/deletion manifest checkpoint from that copy. Replay each
-   tombstone idempotently against the restored Postgres data, indexes/caches, raw
-   objects/versions, and managed exports. Verify that no deleted target is active or
-   visible. Replay and verification must finish **before** safety enablement is
-   reconciled.
-4. Reconcile the application journal with the latest safety generation and canonical
+2. Verify the integrity and freshness of the separate safety/deletion/revocation
+   recovery copy. Missing, stale, rolled-back, conflicting, or unverifiable state ends
+   the procedure with the environment isolated and off and every authentication and
+   traffic class denied.
+3. Purge or revoke every restored magic-link, worker-enrollment, session-verifier, and
+   session row, irrespective of its backed-up expiry/use/revocation state. Advance or
+   reconcile the recovery-protected monotonic auth-invalidation generation or non-
+   restorable signing/verifier key version and ensure restored old key material cannot
+   become current or remain in the active verification set. Reject sampled pre-restore
+   stateful/stateless links, cookies, and tokens in a server-side negative verification
+   before proceeding.
+4. Load the current checkpoints. Replay room/session tombstones idempotently against
+   restored Postgres data, indexes/caches, raw objects/versions, and managed exports;
+   replay typed account/device deletion/revocation checkpoints against account, role,
+   invite, device, statistics, token, verifier, and session rows. Verify that no deleted
+   target is active, visible, authenticable, or able to receive newly issued authority.
+5. Reconcile the application journal with the latest safety generation and canonical
    denylist recovery copy. A stale restored generation cannot overwrite the newer copy;
    any gap or integrity conflict leaves the environment off and creates a payload-free
    alert.
-5. Verify provider-window inventory, audit integrity, source/platform/rights currency,
+6. Verify provider-window inventory, audit integrity, source/platform/rights currency,
    incident remediation, applicable deletion results, and current owner approvals. Run
    the relevant tabletop using the restored environment while it remains isolated.
-6. Only after all checks pass may an admin request `CTRL-REENABLE-GATE`. The new
-   generation/journal/recovery-copy transition must succeed before viewer or ingest
-   traffic is admitted. Otherwise keep the environment offline/off and investigate.
+7. Only after all checks pass may a fresh, non-restored, separately audited admin
+   recovery authentication request `CTRL-REENABLE-GATE`. Its credential and trust root
+   cannot originate in the restored application backup; repository-owner governance
+   grants no production credential. The new generation/journal/recovery-copy transition
+   must succeed before authentication, viewer, worker, callback, or ingest traffic is
+   admitted. Otherwise keep the environment offline/off and investigate.
 
 Restoration tooling must not automatically swap traffic or credentials into the fork.
-A provider's ability to restore old data is exactly why current tombstones live outside
-the application-data backup boundary and are replayed first.
+A provider's ability to restore old data is exactly why current deletion/revocation
+checkpoints and authentication-invalidation state live outside the application-data
+backup boundary, and stateful/stateless pre-restore credentials are rejected before any
+replay or traffic.
 
 ## Re-enable gate
 
@@ -202,15 +259,18 @@ following:
   relevant;
 - the current acquisition channel, platform terms, rights evidence, purpose, public
   outputs, and any community-worker disclosure remain permitted;
-- all affected deletion manifests and tombstones have replayed successfully, and no
-  partial purge or unknown provider window is being misreported;
+- all affected deletion/revocation checkpoints have replayed successfully, every restored
+  stateful/stateless credential is server-rejected, restored identity/device authority
+  cannot issue a new credential, and no partial purge or unknown provider window is being
+  misreported;
 - the safety journal, recovery copy, generation, denylist, and audit are complete,
   current, and mutually consistent;
 - the relevant tabletop has fresh successful evidence;
 - every applicable Critical/High residual risk has an individual owner decision with
   date, scope, compensating controls, review date, and disable owner; and
-- the repository owner has recorded approval for this production enable/remove
-  decision, after which an admin performs the technical transition.
+- the repository owner has recorded approval for this production enable/remove decision,
+  after which a fresh, non-restored, separately audited admin recovery authentication
+  performs the technical transition.
 
 Any failed or missing item leaves the global state disabled. Neither the repository
 owner nor admin may waive a platform or rights-holder restriction.
@@ -223,16 +283,17 @@ fields below are stable content requirements, not a schema:
 | Field | Allowed content |
 | --- | --- |
 | Event identity/time | Random audit event reference; occurrence and recorded timestamps. |
-| Actor/control | Opaque actor reference, actor role, control ID, requested action, authorization result, and result code. |
-| Target | Object class plus opaque room/session/device/export reference; no event body or user-facing content. |
+| Actor/control | Restricted pseudonymous actor reference, actor role, control ID, requested action, authorization result, and result code. |
+| Target | Object class plus opaque room/session/export reference; identity deletion/revocation records only an opaque checkpoint-manifest reference and count, never its account/device target ID, event body, email, public key, bearer, or user-facing content. |
 | Safety transition | Prior and resulting safety generation, previous/new effective posture, and stable reason code. |
 | Incident/deletion | Opaque incident/manifest reference, deletion state, payload-free store counts, retry count, completion timestamp, and immutable `sla_breached` result where applicable. |
 | Integrity | Key identifier/version, previous journal-link reference, and a keyed integrity digest of the canonical control or manifest record. |
 | Failure | Stable component/control error code and success/failure/denied result, never an upstream response body or protected value. |
 | Governance | Opaque owner-approval/risk-decision reference and review expiry where required. |
 
-Never record an event/raw body, email, bearer secret, cookie, playback locator, platform
-credential, audio representation, transcript, or a digest of a low-entropy/raw value.
+Never record an account/device checkpoint target, event/raw body, email, bearer secret,
+cookie, playback locator, platform credential, audio representation, transcript, or a
+digest of a low-entropy/raw value.
 The keyed integrity digest covers the canonical metadata record, never deleted content.
 Diagnostics must redact both secret keys and values. Audit access is restricted to an
 admin/auditor, is append-only, and follows the 365-day lifecycle and documented
@@ -279,22 +340,29 @@ the raw object and advance simulated time beyond 24 hours before its successful 
 duplicate data, partial/late deletion is truthful, and no unchecked store is called
 complete.
 
-### Tabletop 3: restore a backup containing stale enablement and deleted data
+### Tabletop 3: restore stale enablement, deleted data, and revoked identity
 
 **Setup:** Restore an application-data backup whose generation is older, whose global
-setting says enabled, and whose rows include a target deleted after that backup. The
-separate recovery copy contains the newer forced-off generation, denylist, and tombstone.
+setting says enabled, and whose rows include a room/session plus an account/device deleted
+after that backup. It also contains apparently unexpired magic-link, enrollment-token,
+session-verifier/session rows, a stateless token signed by the old key version, and the
+deleted subject's roles/invites/device statistics. The separate recovery copy contains
+the newer forced-off generation, denylist, room/session tombstone, typed pseudonymous
+account/device checkpoints, and newer auth-invalidation generation/key version.
 
 | Step | Action | Expected result |
 | --- | --- | --- |
 | 1 | Boot the restore in isolation. | Startup ignores backed-up enablement and latches off before any viewer, ingest, worker, callback, or scheduled-job traffic. |
-| 2 | Verify and load the separate recovery copy. | The newer tombstone and generation are recognized; missing/tampered/conflicting-copy variants stop here and remain off. |
-| 3 | Replay the deletion manifest against restored stores, then verify. | The resurrected target is purged/hidden idempotently before safety reconciliation; no deleted content is served. |
-| 4 | Reconcile safety generation and denylist. | The stale backed-up generation cannot overwrite the current copy. Gaps or mismatches remain off and produce a payload-free alert. |
-| 5 | Evaluate `CTRL-REENABLE-GATE`. | Traffic remains blocked until remediation, current rights/policy, audit, tabletop, provider-window, and owner approvals all pass and an admin records a fresh durable generation. |
+| 2 | Verify and load the separate recovery copy. | The newer tombstone, identity/device checkpoints, safety generation, and auth-invalidation generation/key version are recognized; missing/tampered/conflicting-copy variants stop here and remain off. |
+| 3 | Purge/revoke restored verifier/session rows, reconcile the protected auth generation/key version, and probe old links/cookies/stateless tokens. | Every stateful/stateless pre-restore credential is server-rejected regardless of backed-up expiry/use state; old verification key material cannot become current; fresh authentication and enrollment are required. |
+| 4 | Replay room/session and typed account/device checkpoints, then verify deletion and issuance denial. | Content is purged/hidden; scoped account roles/invites/devices/statistics/tokens/sessions are purged or remain revoked; deleted authority can neither authenticate nor receive a new credential before safety reconciliation. |
+| 5 | Reconcile safety generation and denylist. | The stale backed-up generation cannot overwrite the current copy. Gaps or mismatches remain off and produce a payload-free alert. |
+| 6 | Evaluate `CTRL-REENABLE-GATE` using a fresh, non-restored, separately audited admin recovery authentication. | Restored admin sessions remain invalid. Traffic stays blocked until remediation, current rights/policy, audit, tabletop, provider-window, and owner approvals pass and the fresh recovery admin records a durable generation. |
 
-**Pass result:** Deletion replay precedes safety reconciliation, both precede traffic,
-and an old enabled value never becomes authority.
+**Pass result:** Stateful/stateless pre-restore credentials remain server-rejected and all
+deletion/revocation checkpoints replay before safety reconciliation; every step precedes
+traffic, and neither an old enabled value, restored admin session, nor deleted identity/
+device authority becomes current.
 
 ### Tabletop 4: authenticated worker capable of retaining PCM
 
@@ -316,7 +384,7 @@ erasure, and real audio remains off without every explicit gate.
 ## Evidence handoff
 
 Issue #2 supplies the stable decisions and paper expectations only. Issues #4, #7, #8,
-#9, #11, #12, #14, #15, #16, #17, and #19 must reference the applicable control IDs in
+#9, #11, #12, #13, #14, #15, #16, #17, and #19 must reference the applicable control IDs in
 their own accepted artifacts and record executable verification. Production enablement
 also requires the repository owner's final ADR approval and an individual decision for
 every accepted Critical/High residual risk; a blanket approval is invalid.

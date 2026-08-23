@@ -19,7 +19,7 @@ owner decisions are complete.
 | --- | --- | --- |
 | `DEC-ARCH-001` | Use one modular-monolith backend as the sole online application authority during Alpha. | Proposed; owner approval pending |
 | `DEC-MAINT-001` | Permit the Issue #4 maintenance job only as a mutually exclusive, non-serving, narrowly credentialed runbook actor. | Proposed; owner approval pending |
-| `DEC-SAFETY-001` | Start and restore globally disabled; reconcile the monotonic safety state and deletion tombstones from a separate recovery boundary before any re-enable. | Proposed; runtime evidence pending |
+| `DEC-SAFETY-001` | Start and restore globally disabled; reject stateful/stateless pre-restore credentials and reconcile deletion/revocation checkpoints plus monotonic safety state from a separate recovery boundary before any re-enable. | Proposed; runtime evidence pending |
 | `DEC-WORKER-001` | Treat every community worker as untrusted; synthetic frames are the production default, and real PCM is a separately gated exception. | Proposed; `RISK-WORKER-AUDIO-RETENTION` is not accepted |
 | `DEC-DATA-001` | Keep normalized data restricted by default and raw business payloads outside ordinary API paths; production persistence awaits Issue #16. | Proposed; runtime evidence pending |
 | `DEC-EXPORT-001` | Allow raw access only through a separately authorized, managed, encrypted, and audited admin-export boundary after Issue #16. | Proposed; capability disabled |
@@ -75,8 +75,8 @@ the following future controls are evidenced:
 - credentials are narrower than the serving backend and expire or are revoked after the
   operation;
 - the job has no browser, Bilibili, worker, Resend, or public-serving interface; and
-- failed safety-state, tombstone, or audit reconciliation leaves the environment
-  globally disabled.
+- failed safety-state, deletion/revocation, restored-credential, or audit reconciliation
+  leaves the environment globally disabled.
 
 The job never becomes a second online authority. This decision constrains Issue #4; it
 does not claim that the job or its controls exist yet.
@@ -86,7 +86,11 @@ does not claim that the job or its controls exist yet.
 Production ingest is disabled by default. The serving backend owns a monotonic safety
 generation, an append-only safety journal, and canonical-room denylist decisions. An
 integrity-protected current recovery copy must be stored outside restorable
-application-data backups.
+application-data backups. In addition to safety and deletion state, that boundary holds
+typed pseudonymous account/device checkpoints and a monotonic authentication-invalidation
+generation or signing/verifier key version. Those values and the current verification
+key material cannot be restored from an application-data backup, and pre-restore key
+versions cannot remain in the active verification set.
 
 An operator or admin may disable globally or add a canonical room to the denylist. Only
 an admin may technically re-enable or remove a denylist entry, and only after recorded
@@ -95,11 +99,16 @@ rolled-back, conflicting, or unwritable safety state denies start and reconnect.
 emergency disable acts locally even when durable writes fail and leaves the system off.
 
 Every process start and every restore ignores any backed-up `enabled` value. Before an
-environment can accept ingest or viewer traffic, the Issue #4 recovery path must
-successfully replay deletion tombstones and reconcile the newest safety generation and
-denylist against the separate recovery copy. Re-enable also requires current
-platform/rights evidence, incident remediation where applicable, tabletop evidence,
-and a recorded owner decision.
+environment can accept authentication, ingest, worker, or viewer traffic, the Issue #4
+recovery path must verify the separate recovery copy; advance or reconcile its protected
+authentication-invalidation generation/key version; purge every restored magic-link,
+enrollment-token, session-verifier, and session row; replay room/session deletion plus
+typed account/device deletion/revocation checkpoints; and reconcile the newest safety
+generation and denylist. A pre-restore credential must remain rejected by the server even
+if its plaintext still exists in a mailbox or client. Re-enable also requires a fresh,
+non-restored, separately audited admin recovery authentication, current platform/rights
+evidence, incident remediation where applicable, tabletop evidence, and a recorded owner
+decision.
 
 ### `DEC-WORKER-001`: community workers are hostile-capable processors
 
@@ -205,7 +214,7 @@ flowchart LR
     end
 
     subgraph RECOVERY["Safety recovery boundary"]
-        SR["Integrity-protected current safety<br/>and deletion recovery copy"]
+        SR["Integrity-protected safety deletion revocation<br/>and auth-invalidation recovery copy"]
     end
 
     subgraph MAINT["Issue #4 maintenance boundary"]
@@ -228,9 +237,9 @@ flowchart LR
     BE -->|"FLOW-ALLOW-008 restricted normalized identity control audit data"| PG
     BE -->|"FLOW-ALLOW-009 sanitized encrypted raw payloads after Issue #16"| BU
     BE -->|"FLOW-ALLOW-010 minimum invited address and one-time link"| RE
-    BE -->|"FLOW-ALLOW-011 monotonic safety and tombstone copy"| SR
+    BE -->|"FLOW-ALLOW-011 safety deletion revocation and auth-invalidation copy"| SR
     AB -->|"FLOW-ALLOW-012 offline restore input"| MJ
-    SR -->|"FLOW-ALLOW-013 safety and deletion replay input"| MJ
+    SR -->|"FLOW-ALLOW-013 credential invalidation and recovery replay input"| MJ
     MJ -->|"FLOW-ALLOW-014 exclusive runbook operation"| PG
     MJ -->|"FLOW-ALLOW-015 exclusive runbook operation"| BU
     MJ -->|"FLOW-ALLOW-016 reconciled recovery update"| SR
@@ -248,7 +257,7 @@ flowchart LR
     RAM -. "FLOW-DENY-008 no audio to Postgres" .-> PG
     RAM -. "FLOW-DENY-009 no audio to Bucket" .-> BU
     BU -. "FLOW-DENY-010 no raw to ordinary public API" .-> BR
-    AB -. "FLOW-DENY-011 backup cannot overwrite current safety" .-> SR
+    AB -. "FLOW-DENY-011 backup cannot overwrite current recovery state" .-> SR
     BR -. "FLOW-DENY-012 no serving path to maintenance job" .-> MJ
     MJ -. "FLOW-DENY-013 no maintenance access to platform" .-> BI
     MJ -. "FLOW-DENY-014 no maintenance access to worker" .-> WK
@@ -288,8 +297,8 @@ authorizes and audits a bounded managed object through `EG`. `FLOW-DENY-001` and
 | `FLOW-ALLOW-008` | The owning Issue has implemented the data class and access rule. | Restricted normalized/minimal identity/control and payload-free audit only. | Do not persist. |
 | `FLOW-ALLOW-009` | Issue #16 and current source/rights gates pass. | Credential-, locator-, identity-, and audio-stripped; compressed and authenticated-encrypted. | Do not archive; never spill to another path. |
 | `FLOW-ALLOW-010` | Issue #12 authorizes an invite. | Minimum invited address and one-time-link content only. | Do not send; never log plaintext bearer material. |
-| `FLOW-ALLOW-011` | Safety/tombstone update can be integrity-protected and ordered. | Current control state and payload-free deletion data only. | Disable locally and remain globally off. |
-| `FLOW-ALLOW-012`–`FLOW-ALLOW-016` | An approved, mutually exclusive Issue #4 runbook is active. | Narrow operation-specific access; safety/tombstone replay precedes traffic. | Abort, remain offline and globally off, alert. |
+| `FLOW-ALLOW-011` | Safety, deletion/revocation, and authentication-invalidation updates can be integrity-protected and ordered. | Current control state, auth-invalidation generation/key version, room/session checkpoints, and typed pseudonymous account/device checkpoints only. | Disable the affected path locally and remain globally off. |
+| `FLOW-ALLOW-012`–`FLOW-ALLOW-016` | An approved, mutually exclusive Issue #4 runbook is active. | Narrow operation-specific access; restored stateful and stateless credential invalidation plus deletion/revocation replay precedes safety reconciliation and traffic. | Abort, remain offline and globally off, alert. |
 | `FLOW-ALLOW-017`–`FLOW-ALLOW-020` | Issue #16 managed export and admin authorization/audit controls pass. | 15-minute capability; encrypted managed object no longer than 24 hours. | Deny or delete/revoke; no local plaintext fallback. |
 
 ### No-flow registry
@@ -301,9 +310,9 @@ authorizes and audits a bounded managed object through `EG`. `FLOW-DENY-001` and
 | `FLOW-DENY-003`–`FLOW-DENY-006` | No worker access to Bilibili, Postgres, Bucket, or Resend. | Workers are untrusted and receive least data only. |
 | `FLOW-DENY-007` | No credential, cookie, locator, bearer secret, or key reaches a worker. | Worker compromise must not cross into platform or managed-service authority. |
 | `FLOW-DENY-008`, `FLOW-DENY-009` | No audio representation reaches any persistent store or backup. | Audio is RAM-only and ephemeral. |
-| `FLOW-DENY-011` | Restored application data cannot overwrite the current recovery copy. | A stale backup must not roll back a disable, denylist, or tombstone. |
+| `FLOW-DENY-011` | Restored application data cannot overwrite the current recovery copy. | A stale backup must not roll back a disable, denylist, deletion, identity/device revocation, or credential invalidation. |
 | `FLOW-DENY-012`–`FLOW-DENY-015` | The maintenance job has no serving, platform, worker, or email path. | It is a mutually exclusive runbook actor, not an online authority. |
-| `FLOW-DENY-016`–`FLOW-DENY-018` | No audio representation reaches application backups, the safety/deletion recovery copy, or a managed export. | Every persistent and export boundary excludes audio, even when it is separate from the primary data stores. |
+| `FLOW-DENY-016`–`FLOW-DENY-018` | No audio representation reaches application backups, the safety/deletion/revocation/auth-invalidation recovery copy, or a managed export. | Every persistent and export boundary excludes audio, even when it is separate from the primary data stores. |
 
 In addition, workers may not receive remote shell commands, arbitrary execution or
 container fields, code, server-selected download URLs, or non-allowlisted models. Those
@@ -318,10 +327,10 @@ are protocol no-flow constraints even though they are not separate diagram nodes
 | Bilibili | External, mutable, and untrusted. | Only the approved public/free/anonymous/current-live channel; restrictions or ambiguity stop the session. |
 | Community worker | Untrusted for confidentiality, integrity, and availability after authentication. | Synthetic by default; least-data protocol only; no service/platform credentials. |
 | Postgres | Managed processor with least-privilege backend access. | Restricted normalized/minimal identity/control data and payload-free audit after owning Issues. No audio or raw business payload. |
-| Private Bucket | Managed high-risk processor isolated from ordinary APIs. | Sanitized authenticated-encrypted raw data after Issue #16, plus a separately protected safety/deletion recovery copy. No audio. |
+| Private Bucket | Managed high-risk processor isolated from ordinary APIs. | Sanitized authenticated-encrypted raw data after Issue #16, plus a separately protected safety/deletion/revocation/auth-invalidation recovery copy. No audio. |
 | Resend | External email processor. | Minimum invited address and one-time-link content only after Issue #12. |
 | Issue #4 maintenance | Trusted only for one approved offline operation. | Narrow credentials; mutual exclusion; no serving or external-party flows. |
-| Safety recovery copy | Integrity-protected authority over restored application safety state. | Current safety generation, denylist, and payload-free deletion recovery data only. |
+| Safety recovery copy | Integrity-protected authority over restored application safety, deletion, revocation, and authentication invalidation. | Current safety/auth generations or key versions and denylist, room/session deletion records, and restricted typed pseudonymous account/device checkpoints only; no direct identity or bearer material. |
 | Admin export | Separately authorized and audited managed boundary. | Encrypted, time-bounded object; no ordinary API or untracked plaintext route. |
 
 ## Consequences
@@ -357,10 +366,14 @@ are protocol no-flow constraints even though they are not separate diagram nodes
 - Issues #7 and #10 own platform resolution, real-time event validation, and ingest
   behavior under the fail-closed policy.
 - Issue #8 owns executable decoder and bounded-RAM/no-persistence evidence.
-- Issues #12–#15 own identity, roles, worker enrollment, lease, and scheduling controls.
-- Issue #16 owns normalized/raw persistence, managed export, deletion, backup, and
-  restore-replay evidence.
-- Issue #19 owns production deployment, monitoring, recovery, and final Alpha evidence.
+- Issues #12 and #13 own account/device cascade, stateful and stateless credential
+  invalidation, fresh recovery-admin authentication, and negative acceptance tests;
+  Issues #14/#15 own lease and scheduling controls.
+- Issue #16 owns normalized/raw persistence, managed export, room/session and identity
+  checkpoints, backup inventory, independent auth-invalidation state, and restore-replay
+  evidence.
+- Issues #4 and #19 own isolated restore sequencing, deployment, monitoring, recovery,
+  and final Alpha evidence.
 
 ## Alternatives considered
 
@@ -372,7 +385,7 @@ are protocol no-flow constraints even though they are not separate diagram nodes
 | Persist audio for retry, debugging, fixtures, or recovery | Rejected. | It violates the audio ephemerality invariant; retries must use only frames still inside the existing RAM budget. |
 | Put raw payloads in Postgres or ordinary history APIs | Rejected. | It expands the high-risk disclosure surface and defeats the separate archive/export boundary. |
 | Run Issue #4 maintenance as an always-on service | Rejected. | It would become a second authority with broad credentials. |
-| Restore the backed-up `enabled` flag and reconcile later | Rejected. | It can resurrect deleted or denied rooms and roll back emergency safety decisions. |
+| Restore backed-up enable/auth state and reconcile later | Rejected. | It can resurrect deleted or denied rooms, deleted account/device authority, pre-restore credentials, and emergency safety decisions. |
 | Assume public viewing grants redistribution or worker-processing rights | Rejected. | Eligibility requires current platform and rights evidence for each purpose and disclosure. |
 
 ## Production gates and decision record
@@ -381,8 +394,8 @@ are protocol no-flow constraints even though they are not separate diagram nodes
 | --- | --- | --- |
 | `GATE-ADR-OWNER` | Repository owner explicitly approves this final ADR. | **PENDING** |
 | `GATE-PLATFORM-RIGHTS` | Current authoritative terms, acquisition channel, purpose, rights, worker disclosure, output use, takedown contact, and review evidence are approved. | **PENDING; production ingest OFF** |
-| `GATE-SAFETY-RUNTIME` | Default-off, monotonic journal/recovery copy, denylist, cleanup, restore replay, audit, and re-enable controls have executable evidence. | **PENDING; production ingest OFF** |
-| `GATE-PERSISTENCE` | Issue #16 implements approved access, sanitization, encryption, retention, deletion, backup, export, and recovery controls. | **PENDING; production persistence/export OFF** |
+| `GATE-SAFETY-RUNTIME` | Default-off, monotonic journal/recovery copy, denylist, cleanup, stateful/stateless restored-credential rejection, deletion/revocation replay, fresh recovery-admin authentication, audit, and re-enable controls have executable evidence. | **PENDING; production auth/ingest OFF** |
+| `GATE-PERSISTENCE` | Issue #16 implements approved access, sanitization, encryption, retention, deletion/revocation checkpoints, independent auth-invalidation state, backup, export, and recovery controls. | **PENDING; production persistence/export OFF** |
 | `GATE-WORKER-PCM` | Rights allow third-party disclosure and the owner individually accepts `RISK-WORKER-AUDIO-RETENTION`. | **NOT MET; High risk NOT ACCEPTED; synthetic only** |
 | `GATE-RESIDUAL-RISK` | Every Critical/High residual in the threat model has an individual owner record with date, scope, compensating control, review date, and disable owner. | **PENDING; no blanket approval** |
 

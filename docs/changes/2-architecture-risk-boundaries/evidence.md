@@ -21,12 +21,12 @@
 
 | Command | Result | Date/commit |
 | --- | --- | --- |
-| `make bootstrap` | Passed; uv checked 10 packages and pnpm reported the frozen workspace already up to date. | 2026-08-24 / final implementation worktree |
-| `make verify` | Passed; Ruff, workspace lint, mypy, typecheck, 40 pytest tests, pnpm tests, artifact gate, and build all succeeded. | 2026-08-24 / final implementation worktree |
-| `git diff --check && git diff --cached --check` | Passed with no whitespace errors. | 2026-08-24 / final staged implementation tree |
-| Mermaid CLI render command below | Passed with `@mermaid-js/mermaid-cli` 11.12.0 and system Google Chrome; the ADR Markdown produced a rendered SVG. | 2026-08-24 / final implementation worktree |
-| GitHub Markdown API table-render comparison | Passed; all 34 Markdown table delimiter rows rendered as 34 HTML tables across the six records. | 2026-08-24 / final implementation worktree |
-| Local Markdown link existence check | Passed; every relative link in `README.md`, `SECURITY.md`, and the six records resolved to an existing repository path. | 2026-08-24 / final implementation worktree |
+| `make bootstrap` | Passed; uv checked 10 packages and pnpm reported the frozen workspace already up to date. | 2026-08-24 / post-review P1-fix worktree |
+| `make verify` | Passed; Ruff, workspace lint, mypy, typecheck, 40 pytest tests, pnpm tests, artifact gate, and build all succeeded. | 2026-08-24 / post-review P1-fix worktree |
+| `git diff --check && git diff --cached --check` | Passed with no whitespace errors. | 2026-08-24 / final staged P1-fix tree |
+| Mermaid CLI render command below | Passed with `@mermaid-js/mermaid-cli` 11.12.0 and system Google Chrome; the ADR Markdown produced a 94,792-byte SVG. | 2026-08-24 / post-review P1-fix worktree |
+| GitHub Markdown API table-render comparison | Passed; all 34 Markdown table delimiter rows rendered as 34 HTML tables across the six records. | 2026-08-24 / post-review P1-fix worktree |
+| Local Markdown link existence check | Passed; all 18 relative links in `README.md`, `SECURITY.md`, and the six records resolved to existing repository paths. | 2026-08-24 / post-review P1-fix worktree |
 
 The isolated Mermaid render used no repository dependency or output path:
 
@@ -52,18 +52,20 @@ update; it adds no runtime or deployment resource.
 - **Diagram trace: Passed.** Mermaid CLI rendered every required zone plus the Issue #4
   maintenance, safety recovery, and managed-export boundaries. The registries trace 20
   conditionally allowed flows and 18 explicit no-flows, including transient playback
-  bytes and audio exclusions for Postgres, Bucket, application backups, the safety copy,
-  and managed export.
+  bytes and audio exclusions for Postgres, Bucket, application backups, the safety/
+  deletion/revocation/auth-invalidation recovery copy, and managed export.
 - **Threat and role trace: Passed as a design review.** Every required threat has asset,
   actor, entry point, precondition, prevention, detection, response, later evidence
   owners/dependencies, residual severity, and decision. The anonymous/invited/
   contributor/operator/admin/owner matrix matches the accepted deny-by-default model.
   All 13 High residuals are individually `NOT ACCEPTED`; no Critical residual is listed.
   Their production capabilities remain off or prohibited.
-- **Lifecycle trace: Passed as a design review.** Every accepted data class and exact
-  audio ceiling is present, there is no audio retry queue, and the three truthful
-  deletion states, immutable late-SLA result, provider-window boundary, tombstone, and
-  forced-off restore order are explicit. This is not runtime enforcement evidence.
+- **Lifecycle trace: Passed as a design review.** Twelve stable data classes cover every
+  accepted class plus a separate typed pseudonymous identity/device checkpoint without
+  broadening the room/session tombstone. The exact audio ceilings, no-retry-queue rule,
+  three truthful room/session deletion states, immutable late-SLA result, provider-window
+  boundary, checkpoint durability, and forced-off restore order are explicit. This is
+  not runtime enforcement evidence.
 - **Tabletop 1 — active-room global disable: Passed on paper.** The runbook immediately
   latches off, denies starts/reconnects, stops the platform session, revokes the lease,
   rejects late output, clears conforming audio/locator RAM, hides publication, and keeps
@@ -73,9 +75,12 @@ update; it adds no runtime or deployment resource.
   idempotent, a late success records `sla_breached=true`, and the final state waits for
   every enumerated export/provider window and a post-window restore check.
 - **Tabletop 3 — stale restore: Passed on paper.** The environment starts isolated and
-  forced off, replays current tombstones before reconciling the newer safety generation
-  and denylist, rejects the backed-up enabled value, and admits no traffic before every
-  gate succeeds.
+  forced off; purges restored verifier/session rows; advances or reconciles a recovery-
+  protected auth-invalidation generation/key version; rejects stateful/stateless pre-
+  restore credentials; replays room/session and typed account/device checkpoints; and
+  proves deleted authority cannot receive new credentials before safety reconciliation.
+  Restored admin sessions stay invalid, and only a fresh non-restored separately audited
+  recovery-admin authentication may request re-enable after all other gates pass.
 - **Tabletop 4 — malicious authenticated worker: Passed on paper.** Authentication is
   never treated as trusted execution or proof of RAM erasure. Missing third-party rights
   or an individual `RISK-WORKER-AUDIO-RETENTION` decision keeps real PCM off and synthetic
@@ -133,9 +138,27 @@ The implementation review then found and resolved:
   and an incomplete account of generated upstream-summary exposure.
 
 After those revisions, independent architecture/security and data/platform/license
-re-reviews reported no remaining P1/P2. GitHub GFM rendered all record tables, Mermaid
-rendering passed, local links resolved, official source URLs were reachable, and the
-upstream commit/tree/blob/digest checks matched.
+re-reviews reported no remaining P1/P2 at implementation head `9b534b6`. GitHub GFM
+rendered all record tables, Mermaid rendering passed, local links resolved, official
+source URLs were reachable, and the upstream commit/tree/blob/digest checks matched.
+
+The first remote review of PR #22 then found one valid P1:
+[restored application backups could recreate deleted account/device authority and accept
+backed-up credentials](https://github.com/Shuang-su/Livecho/pull/22#discussion_r3839433951).
+The resolution keeps the accepted room/session tombstone unchanged and adds the stricter,
+separate `DATA-IDENTITY-REVOCATION-CHECKPOINT` control. It requires durable checkpoint
+write/read-back before completion; typed account versus device cascade semantics;
+server-side rejection of every stateful/stateless pre-restore credential; non-restorable
+current verification-key material; denial of newly issued authority to deleted targets;
+and fresh non-restored audited recovery-admin authentication before re-enable. The
+accepted `intent.md`, `spec.md`, and `plan.md` remain unchanged; the implementation record
+closes the gap without reinterpreting the room/session tombstone.
+
+The post-fix independent review and mechanical consistency audit found no remaining
+P1/P2. The latest tree has 30 stable controls, 12 data classes, 13 individually unaccepted
+High rows, continuous `FLOW-ALLOW-001`–`020` and `FLOW-DENY-001`–`018`, no shared-control
+owner mismatch, 34/34 GFM tables, 18/18 local links, and a successful Mermaid 11.12.0
+render.
 
 ## Deviations
 
@@ -145,6 +168,7 @@ deviation.
 
 ## Release and rollback evidence
 
-Not deployed. Production ingest, production persistence/export, and community-worker
-real PCM remain disabled. Repository-owner approval of the final ADR and threat-model
-record is pending; no Critical/High residual risk is accepted by this evidence.
+Not deployed. Production authentication/restore traffic, ingest, persistence/export, and
+community-worker real PCM remain disabled. Repository-owner approval of the final ADR and
+threat-model record is pending; no Critical/High residual risk is accepted by this
+evidence.

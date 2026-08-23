@@ -28,8 +28,9 @@ name requirements, not wire fields or runtime schemas.
 | `CTRL-AUTH-EXPIRY` | Bearer credentials have the maximum lifetimes, single-use rules, verifier storage, revocation, and purge behavior below. | Issues #12 and #13 |
 | `CTRL-AUDIT-PAYLOAD-FREE` | Security, safety-control, raw-access, and deletion audit records contain control metadata but no protected payload. | Issues #12, #13, #16, #17, and #19 |
 | `CTRL-DELETION-STATE` | Room/session deletion is idempotent and reports three truthful states, including immutable late-SLA evidence. | Issue #16 |
-| `CTRL-BACKUP-EVIDENCE` | Every cache, replica, object version, export, and backup window is enumerated and evidenced; an unknown bound blocks production persistence. | Issues #4, #16, and #19 |
-| `CTRL-RESTORE-REPLAY` | A restore is offline and globally disabled until current tombstones and safety state are replayed and verified. | Issues #4, #16, and #19 |
+| `CTRL-BACKUP-EVIDENCE` | Every cache, replica, object version, export, and backup window is enumerated and evidenced; an unknown bound blocks production persistence or restored authentication. | Issues #4, #12, #13, #16, and #19 |
+| `CTRL-RESTORE-REPLAY` | A restore is offline and globally disabled until stateful/stateless pre-restore credentials are rejected and current deletion/revocation checkpoints and safety state are replayed and verified. | Issues #4, #12, #13, #16, and #19 |
+| `CTRL-IDENTITY-RESTORE-REVOCATION` | Typed pseudonymous account/device checkpoints and auth-invalidation state survive application backups, and every stateful/stateless pre-restore credential is server-rejected before any traffic or authentication. | Issues #4, #12, #13, #16, and #19 |
 
 ## Normative lifecycle matrix
 
@@ -39,13 +40,14 @@ name requirements, not wire fields or runtime schemas.
 | `DATA-PLAYBACK-SECRET`: playback URL/token/cookie or upstream credential | Trusted backend ingest memory only during the active connect or refresh operation. Never persisted and never sent to a worker or browser. | Stop use, close the platform session, and clear the local reference after use, refresh, stop, disable, or error. Request upstream revocation only where supported. Every diagnostic redacts both key and value. |
 | `DATA-NORMALIZED-EVENT`: normalized event and room/session metadata | Restricted by default. Production Postgres persistence is disabled until Issue #16 implements these controls and a current per-source/per-field record approves purpose, publication, retention/review, and deletion triggers. There is no platform-independent default TTL. Missing or expired evidence stops new persistence and publication. | Anonymous APIs expose only the approved normalized live subset; invited history requires separate authorization. A canonical room/session deletion hides and blocks immediately, then purges active stores within 24 hours. |
 | `DATA-RAW-BUSINESS`: sanitized raw business payload | Production persistence is disabled until the normalized-data gates and Issue #16 sanitization, key, encryption, audit, manifest, and deletion controls pass. If enabled, raw data may exist only in the private Bucket after credentials, playback locators, excess identity, and every audio representation are rejected or removed, then compressed and encrypted with AES-256-GCM using separate keys. It has no platform-independent TTL. | Admin-only managed export with per-access audit. Never an ordinary/public API response or browser cache. Delete all room/session objects and versions from active storage within 24 hours. Sanitization, encryption, key, audit, manifest, or storage failure prevents archival and must not spill raw data into Postgres, logs, queues, or temporary files. |
-| `DATA-ACCOUNT-IDENTITY`: invite/account identity | Disabled until Issue #12. Then only the invited email, role, and minimum account/revocation state may remain while the account is active. | Subject or admin access only. Revoke access immediately. An approved account deletion purges identifying active-store fields within 24 hours and retains only the payload-free audit/tombstone record required below. |
-| `DATA-AUTH-BEARER`: authentication, enrollment, and session bearer secret | Disabled until its owning Issue. A magic link is single-use and valid for at most 15 minutes; a worker enrollment token is single-use and valid for at most 24 hours; a session cookie is individually revocable and valid for at most 30 days. The database stores only a verifier hash plus expiry/use state. Plaintext exists only in the intended Resend email or initiating client flow, never in a database, log, telemetry event, or URL analytics. | Expiry, use, or revocation immediately prevents future acceptance. Plaintext retained in a previously delivered email is inert and cannot become valid again. Account/device deletion revokes related tokens and sessions immediately and purges active verifier/session rows within 24 hours. Issue #12 owns account authentication/session evidence; Issue #13 owns worker enrollment evidence. |
-| `DATA-WORKER-DEVICE`: device identity and aggregate worker statistics | Disabled until Issue #13. Then limited to device public key, status, allowlisted capabilities, online/processed duration, success rate, RTF, and recent health while registered. | A contributor sees only that contributor's aggregates; an admin manages devices. Revoke immediately. Device/account deletion purges identifying active-store fields within 24 hours. |
-| `DATA-AUDIT`: security, control, deletion, and raw-access audit | Append-only actor/control result, timestamps, object class, safety generation, and integrity metadata for 365 days. It contains no event body, email, secret, playback locator, audio, transcript, or digest of low-entropy/raw values. Keyed integrity digests cover canonical manifest/control records, never deleted content. | Restricted admin/auditor access. After 365 days, purge active audit rows within 24 hours unless a documented incident hold names an owner and expiry. The payload-free field contract is also defined by `CTRL-AUDIT-PAYLOAD-FREE` in the incident runbook. |
-| `DATA-DELETION-TOMBSTONE`: deletion manifest/tombstone | Opaque room/session target, deletion state, safety generation, timestamps, and payload-free counts only. It must be held separately from restorable application data and be available to every restore. | Retain while any live/history store, object version, export, replica, or backup can reintroduce the target and through at least one successful restore verification after the last backup window. It contains no raw, identity, event, transcript, or audio content. |
+| `DATA-ACCOUNT-IDENTITY`: invite/account identity | Disabled until Issue #12. Then only the invited email, role, and minimum account/revocation state may remain while the account is active. | Subject or admin access only. Revoke access immediately. An approved account deletion purges identifying active-store fields within 24 hours and writes the typed pseudonymous recovery checkpoint required by `CTRL-IDENTITY-RESTORE-REVOCATION`; an application-data restore must not recreate the account or its authority. |
+| `DATA-AUTH-BEARER`: authentication, enrollment, and session bearer secret | Disabled until its owning Issue. A magic link is single-use and valid for at most 15 minutes; a worker enrollment token is single-use and valid for at most 24 hours; a session cookie is individually revocable and valid for at most 30 days. The database stores only a verifier hash plus expiry/use state. Plaintext exists only in the intended Resend email or initiating client flow, never in a database, log, telemetry event, or URL analytics. | Expiry, use, or revocation immediately prevents future server acceptance; this does not claim erasure of plaintext in an email/client. Account/device deletion revokes related tokens and sessions immediately and purges active verifier/session rows within 24 hours. Every restore purges/revokes all restored magic-link, enrollment-token, session-verifier, and session rows and advances/reconciles a recovery-protected monotonic auth-invalidation generation or non-restorable signing/verifier key version. All pre-restore stateful/stateless credentials remain server-rejected, and current verification secret material is never restored from an application backup. Issue #12 owns account authentication/session evidence; Issue #13 owns worker enrollment evidence. |
+| `DATA-WORKER-DEVICE`: device identity and aggregate worker statistics | Disabled until Issue #13. Then limited to device public key, status, allowlisted capabilities, online/processed duration, success rate, RTF, and recent health while registered. | A contributor sees only that contributor's aggregates; an admin manages devices. Revoke immediately. Device/account deletion purges identifying active-store fields within 24 hours and writes a typed pseudonymous recovery checkpoint; a restore must replay it before accepting device authentication or traffic. |
+| `DATA-AUDIT`: security, control, deletion, and raw-access audit | Append-only actor/control result, timestamps, object class, safety generation, opaque manifest reference/count, and integrity metadata for 365 days. It contains no account/device checkpoint target, event body, email, public key, secret, playback locator, audio, transcript, or digest of low-entropy/raw values. Any opaque actor reference remains restricted pseudonymous data. Keyed integrity digests cover canonical manifest/control records, never deleted content. | Restricted admin/auditor access. After 365 days, purge active audit rows within 24 hours unless a documented incident hold names an owner and expiry. The payload-free field contract is also defined by `CTRL-AUDIT-PAYLOAD-FREE` in the incident runbook. |
+| `DATA-DELETION-TOMBSTONE`: room/session deletion manifest/tombstone | Opaque room/session target, deletion state, safety generation, timestamps, and payload-free counts only. It must be held separately from restorable application data and be available to every restore. | Retain while any live/history store, object version, export, replica, or backup can reintroduce the target and through at least one successful restore verification after the last backup window. It contains no raw, identity, event, transcript, or audio content. |
+| `DATA-IDENTITY-REVOCATION-CHECKPOINT`: account/device deletion or revocation checkpoint | Restricted pseudonymous control data held in the separate encrypted, integrity-protected recovery copy: typed random immutable never-reused internal account/device reference, operation (`deleted` or `revoked`), monotonic control generation, timestamp, and payload-free result. Never email, role, device public key, IP address, bearer/verifier hash, content, or an unkeyed digest of a low-entropy value. | A permanent deletion checkpoint is never converted back to a reversible revocation; a current revocation generation cannot be rolled back by a backup. Retain until the longest enumerated backup/object window that can reintroduce the target has passed and through one successful post-window restore, then delete under an audited rule. Access is narrowly authorized and audited because even opaque references are linkable pseudonymous identity. |
 | `DATA-MANAGED-RAW-EXPORT`: managed raw export and access capability | Disabled until Issue #16. The access capability lasts at most 15 minutes; an encrypted managed export object lasts at most 24 hours. Alpha forbids untracked local plaintext copies by default. | Per-access admin audit. Revoke/delete the managed object within 24 hours or immediately when its room/session is deleted. Revoking authorization prevents future access but does not claim erasure of plaintext already disclosed. Introducing such disclosure requires a named High residual, a bounded destination, and owner acceptance. |
-| `DATA-DERIVED-COPY`: cache, index, replica, object version, or backup | Never an independent source of truth. Active copies follow the 24-hour purge SLA. Each production configuration must enumerate its actual schedules, object-version behavior, recovery window, and deletion/purge evidence. | Restore remains offline and globally disabled until current safety/denylist state and deletion records replay successfully. Unknown, unbounded, or untested provider behavior blocks production persistence. |
+| `DATA-DERIVED-COPY`: cache, index, replica, object version, or backup | Never an independent source of truth. Active copies follow the 24-hour purge SLA. Each production configuration must enumerate its actual schedules, object-version behavior, recovery window, and deletion/purge evidence. | Restore remains offline and globally disabled until protected auth-invalidation state rejects pre-restore credentials and current safety/denylist, room/session deletion, and account/device deletion/revocation records replay successfully. Unknown, unbounded, or untested provider behavior blocks production persistence and restored authentication. |
 
 ## Audio budget and teardown invariants
 
@@ -70,6 +72,50 @@ proof; Issue #14 owns lease-scoped acceptance, cancellation, and late-frame reje
 Issue #15 owns single-active-lease promotion/failover without a retry queue. Until those
 checks exist and `RISK-WORKER-AUDIO-RETENTION` is individually accepted for real PCM,
 community-worker audio is synthetic only.
+
+## Identity revocation and restore rollback
+
+`CTRL-IDENTITY-RESTORE-REVOCATION` prevents an older application-data backup from
+recreating deleted authority. Before an account/device deletion or revocation is reported
+complete, its typed checkpoint must be committed to the separate encrypted, integrity-
+protected recovery boundary and pass read-back verification. A permanent deletion
+checkpoint can never become a reversible revocation, and neither form may be overwritten
+by a lower generation. Typed internal IDs are random, immutable, and never reused. An
+account deletion cascades to its roles, invites, devices, statistics, tokens, and sessions;
+a device deletion invalidates only that device's authority plus its enrollment/session
+state unless the account is also targeted.
+
+The checkpoint is linkable pseudonymous control data, not anonymous data. It contains no
+email, role, device public key, IP address, verifier hash, bearer, event, transcript, or
+other user content, and never uses an unkeyed digest of a low-entropy value. Access is
+narrowly authorized, encrypted, integrity protected, and audited by opaque manifest
+reference/count. If commit, read-back, integrity, or access control fails, the affected
+authentication path and restored environment remain disabled; an application-database
+row is never the sole record of a deletion or revocation.
+
+Every restore must, while isolated and forced off:
+
+1. purge or revoke every restored magic-link, worker-enrollment, session-verifier, and
+   session row regardless of its backed-up expiry or use flag, and advance a recovery-
+   protected monotonic auth invalidation generation or signing/verifier key version so a
+   stateless pre-restore credential is also rejected; the current version/root and current
+   verification secret material live outside application-data backups, and restored old
+   key material is never made current or retained in the active verification set;
+2. replay every current typed pseudonymous account/device checkpoint to purge or keep
+   revoked the restored account, role, invite, device, statistics, verifier, and session
+   rows;
+3. verify that presenting every sampled pre-restore link/cookie/token is rejected and
+   that deleted accounts/devices cannot receive newly issued authority; and
+4. only then continue with room/session deletion replay and safety-state reconciliation.
+
+This intentionally requires fresh authentication and enrollment after a restore. It is
+safer than attempting to distinguish a legitimately current bearer from state rolled
+back by the backup. It does not claim erasure of plaintext still present in an email or
+client; it guarantees server rejection. A fresh, non-restored, separately audited admin
+recovery authentication may request re-enable after every other gate passes, avoiding a
+dependency on the invalid restored admin session. Issue #12 owns account/session behavior,
+Issue #13 owns device and enrollment behavior, Issue #16 owns the separate checkpoint and
+auth-invalidation inventory, and Issues #4/#19 own the pre-traffic restore proof.
 
 ## Room/session deletion state machine
 
@@ -124,8 +170,9 @@ media.
 Audit counts, keyed manifest digests, and failure metadata must never contain or hash
 raw, identity, transcript, event-body, secret, locator, or audio content. Backups may
 remain immutable only while inaccessible to application traffic and only if every
-restore replays the current tombstones before any traffic is admitted. The exact
-forced-off recovery procedure is `CTRL-RESTORE-REPLAY` in
+restore rejects stateful/stateless pre-restore credentials and replays the current
+deletion/revocation checkpoints before any traffic is admitted. The exact forced-off
+recovery procedure is `CTRL-RESTORE-REPLAY` in
 `docs/operations/incident-disable-and-recovery.md`.
 
 ## Current Railway provider evidence and production gate
@@ -157,14 +204,16 @@ URLs and capture date are recorded rather than inventing a revision.
 No production plan/configuration, Postgres backup schedule, PITR selection, private
 Bucket retention mechanism, backup inventory, or restore replay has yet been approved
 or evidenced. The Bucket limitations also leave Issue #16 responsible for authenticated
-client-side encryption and an independently integrity-protected deletion/safety recovery
-copy. Consequently normalized and raw production persistence stays **OFF** until Issue
-#16 records the configured maximum window for every store and Issue #19 verifies restore
-replay. A provider-declared window is a control boundary, not proof of physical erasure.
+client-side encryption and an independently integrity-protected safety, deletion,
+revocation, and authentication-invalidation recovery copy. Consequently normalized and
+raw production persistence stays **OFF** until Issue #16 records the configured maximum
+window for every store and Issue #19 verifies restore replay. A provider-declared window
+is a control boundary, not proof of physical erasure.
 
 If any provider's maximum backup, recovery, object-version, or deletion window remains
-unknown, or if a current tombstone cannot be made available to all restores, production
-persistence remains disabled. Do not guess a value from an unselected provider option.
+unknown, or if a current deletion/revocation checkpoint cannot be made available to all
+restores, production persistence and restored authentication remain disabled. Do not
+guess a value from an unselected provider option.
 
 ## Implementation ownership and acceptance evidence
 
@@ -173,12 +222,12 @@ persistence remains disabled. Do not guess a value from an unselected provider o
 | #3 | Protocol limits and golden fixtures for bounded frame metadata, monotonic media time, and rejection without persistence. |
 | #8 | Measured backend/decoder/transport memory ceilings, no persistent/crash path, prompt eviction, and teardown tests. |
 | #10 | Restricted normalization/public projection plus raw sanitization that rejects credentials, locators, excess identity, and audio. |
-| #12 | Invite/account fields, 15-minute single-use magic link, 30-day revocable session, role checks, and identity/token deletion. |
-| #13 | 24-hour single-use enrollment token, device identity/statistics minimization, revocation, and purge. |
+| #12 | Invite/account fields, 15-minute single-use magic link, 30-day revocable session, role checks, identity/token deletion, typed pseudonymous account checkpoint, stateful/stateless pre-restore credential rejection, and fresh recovery-admin authentication. |
+| #13 | 24-hour single-use enrollment token, device identity/statistics minimization, typed revocation/purge checkpoint, restored credential/device-authority rejection, and no new issuance to deleted targets. |
 | #14 | One active lease's bounded frame acceptance, cancellation/timeout/disconnect clearing, and rejection of late output. |
 | #15 | One-active-room/lease scheduling, standby-without-PCM promotion, and failover without an audio retry queue. |
-| #16 | Postgres/Bucket access, AES-256-GCM and separate keys, audit, managed export, store inventory, idempotent purge, truthful states, provider windows, and tombstone recovery copy. |
-| #4/#19 | Startup/restore forced-off deployment behavior and a recovery drill proving tombstone/safety replay before traffic. |
+| #16 | Postgres/Bucket access, AES-256-GCM and separate keys, audit, managed export, store inventory, idempotent purge, truthful states, provider windows, room/session/account/device recovery checkpoints, and the independent auth-invalidation/current-verification-material boundary. |
+| #4/#19 | Startup/restore forced-off deployment behavior and a recovery drill proving stateful/stateless pre-restore credential rejection, old-key exclusion, fresh non-restored recovery-admin authentication, and deletion/revocation plus safety replay before traffic. |
 
 Issue #2 supplies no runtime acceptance evidence. A later owner must record the exact
 commands, provider configuration, restore results, residual risks, and source/rights
