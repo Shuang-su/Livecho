@@ -3,7 +3,7 @@
 ## Artifact approval
 
 - Artifact PR: #21
-- Documentation implementation PR: Pending
+- Documentation implementation PR: #22
 - Approved by/date: @Shuang-su / 2026-08-24 authorized this agent to prepare, review,
   and merge the artifact after required checks and review gates pass. Final ADR and
   residual-risk approval remains pending the separate implementation PR.
