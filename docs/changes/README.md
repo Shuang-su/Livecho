@@ -18,7 +18,9 @@ docs/changes/<issue>-<slug>/
 
 Copy `_template`, rename it with the real Issue number and a lowercase kebab-case slug,
 and replace every placeholder. The artifact pull request must merge before product code
-is written. Issue 1 is the documented repository-bootstrap exception.
+is written. CI compares implementation branches with their base commit and rejects code
+when the matching Issue's intent, spec, and plan were not already present in that base.
+Issue 1 is the documented repository-bootstrap exception.
 
 Artifacts are durable engineering records. Do not rewrite accepted intent to disguise an
 implementation deviation; update the record and make the decision visible.

@@ -10,9 +10,10 @@
   },
   "packageManager": "pnpm@11.21.0",
   "scripts": {
-    "build": "pnpm -r --if-present build",
-    "lint": "pnpm -r --if-present lint",
-    "test": "pnpm -r --if-present test",
-    "typecheck": "pnpm -r --if-present typecheck"
+    "check:workspaces": "uv run python tools/check_workspace_scripts.py",
+    "build": "pnpm check:workspaces && pnpm -r --if-present build",
+    "lint": "pnpm check:workspaces && pnpm -r --if-present lint",
+    "test": "pnpm check:workspaces && pnpm -r --if-present test",
+    "typecheck": "pnpm check:workspaces && pnpm -r --if-present typecheck"
   }
 }

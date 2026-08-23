@@ -10,7 +10,7 @@
 | Command | Result | Date/commit |
 | --- | --- | --- |
 | `make bootstrap` | Passed; frozen uv and pnpm installs completed | 2026-08-24, PR branch |
-| `make verify` | Passed; ruff, mypy, 9 pytest cases, artifact check, pnpm workspace checks | 2026-08-24, PR branch |
+| `make verify` | Passed; ruff, mypy, 18 pytest cases, base-artifact/workspace gates, pnpm checks | 2026-08-24, PR branch |
 | `git diff --check` | Passed on the complete staged diff | 2026-08-24, PR branch |
 
 ## Manual evidence
@@ -33,7 +33,12 @@ Owner review is pending. `@codex review` was requested on PR #20; automated revi
 advisory and cannot approve or merge the change. Cursor Bugbot correctly found that the
 foundation test covered only three AGENTS.md invariants. The test was expanded to cover
 audio, arbitrary worker execution, credential isolation, raw archive access, protocol
-idempotency, public-ingest boundaries, and CUDA mock-only status individually.
+idempotency, public-ingest boundaries, and CUDA mock-only status individually. Codex
+review additionally identified that branch protection needed to be active before this
+merge, implementation changes were not tied to artifacts already in the base, workspace
+scripts could be silently absent, and auto-merge wording was too narrow. Protection and
+repository-wide auto-merge disablement are active; the artifact and workspace gates now
+have positive and negative tests.
 
 ## Deviations
 

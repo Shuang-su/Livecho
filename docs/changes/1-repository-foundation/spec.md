@@ -7,9 +7,14 @@
   credential, worker-execution, protocol, archive, and CUDA invariants.
 - Every non-bootstrap implementation has a GitHub Issue and a merged four-file artifact
   directory before code begins.
+- Artifact-only pull requests may introduce one Issue's artifact directory; any branch
+  that also changes implementation paths must find that Issue's intent, spec, and plan
+  in the pull request base commit.
 - `make bootstrap` installs only lock-file-resolved dependencies.
 - `make verify` runs formatting checks, lint, typing, tests, artifact validation, and the
   workspace build without rewriting tracked files.
+- Every JavaScript workspace package must declare lint, typecheck, test, and build
+  scripts before recursive pnpm commands are allowed to skip absent workspaces.
 - GitHub CI invokes the same Make targets on pull requests and main.
 
 ## Interfaces and compatibility
@@ -25,6 +30,8 @@
 ## Failure modes and disable path
 
 - Missing, empty, or incorrectly named artifacts fail `make artifacts` and CI.
+- A nonconforming branch name, implementation without base-accepted artifacts, or
+  workspace missing a standard verification script fails `make verify`.
 - Version or lock drift fails frozen installs.
 - A broken foundation PR is not merged; there is no production rollback because nothing
   is deployed.
