@@ -20,11 +20,17 @@
   [#1](https://github.com/Shuang-su/Livecho/issues/1)–[#19](https://github.com/Shuang-su/Livecho/issues/19),
   labels, and M0/M1/M2 milestones created
 - PR file-list review: 36 foundation/documentation files; no product runtime directories
-- GitHub Actions run: Pending
+- GitHub Actions run:
+  [Verify #32651929263](https://github.com/Shuang-su/Livecho/actions/runs/32651929263),
+  passed on Ubuntu 24.04 with pinned Node 24-compatible action releases
+- Main protection: pull request required, branch-current `verify` required, conversations
+  resolved, administrators included, force-push/deletion disabled; squash is the only
+  merge method and merged branches are deleted
 
 ## Review findings
 
-Pending owner and Codex review.
+Owner review is pending. `@codex review` was requested on PR #20; automated review is
+advisory and cannot approve or merge the change.
 
 ## Deviations
 
