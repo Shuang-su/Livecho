@@ -1,0 +1,19 @@
+{
+  "name": "livecho",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Distributed real-time captions for public live streams.",
+  "license": "MIT",
+  "engines": {
+    "node": ">=22 <23",
+    "pnpm": ">=11 <12"
+  },
+  "packageManager": "pnpm@11.21.0",
+  "scripts": {
+    "check:workspaces": "uv run python tools/check_workspace_scripts.py",
+    "build": "pnpm check:workspaces && pnpm -r --if-present build",
+    "lint": "pnpm check:workspaces && pnpm -r --if-present lint",
+    "test": "pnpm check:workspaces && pnpm -r --if-present test",
+    "typecheck": "pnpm check:workspaces && pnpm -r --if-present typecheck"
+  }
+}

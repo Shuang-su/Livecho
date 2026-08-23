@@ -1,0 +1,667 @@
+from __future__ import annotations
+
+import shutil
+import subprocess
+import sys
+import tomllib
+from pathlib import Path
+from types import SimpleNamespace
+
+import pytest
+
+from tools import check_change_artifacts, check_workspace_scripts
+from tools.check_change_artifacts import (
+    REQUIRED_FILES,
+    is_artifact_only_change,
+    issue_number_from_branch,
+    validation_errors,
+)
+from tools.check_workspace_scripts import validation_errors as workspace_errors
+
+REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
+
+
+def write_workspace_config(repository_root: Path, *patterns: str) -> None:
+    lines = ["packages:", *(f"  - {pattern}" for pattern in patterns)]
+    (repository_root / "pnpm-workspace.yaml").write_text(
+        "\n".join(lines) + "\n",
+        encoding="utf-8",
+    )
+
+
+def test_change_artifacts_are_complete() -> None:
+    assert validation_errors() == []
+
+
+def test_bootstrap_change_has_every_required_artifact() -> None:
+    change = REPOSITORY_ROOT / "docs" / "changes" / "1-repository-foundation"
+    assert {path.name for path in change.iterdir() if path.is_file()} == set(REQUIRED_FILES)
+
+
+@pytest.mark.parametrize(
+    ("branch", "issue_number"),
+    [
+        ("codex/issue-2-architecture-artifacts", 2),
+        ("issue/19-alpha-acceptance", 19),
+        ("feature/untracked-change", None),
+        ("codex/issue-2-", None),
+    ],
+)
+def test_issue_number_from_branch(branch: str, issue_number: int | None) -> None:
+    assert issue_number_from_branch(branch) == issue_number
+
+
+def test_only_the_current_issues_artifact_directory_is_artifact_only() -> None:
+    assert is_artifact_only_change(2, {"docs/changes/2-architecture/intent.md"})
+    assert not is_artifact_only_change(
+        2,
+        {"docs/changes/2-architecture/intent.md", "apps/web/package.json"},
+    )
+
+
+def test_implementation_requires_artifacts_in_the_base(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("LIVECHO_HEAD_REF", "codex/issue-2-architecture")
+    monkeypatch.setattr(check_change_artifacts, "_base_ref", lambda branch: "base-sha")
+    monkeypatch.setattr(
+        check_change_artifacts,
+        "_changed_paths",
+        lambda base: {"apps/web/package.json"},
+    )
+    monkeypatch.setattr(check_change_artifacts, "_durable_base_artifact_errors", lambda base: [])
+    monkeypatch.setattr(check_change_artifacts, "_current_issue_artifact_errors", lambda issue: [])
+    monkeypatch.setattr(
+        check_change_artifacts, "_accepted_artifact_rewrite_errors", lambda base, paths: []
+    )
+    monkeypatch.setattr(check_change_artifacts, "_base_artifact_paths", lambda base, issue: [])
+
+    assert check_change_artifacts.lifecycle_errors() == [
+        "implementation for Issue 2 requires exactly one matching artifact directory "
+        "already present in base base-sha"
+    ]
+
+
+def test_implementation_requires_complete_base_artifacts(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("LIVECHO_HEAD_REF", "issue/2-architecture")
+    monkeypatch.setattr(check_change_artifacts, "_base_ref", lambda branch: "base-sha")
+    monkeypatch.setattr(
+        check_change_artifacts,
+        "_changed_paths",
+        lambda base: {"services/backend/pyproject.toml"},
+    )
+    monkeypatch.setattr(check_change_artifacts, "_durable_base_artifact_errors", lambda base: [])
+    monkeypatch.setattr(check_change_artifacts, "_current_issue_artifact_errors", lambda issue: [])
+    monkeypatch.setattr(
+        check_change_artifacts, "_accepted_artifact_rewrite_errors", lambda base, paths: []
+    )
+    base_artifacts = [
+        "docs/changes/2-architecture/intent.md",
+        "docs/changes/2-architecture/spec.md",
+        "docs/changes/2-architecture/plan.md",
+        "docs/changes/2-architecture/evidence.md",
+    ]
+    monkeypatch.setattr(
+        check_change_artifacts,
+        "_base_artifact_paths",
+        lambda base, issue: base_artifacts,
+    )
+
+    assert check_change_artifacts.lifecycle_errors() == []
+
+    base_artifacts.remove("docs/changes/2-architecture/evidence.md")
+    assert check_change_artifacts.lifecycle_errors() == [
+        "base artifact docs/changes/2-architecture is not accepted for implementation; "
+        "missing: evidence.md"
+    ]
+
+
+def test_issue_one_exception_closes_after_bootstrap(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("LIVECHO_HEAD_REF", "codex/issue-1-late-change")
+    monkeypatch.setattr(check_change_artifacts, "_base_ref", lambda branch: "post-bootstrap")
+    monkeypatch.setattr(
+        check_change_artifacts,
+        "_changed_paths",
+        lambda base: {"services/backend/pyproject.toml"},
+    )
+    monkeypatch.setattr(check_change_artifacts, "_durable_base_artifact_errors", lambda base: [])
+    monkeypatch.setattr(check_change_artifacts, "_current_issue_artifact_errors", lambda issue: [])
+    monkeypatch.setattr(
+        check_change_artifacts, "_is_empty_repository_bootstrap", lambda base: False
+    )
+
+    assert check_change_artifacts.lifecycle_errors() == [
+        "Issue 1 bootstrap exception is closed after the foundation reaches main"
+    ]
+
+
+def test_fork_branch_named_main_does_not_skip_lifecycle(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("LIVECHO_HEAD_REF", "main")
+    monkeypatch.setenv("LIVECHO_BASE_SHA", "base-sha")
+
+    assert check_change_artifacts.lifecycle_errors() == [
+        "change branch must match codex/issue-<number>-<slug> or issue/<number>-<slug>"
+    ]
+
+
+def test_resulting_tree_requires_current_issue_artifacts(tmp_path: Path) -> None:
+    assert check_change_artifacts._current_issue_artifact_errors(2, tmp_path) == [
+        "change for Issue 2 requires exactly one complete artifact directory in the resulting tree"
+    ]
+
+
+def test_required_artifact_names_are_case_sensitive(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(check_change_artifacts, "REPOSITORY_ROOT", tmp_path)
+    changes_root = tmp_path / "docs" / "changes"
+    change = changes_root / "2-architecture"
+    change.mkdir(parents=True)
+    for filename in REQUIRED_FILES:
+        actual_name = "Intent.md" if filename == "intent.md" else filename
+        (change / actual_name).write_text("artifact\n", encoding="utf-8")
+
+    assert check_change_artifacts.artifact_content_errors(changes_root) == [
+        "missing artifact: docs/changes/2-architecture/intent.md"
+    ]
+
+
+def test_change_artifact_root_names_are_case_sensitive(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    cases = [
+        (("Docs", "changes"), "docs"),
+        (("docs", "Changes"), "docs/changes"),
+    ]
+    for index, (actual_parts, expected_component) in enumerate(cases):
+        repository_root = tmp_path / str(index)
+        repository_root.joinpath(*actual_parts).mkdir(parents=True)
+        monkeypatch.setattr(check_change_artifacts, "REPOSITORY_ROOT", repository_root)
+
+        assert check_change_artifacts.artifact_content_errors(
+            repository_root / "docs" / "changes"
+        ) == [f"change artifact root component must use exact case: {expected_component}"]
+
+
+def test_change_artifact_files_cannot_be_symlinks(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(check_change_artifacts, "REPOSITORY_ROOT", tmp_path)
+    changes_root = tmp_path / "docs" / "changes"
+    change = changes_root / "2-architecture"
+    change.mkdir(parents=True)
+    (tmp_path / "README.md").write_text("not an accepted change artifact\n", encoding="utf-8")
+    for filename in REQUIRED_FILES:
+        (change / filename).symlink_to("../../../README.md")
+    (change / "context.md").symlink_to("../../../README.md")
+
+    assert check_change_artifacts.artifact_content_errors(changes_root) == [
+        *(
+            f"artifact must be a regular file: docs/changes/2-architecture/{filename}"
+            for filename in REQUIRED_FILES
+        ),
+        "change artifacts cannot contain non-regular entries: "
+        "docs/changes/2-architecture/context.md",
+    ]
+
+
+def test_change_artifact_directory_cannot_be_a_symlink(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(check_change_artifacts, "REPOSITORY_ROOT", tmp_path)
+    changes_root = tmp_path / "docs" / "changes"
+    accepted = changes_root / "1-foundation"
+    accepted.mkdir(parents=True)
+    for filename in REQUIRED_FILES:
+        (accepted / filename).write_text("accepted\n", encoding="utf-8")
+    for directory in ("2-architecture", "2-bad_slug"):
+        (changes_root / directory).symlink_to("1-foundation", target_is_directory=True)
+
+    assert check_change_artifacts.artifact_content_errors(changes_root) == [
+        "change artifact directory must be a regular directory: docs/changes/2-architecture",
+        "invalid change directory name: 2-bad_slug",
+    ]
+
+
+def test_change_artifact_root_cannot_traverse_a_symlink(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(check_change_artifacts, "REPOSITORY_ROOT", tmp_path)
+    artifact_store = tmp_path / "artifact-store" / "1-foundation"
+    artifact_store.mkdir(parents=True)
+    for filename in REQUIRED_FILES:
+        (artifact_store / filename).write_text("not in docs/changes\n", encoding="utf-8")
+    (tmp_path / "docs").mkdir()
+    (tmp_path / "docs" / "changes").symlink_to("../artifact-store", target_is_directory=True)
+
+    assert check_change_artifacts.artifact_content_errors(tmp_path / "docs" / "changes") == [
+        "change artifact root component must be a regular directory: docs/changes"
+    ]
+
+
+def test_tracked_artifact_symlinks_fail_when_git_materializes_regular_files(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    subprocess.run(["git", "init", "--quiet"], cwd=tmp_path, check=True)
+    subprocess.run(["git", "config", "core.symlinks", "false"], cwd=tmp_path, check=True)
+    (tmp_path / "README.md").write_text("target\n", encoding="utf-8")
+
+    def stage_symlink(path_text: str, target: str) -> Path:
+        artifact = tmp_path / path_text
+        artifact.parent.mkdir(parents=True, exist_ok=True)
+        artifact.write_text(target, encoding="utf-8")
+        object_id = subprocess.run(
+            ["git", "hash-object", "-w", str(artifact)],
+            cwd=tmp_path,
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+        subprocess.run(
+            [
+                "git",
+                "update-index",
+                "--add",
+                "--cacheinfo",
+                f"120000,{object_id},{path_text}",
+            ],
+            cwd=tmp_path,
+            check=True,
+        )
+        assert artifact.is_file()
+        assert not artifact.is_symlink()
+        return artifact
+
+    for filename in REQUIRED_FILES:
+        stage_symlink(
+            f"docs/changes/2-architecture/{filename}",
+            "../../../README.md",
+        )
+    stage_symlink("docs/changes/2-architecture/context.md", "../../../README.md")
+    stage_symlink("docs/changes/2-bad_slug", "1-foundation")
+    stage_symlink("docs/changes/_evil", "2-architecture")
+    for filename in REQUIRED_FILES:
+        template_artifact = tmp_path / "docs" / "changes" / "_template" / filename
+        template_artifact.parent.mkdir(parents=True, exist_ok=True)
+        template_artifact.write_text("template\n", encoding="utf-8")
+    stage_symlink("docs/changes/_template/intent.md", "../../../README.md")
+
+    monkeypatch.setattr(check_change_artifacts, "REPOSITORY_ROOT", tmp_path)
+    tracked_non_regular = check_change_artifacts._tracked_non_regular_artifact_paths()
+
+    assert check_change_artifacts.artifact_content_errors(
+        tmp_path / "docs" / "changes",
+        tracked_non_regular,
+    ) == [
+        *(
+            f"artifact must be a regular file: docs/changes/2-architecture/{filename}"
+            for filename in REQUIRED_FILES
+        ),
+        "invalid change directory name: 2-bad_slug",
+        "invalid change directory name: _evil",
+        "template artifact must be a regular file: docs/changes/_template/intent.md",
+        "change artifacts cannot contain non-regular entries: "
+        "docs/changes/2-architecture/context.md",
+    ]
+
+
+def test_implementation_does_not_accept_symlink_artifacts_from_base(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    regular_paths = [f"docs/changes/2-architecture/{filename}" for filename in REQUIRED_FILES]
+    monkeypatch.setattr(
+        check_change_artifacts,
+        "_git",
+        lambda *arguments: "\n".join(
+            [
+                *(f"100644 blob deadbeef\t{path}" for path in regular_paths),
+                "100644 blob deadbeef\tdocs/changes/2-architecture/assets/diagram.svg",
+                *(
+                    f"120000 blob deadbeef\tdocs/changes/3-threats/{filename}"
+                    for filename in REQUIRED_FILES
+                ),
+            ]
+        ),
+    )
+
+    assert check_change_artifacts._base_artifact_paths("base-sha", 2) == regular_paths
+    assert check_change_artifacts._base_artifact_paths("base-sha", 3) == []
+
+
+def test_base_artifact_required_files_cannot_be_deleted(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        check_change_artifacts,
+        "_git",
+        lambda *arguments: "docs/changes/2-architecture/intent.md",
+    )
+
+    assert check_change_artifacts._durable_base_artifact_errors("base-sha") == [
+        "accepted change artifacts cannot be deleted: docs/changes/2-architecture/intent.md"
+    ]
+
+
+def test_implementation_cannot_rewrite_accepted_decisions(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        check_change_artifacts,
+        "_git",
+        lambda *arguments: "\n".join(
+            [
+                "docs/changes/2-architecture/intent.md",
+                "docs/changes/2-architecture/spec.md",
+                "docs/changes/2-architecture/plan.md",
+                "docs/changes/2-architecture/evidence.md",
+            ]
+        ),
+    )
+
+    assert check_change_artifacts._accepted_artifact_rewrite_errors(
+        "base-sha",
+        {
+            "docs/changes/2-architecture/spec.md",
+            "docs/changes/2-architecture/evidence.md",
+            "services/backend/app.py",
+        },
+    ) == ["implementation cannot rewrite accepted artifacts: docs/changes/2-architecture/spec.md"]
+
+
+def test_implementation_can_update_change_artifact_templates(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        check_change_artifacts,
+        "_git",
+        lambda *arguments: "\n".join(
+            [
+                "docs/changes/_template/intent.md",
+                "docs/changes/_template/spec.md",
+                "docs/changes/_template/plan.md",
+                "docs/changes/2-architecture/intent.md",
+            ]
+        ),
+    )
+
+    assert (
+        check_change_artifacts._accepted_artifact_rewrite_errors(
+            "base-sha",
+            {
+                "docs/changes/_template/intent.md",
+                "docs/changes/_template/spec.md",
+                "docs/changes/_template/plan.md",
+            },
+        )
+        == []
+    )
+
+
+def test_implementation_lifecycle_rejects_accepted_decision_rewrite(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    changed_paths = {
+        "docs/changes/2-architecture/plan.md",
+        "services/backend/app.py",
+    }
+    monkeypatch.setenv("LIVECHO_HEAD_REF", "codex/issue-2-architecture")
+    monkeypatch.setattr(check_change_artifacts, "_base_ref", lambda branch: "base-sha")
+    monkeypatch.setattr(check_change_artifacts, "_changed_paths", lambda base: changed_paths)
+    monkeypatch.setattr(check_change_artifacts, "_durable_base_artifact_errors", lambda base: [])
+    monkeypatch.setattr(check_change_artifacts, "_current_issue_artifact_errors", lambda issue: [])
+    monkeypatch.setattr(
+        check_change_artifacts,
+        "_git",
+        lambda *arguments: "docs/changes/2-architecture/plan.md",
+    )
+
+    assert check_change_artifacts.lifecycle_errors() == [
+        "implementation cannot rewrite accepted artifacts: docs/changes/2-architecture/plan.md"
+    ]
+
+
+def test_implementation_lifecycle_rejects_other_issue_artifacts(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    changed_paths = {
+        "docs/changes/3-protocol/intent.md",
+        "docs/changes/README.md",
+        "docs/changes/_template/intent.md",
+        "services/backend/app.py",
+    }
+    monkeypatch.setenv("LIVECHO_HEAD_REF", "codex/issue-2-architecture")
+    monkeypatch.setattr(check_change_artifacts, "_base_ref", lambda branch: "base-sha")
+    monkeypatch.setattr(check_change_artifacts, "_changed_paths", lambda base: changed_paths)
+    monkeypatch.setattr(check_change_artifacts, "_durable_base_artifact_errors", lambda base: [])
+    monkeypatch.setattr(check_change_artifacts, "_current_issue_artifact_errors", lambda issue: [])
+
+    assert check_change_artifacts.lifecycle_errors() == [
+        "change for Issue 2 cannot modify artifacts for other Issues: docs/changes/3-protocol"
+    ]
+
+
+def test_issue_one_bootstrap_cannot_include_later_issue_artifacts(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    changed_paths = {
+        "AGENTS.md",
+        "docs/changes/1-repository-foundation/intent.md",
+        "docs/changes/2-architecture/intent.md",
+    }
+    monkeypatch.setenv("LIVECHO_HEAD_REF", "codex/issue-1-repository-foundation")
+    monkeypatch.setattr(check_change_artifacts, "_base_ref", lambda branch: "bootstrap-base")
+    monkeypatch.setattr(check_change_artifacts, "_changed_paths", lambda base: changed_paths)
+    monkeypatch.setattr(check_change_artifacts, "_durable_base_artifact_errors", lambda base: [])
+    monkeypatch.setattr(check_change_artifacts, "_current_issue_artifact_errors", lambda issue: [])
+    monkeypatch.setattr(check_change_artifacts, "_is_empty_repository_bootstrap", lambda base: True)
+
+    assert check_change_artifacts.lifecycle_errors() == [
+        "change for Issue 1 cannot modify artifacts for other Issues: docs/changes/2-architecture"
+    ]
+
+
+def test_mypy_covers_future_python_roots_and_ignores_generated_files(tmp_path: Path) -> None:
+    shutil.copyfile(REPOSITORY_ROOT / "pyproject.toml", tmp_path / "pyproject.toml")
+    shutil.copyfile(REPOSITORY_ROOT / ".gitignore", tmp_path / ".gitignore")
+
+    runtime_source = tmp_path / "services" / "backend" / "app.py"
+    runtime_source.parent.mkdir(parents=True)
+    runtime_source.write_text("caption: str = 1\n", encoding="utf-8")
+
+    ignored_source = tmp_path / "dist" / "generated.py"
+    ignored_source.parent.mkdir()
+    ignored_source.write_text("generated: str = 1\n", encoding="utf-8")
+
+    result = subprocess.run(
+        [sys.executable, "-m", "mypy", "--no-incremental"],
+        cwd=tmp_path,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 1
+    assert "services/backend/app.py:1: error: Incompatible types" in result.stdout
+    assert "dist/generated.py" not in result.stdout
+
+
+def test_pytest_discovers_colocated_tests_in_future_python_roots(tmp_path: Path) -> None:
+    shutil.copyfile(REPOSITORY_ROOT / "pyproject.toml", tmp_path / "pyproject.toml")
+    shutil.copyfile(REPOSITORY_ROOT / ".gitignore", tmp_path / ".gitignore")
+
+    root_test = tmp_path / "tests" / "test_contract.py"
+    root_test.parent.mkdir()
+    root_test.write_text("def test_root_contract():\n    assert True\n", encoding="utf-8")
+
+    service_test = tmp_path / "services" / "backend" / "tests" / "test_contract.py"
+    service_test.parent.mkdir(parents=True)
+    service_test.write_text("def test_service_contract():\n    assert True\n", encoding="utf-8")
+
+    generated_test = tmp_path / "services" / "backend" / "coverage" / "test_generated.py"
+    generated_test.parent.mkdir()
+    generated_test.write_text("def test_generated():\n    assert False\n", encoding="utf-8")
+
+    result = subprocess.run(
+        [sys.executable, "-m", "pytest", "--collect-only", "-q"],
+        cwd=tmp_path,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    collected = result.stdout.replace("\\", "/")
+    assert result.returncode == 0, result.stderr
+    assert "tests/test_contract.py::test_root_contract" in collected
+    assert "services/backend/tests/test_contract.py::test_service_contract" in collected
+    assert "coverage/test_generated.py" not in collected
+
+
+def test_uv_version_matches_local_docs_and_ci(tmp_path: Path) -> None:
+    pyproject_path = REPOSITORY_ROOT / "pyproject.toml"
+    pyproject_text = pyproject_path.read_text(encoding="utf-8")
+    pyproject = tomllib.loads(pyproject_text)
+    required_version = pyproject["tool"]["uv"]["required-version"]
+    assert required_version == "==0.12.1"
+
+    readme = (REPOSITORY_ROOT / "README.md").read_text(encoding="utf-8")
+    workflow = (REPOSITORY_ROOT / ".github" / "workflows" / "verify.yml").read_text(
+        encoding="utf-8"
+    )
+    assert "uv 0.12.1" in readme
+    assert 'version: "0.12.1"' in workflow
+
+    result = subprocess.run(
+        ["uv", "--version"],
+        cwd=REPOSITORY_ROOT,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0
+    running_version = result.stdout.split()[1]
+    assert running_version == required_version.removeprefix("==")
+
+    (tmp_path / "pyproject.toml").write_text(
+        pyproject_text.replace(
+            f'required-version = "{required_version}"',
+            'required-version = "==0.0.0"',
+            1,
+        ),
+        encoding="utf-8",
+    )
+    shutil.copyfile(REPOSITORY_ROOT / "uv.lock", tmp_path / "uv.lock")
+    mismatch = subprocess.run(
+        ["uv", "lock", "--check"],
+        cwd=tmp_path,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert mismatch.returncode == 2
+    normalized_error = " ".join(mismatch.stderr.split())
+    assert (
+        f"Required uv version `==0.0.0` does not match the running version `{running_version}`"
+        in normalized_error
+    )
+
+
+def test_workspace_requires_every_verification_script(tmp_path: Path) -> None:
+    write_workspace_config(tmp_path, "apps/*")
+    package = tmp_path / "apps" / "web"
+    package.mkdir(parents=True)
+    (package / "package.json").write_text(
+        '{"scripts":{"lint":"eslint ."}}',
+        encoding="utf-8",
+    )
+
+    assert workspace_errors(tmp_path) == [
+        "workspace apps/web missing scripts: typecheck, test, build"
+    ]
+
+
+def test_workspace_accepts_complete_verification_scripts(tmp_path: Path) -> None:
+    write_workspace_config(tmp_path, "packages/*")
+    package = tmp_path / "packages" / "protocol"
+    package.mkdir(parents=True)
+    (package / "package.json").write_text(
+        '{"scripts":{"lint":"lint","typecheck":"types","test":"test","build":"build"}}',
+        encoding="utf-8",
+    )
+
+    assert workspace_errors(tmp_path) == []
+
+
+def test_workspace_checker_follows_new_configured_roots(tmp_path: Path) -> None:
+    write_workspace_config(tmp_path, "services/*")
+    package = tmp_path / "services" / "backend"
+    package.mkdir(parents=True)
+    (package / "package.json").write_text(
+        '{"scripts":{"lint":"lint"}}',
+        encoding="utf-8",
+    )
+
+    assert workspace_errors(tmp_path) == [
+        "workspace services/backend missing scripts: typecheck, test, build"
+    ]
+
+
+def test_workspace_checker_uses_pnpm_glob_semantics(tmp_path: Path) -> None:
+    write_workspace_config(tmp_path, "packages/{web,admin}")
+    for package_name in ("web", "admin"):
+        package = tmp_path / "packages" / package_name
+        package.mkdir(parents=True)
+        (package / "package.json").write_text(
+            '{"name":"@livecho/' + package_name + '","version":"0.0.0","private":true,'
+            '"scripts":{"lint":"lint"}}',
+            encoding="utf-8",
+        )
+
+    assert workspace_errors(tmp_path) == [
+        "workspace packages/admin missing scripts: typecheck, test, build",
+        "workspace packages/web missing scripts: typecheck, test, build",
+    ]
+
+
+def test_workspace_checker_resolves_relative_pnpm_paths(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    write_workspace_config(tmp_path, "packages/*")
+    package = tmp_path / "packages" / "web"
+    package.mkdir(parents=True)
+    (package / "package.json").write_text(
+        '{"scripts":{"lint":"lint","typecheck":"types","test":"test","build":"build"}}',
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(
+        check_workspace_scripts,
+        "_run_pnpm",
+        lambda repository_root: SimpleNamespace(
+            returncode=0,
+            stdout='[{"path":"packages/web"}]',
+            stderr="",
+        ),
+    )
+
+    assert workspace_errors(tmp_path) == []
+
+
+@pytest.mark.parametrize(
+    "invariant",
+    [
+        "Audio is ephemeral",
+        "Never add remote shell",
+        "Never send Bilibili account credentials",
+        "Raw event archives are encrypted",
+        "`epoch`, `seq`, and `revision`",
+        "Public ingest is limited",
+        "CUDA remains mock/contract-only",
+    ],
+    ids=["audio", "worker-execution", "credentials", "archive", "protocol", "ingest", "cuda"],
+)
+def test_agent_guidance_contains_product_invariant(invariant: str) -> None:
+    guidance = (REPOSITORY_ROOT / "AGENTS.md").read_text(encoding="utf-8")
+    assert invariant in guidance
