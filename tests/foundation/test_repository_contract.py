@@ -3,6 +3,7 @@ from __future__ import annotations
 import shutil
 import subprocess
 import sys
+import tomllib
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -295,6 +296,54 @@ def test_mypy_covers_future_python_roots_and_ignores_generated_files(tmp_path: P
     assert result.returncode == 1
     assert "services/backend/app.py:1: error: Incompatible types" in result.stdout
     assert "dist/generated.py" not in result.stdout
+
+
+def test_uv_version_matches_local_docs_and_ci(tmp_path: Path) -> None:
+    pyproject_path = REPOSITORY_ROOT / "pyproject.toml"
+    pyproject_text = pyproject_path.read_text(encoding="utf-8")
+    pyproject = tomllib.loads(pyproject_text)
+    required_version = pyproject["tool"]["uv"]["required-version"]
+    assert required_version == "==0.12.1"
+
+    readme = (REPOSITORY_ROOT / "README.md").read_text(encoding="utf-8")
+    workflow = (REPOSITORY_ROOT / ".github" / "workflows" / "verify.yml").read_text(
+        encoding="utf-8"
+    )
+    assert "uv 0.12.1" in readme
+    assert 'version: "0.12.1"' in workflow
+
+    result = subprocess.run(
+        ["uv", "--version"],
+        cwd=REPOSITORY_ROOT,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0
+    running_version = result.stdout.split()[1]
+    assert running_version == required_version.removeprefix("==")
+
+    (tmp_path / "pyproject.toml").write_text(
+        pyproject_text.replace(
+            f'required-version = "{required_version}"',
+            'required-version = "==0.0.0"',
+            1,
+        ),
+        encoding="utf-8",
+    )
+    shutil.copyfile(REPOSITORY_ROOT / "uv.lock", tmp_path / "uv.lock")
+    mismatch = subprocess.run(
+        ["uv", "lock", "--check"],
+        cwd=tmp_path,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert mismatch.returncode == 2
+    assert (
+        f"Required uv version `==0.0.0` does not match the running version `{running_version}`"
+        in mismatch.stderr
+    )
 
 
 def test_workspace_requires_every_verification_script(tmp_path: Path) -> None:

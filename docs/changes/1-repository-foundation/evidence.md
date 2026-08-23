@@ -9,10 +9,11 @@
 
 | Command | Result | Date/commit |
 | --- | --- | --- |
-| `make bootstrap` | Passed; frozen uv and pnpm installs completed | 2026-08-24, PR branch |
-| `make verify` | Passed; ruff, repository-wide mypy, 31 pytest cases, base/result artifact and pnpm-native workspace gates | 2026-08-24, PR branch |
+| `make bootstrap` | Passed; project-enforced uv 0.12.1 and frozen pnpm installs completed | 2026-08-24, PR branch |
+| `make verify` | Passed; ruff, repository-wide mypy, 32 pytest cases, base/result artifact and pnpm-native workspace gates | 2026-08-24, PR branch |
 | `uv run pytest -q tests/foundation/test_repository_contract.py -k 'accepted_decisions or artifact_templates or lifecycle_rejects'` | Passed; 3 targeted rewrite-gate regressions | 2026-08-24, PR branch |
 | `uv run pytest -q tests/foundation/test_repository_contract.py -k 'other_issue_artifacts or bootstrap_cannot_include or mypy_covers'` | Passed; 3 targeted Issue-scope and Python-discovery regressions | 2026-08-24, PR branch |
+| `uv run pytest -q tests/foundation/test_repository_contract.py -k uv_version_matches_local_docs_and_ci` | Passed; exact local/CI uv pin alignment and fail-closed mismatch regression | 2026-08-24, PR branch |
 | `git diff --check` | Passed on the complete working-tree diff | 2026-08-24, PR branch |
 
 ## Manual evidence
@@ -62,6 +63,10 @@ whose Issue differs from the branch, including during the Issue 1 bootstrap exce
 Mypy now discovers Python from the repository root while honoring the tracked
 `.gitignore`; a synthetic `services/backend` type error is detected while ignored `dist`
 output remains excluded.
+The latest Codex review found that local bootstrap accepted any uv version while CI
+installed 0.12.1. The project now requires that same exact version, the README documents
+it, and a contract test keeps the project pin aligned with CI. A real temporary-project
+regression confirms that a mismatched uv exits before lock processing.
 
 ## Deviations
 

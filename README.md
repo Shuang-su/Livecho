@@ -22,7 +22,10 @@ review described in the change artifacts.
 
 ## Development
 
-Prerequisites are Python 3.12, [uv](https://docs.astral.sh/uv/), Node.js 22, and pnpm 11.
+Prerequisites are Python 3.12,
+[uv 0.12.1](https://docs.astral.sh/uv/getting-started/installation/), Node.js 22, and pnpm
+11. The repository requires that exact uv release, so project commands fail before
+dependency resolution when a different uv version is installed.
 
 ```sh
 make bootstrap
