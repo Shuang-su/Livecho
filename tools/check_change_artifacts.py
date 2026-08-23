@@ -13,7 +13,9 @@ CHANGES_ROOT = REPOSITORY_ROOT / "docs" / "changes"
 REQUIRED_FILES = ("intent.md", "spec.md", "plan.md", "evidence.md")
 ACCEPTED_BEFORE_IMPLEMENTATION = ("intent.md", "spec.md", "plan.md")
 CHANGE_DIRECTORY_PATTERN = re.compile(r"^[1-9][0-9]*-[a-z0-9]+(?:-[a-z0-9]+)*$")
-ISSUE_BRANCH_PATTERN = re.compile(r"^(?:codex/)?issue(?:-|/)([1-9][0-9]*)-")
+ISSUE_BRANCH_PATTERN = re.compile(
+    r"^(?:codex/)?issue(?:-|/)([1-9][0-9]*)-[a-z0-9]+(?:-[a-z0-9]+)*$"
+)
 
 
 def artifact_content_errors(changes_root: Path = CHANGES_ROOT) -> list[str]:
@@ -39,7 +41,7 @@ def artifact_content_errors(changes_root: Path = CHANGES_ROOT) -> list[str]:
 
 def issue_number_from_branch(branch: str) -> int | None:
     """Extract the Issue number from an approved implementation branch name."""
-    match = ISSUE_BRANCH_PATTERN.fullmatch(branch) or ISSUE_BRANCH_PATTERN.match(branch)
+    match = ISSUE_BRANCH_PATTERN.fullmatch(branch)
     return int(match.group(1)) if match else None
 
 
@@ -84,6 +86,48 @@ def _base_artifact_paths(base_ref: str, issue_number: int) -> list[str]:
     return [path for path in tree.splitlines() if path.startswith(prefix)]
 
 
+def _current_issue_artifact_errors(
+    issue_number: int, changes_root: Path = CHANGES_ROOT
+) -> list[str]:
+    directories = sorted(
+        path
+        for path in changes_root.glob(f"{issue_number}-*")
+        if path.is_dir() and CHANGE_DIRECTORY_PATTERN.fullmatch(path.name)
+    )
+    if len(directories) != 1:
+        return [
+            f"change for Issue {issue_number} requires exactly one complete artifact "
+            "directory in the resulting tree"
+        ]
+    directory = directories[0]
+    missing = [filename for filename in REQUIRED_FILES if not (directory / filename).is_file()]
+    if missing:
+        return [
+            f"resulting artifact {directory.relative_to(REPOSITORY_ROOT)} is missing: "
+            + ", ".join(missing)
+        ]
+    return []
+
+
+def _durable_base_artifact_errors(base_ref: str) -> list[str]:
+    tree = _git("ls-tree", "-r", "--name-only", base_ref, "docs/changes")
+    required_names = set(REQUIRED_FILES)
+    deleted: list[str] = []
+    for path_text in tree.splitlines():
+        path = Path(path_text)
+        if (
+            len(path.parts) == 4
+            and path.parts[:2] == ("docs", "changes")
+            and CHANGE_DIRECTORY_PATTERN.fullmatch(path.parts[2])
+            and path.name in required_names
+            and not (REPOSITORY_ROOT / path).is_file()
+        ):
+            deleted.append(path_text)
+    if deleted:
+        return ["accepted change artifacts cannot be deleted: " + ", ".join(sorted(deleted))]
+    return []
+
+
 def _is_empty_repository_bootstrap(base_ref: str) -> bool:
     protected_paths = _git(
         "ls-tree",
@@ -99,24 +143,32 @@ def _is_empty_repository_bootstrap(base_ref: str) -> bool:
 def lifecycle_errors() -> list[str]:
     """Enforce artifact-only PRs and merged artifacts before implementation."""
     branch = os.environ.get("LIVECHO_HEAD_REF", "").strip() or _git("branch", "--show-current")
-    if branch in {"main", "master"}:
+    base_ref = _base_ref(branch)
+    if branch in {"main", "master"} and base_ref is None:
         return []
 
     issue_number = issue_number_from_branch(branch)
     if issue_number is None:
         return ["change branch must match codex/issue-<number>-<slug> or issue/<number>-<slug>"]
 
-    base_ref = _base_ref(branch)
     if base_ref is None:
         return ["cannot determine the main/base commit for change-artifact validation"]
 
     changed_paths = _changed_paths(base_ref)
-    if not changed_paths or is_artifact_only_change(issue_number, changed_paths):
+    if not changed_paths:
         return []
+    resulting_tree_errors = [
+        *_durable_base_artifact_errors(base_ref),
+        *_current_issue_artifact_errors(issue_number),
+    ]
+    if resulting_tree_errors:
+        return resulting_tree_errors
     if issue_number == 1:
         if _is_empty_repository_bootstrap(base_ref):
             return []
         return ["Issue 1 bootstrap exception is closed after the foundation reaches main"]
+    if is_artifact_only_change(issue_number, changed_paths):
+        return []
 
     base_paths = _base_artifact_paths(base_ref, issue_number)
     directories = {path.rsplit("/", 1)[0] for path in base_paths}

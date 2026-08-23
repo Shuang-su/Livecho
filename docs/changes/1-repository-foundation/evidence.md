@@ -10,7 +10,7 @@
 | Command | Result | Date/commit |
 | --- | --- | --- |
 | `make bootstrap` | Passed; frozen uv and pnpm installs completed | 2026-08-24, PR branch |
-| `make verify` | Passed; ruff, mypy, 18 pytest cases, base-artifact/workspace gates, pnpm checks | 2026-08-24, PR branch |
+| `make verify` | Passed; ruff, mypy, 23 pytest cases, base/result artifact and pnpm-workspace gates | 2026-08-24, PR branch |
 | `git diff --check` | Passed on the complete staged diff | 2026-08-24, PR branch |
 
 ## Manual evidence
@@ -38,7 +38,11 @@ review additionally identified that branch protection needed to be active before
 merge, implementation changes were not tied to artifacts already in the base, workspace
 scripts could be silently absent, and auto-merge wording was too narrow. Protection and
 repository-wide auto-merge disablement are active; the artifact and workspace gates now
-have positive and negative tests.
+have positive and negative tests. Final Codex re-review found three additional bypasses:
+a fork head named `main`, configured workspace globs drifting from the checker, and
+deletion of durable artifacts. Validation now uses the presence of a PR base instead of
+trusting the head name, derives manifests from `pnpm-workspace.yaml`, and requires both
+base artifacts and the resulting artifact tree to remain complete.
 
 ## Deviations
 

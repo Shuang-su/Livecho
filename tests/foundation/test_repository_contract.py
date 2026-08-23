@@ -16,6 +16,14 @@ from tools.check_workspace_scripts import validation_errors as workspace_errors
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 
 
+def write_workspace_config(repository_root: Path, *patterns: str) -> None:
+    lines = ["packages:", *(f"  - {pattern}" for pattern in patterns)]
+    (repository_root / "pnpm-workspace.yaml").write_text(
+        "\n".join(lines) + "\n",
+        encoding="utf-8",
+    )
+
+
 def test_change_artifacts_are_complete() -> None:
     assert validation_errors() == []
 
@@ -31,6 +39,7 @@ def test_bootstrap_change_has_every_required_artifact() -> None:
         ("codex/issue-2-architecture-artifacts", 2),
         ("issue/19-alpha-acceptance", 19),
         ("feature/untracked-change", None),
+        ("codex/issue-2-", None),
     ],
 )
 def test_issue_number_from_branch(branch: str, issue_number: int | None) -> None:
@@ -53,6 +62,8 @@ def test_implementation_requires_artifacts_in_the_base(monkeypatch: pytest.Monke
         "_changed_paths",
         lambda base: {"apps/web/package.json"},
     )
+    monkeypatch.setattr(check_change_artifacts, "_durable_base_artifact_errors", lambda base: [])
+    monkeypatch.setattr(check_change_artifacts, "_current_issue_artifact_errors", lambda issue: [])
     monkeypatch.setattr(check_change_artifacts, "_base_artifact_paths", lambda base, issue: [])
 
     assert check_change_artifacts.lifecycle_errors() == [
@@ -69,6 +80,8 @@ def test_implementation_accepts_complete_base_artifacts(monkeypatch: pytest.Monk
         "_changed_paths",
         lambda base: {"services/backend/pyproject.toml"},
     )
+    monkeypatch.setattr(check_change_artifacts, "_durable_base_artifact_errors", lambda base: [])
+    monkeypatch.setattr(check_change_artifacts, "_current_issue_artifact_errors", lambda issue: [])
     monkeypatch.setattr(
         check_change_artifacts,
         "_base_artifact_paths",
@@ -91,6 +104,8 @@ def test_issue_one_exception_closes_after_bootstrap(monkeypatch: pytest.MonkeyPa
         "_changed_paths",
         lambda base: {"services/backend/pyproject.toml"},
     )
+    monkeypatch.setattr(check_change_artifacts, "_durable_base_artifact_errors", lambda base: [])
+    monkeypatch.setattr(check_change_artifacts, "_current_issue_artifact_errors", lambda issue: [])
     monkeypatch.setattr(
         check_change_artifacts, "_is_empty_repository_bootstrap", lambda base: False
     )
@@ -100,7 +115,37 @@ def test_issue_one_exception_closes_after_bootstrap(monkeypatch: pytest.MonkeyPa
     ]
 
 
+def test_fork_branch_named_main_does_not_skip_lifecycle(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("LIVECHO_HEAD_REF", "main")
+    monkeypatch.setenv("LIVECHO_BASE_SHA", "base-sha")
+
+    assert check_change_artifacts.lifecycle_errors() == [
+        "change branch must match codex/issue-<number>-<slug> or issue/<number>-<slug>"
+    ]
+
+
+def test_resulting_tree_requires_current_issue_artifacts(tmp_path: Path) -> None:
+    assert check_change_artifacts._current_issue_artifact_errors(2, tmp_path) == [
+        "change for Issue 2 requires exactly one complete artifact directory in the resulting tree"
+    ]
+
+
+def test_base_artifact_required_files_cannot_be_deleted(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        check_change_artifacts,
+        "_git",
+        lambda *arguments: "docs/changes/2-architecture/intent.md",
+    )
+
+    assert check_change_artifacts._durable_base_artifact_errors("base-sha") == [
+        "accepted change artifacts cannot be deleted: docs/changes/2-architecture/intent.md"
+    ]
+
+
 def test_workspace_requires_every_verification_script(tmp_path: Path) -> None:
+    write_workspace_config(tmp_path, "apps/*")
     package = tmp_path / "apps" / "web"
     package.mkdir(parents=True)
     (package / "package.json").write_text(
@@ -114,6 +159,7 @@ def test_workspace_requires_every_verification_script(tmp_path: Path) -> None:
 
 
 def test_workspace_accepts_complete_verification_scripts(tmp_path: Path) -> None:
+    write_workspace_config(tmp_path, "packages/*")
     package = tmp_path / "packages" / "protocol"
     package.mkdir(parents=True)
     (package / "package.json").write_text(
@@ -122,6 +168,20 @@ def test_workspace_accepts_complete_verification_scripts(tmp_path: Path) -> None
     )
 
     assert workspace_errors(tmp_path) == []
+
+
+def test_workspace_checker_follows_new_configured_roots(tmp_path: Path) -> None:
+    write_workspace_config(tmp_path, "services/*")
+    package = tmp_path / "services" / "backend"
+    package.mkdir(parents=True)
+    (package / "package.json").write_text(
+        '{"scripts":{"lint":"lint"}}',
+        encoding="utf-8",
+    )
+
+    assert workspace_errors(tmp_path) == [
+        "workspace services/backend missing scripts: typecheck, test, build"
+    ]
 
 
 @pytest.mark.parametrize(
