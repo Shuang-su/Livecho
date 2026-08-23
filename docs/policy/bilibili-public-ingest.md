@@ -118,6 +118,13 @@ only that canonical room; it does not change the global enable decision or inter
 unrelated eligible room. Canonicalization or active-resource binding ambiguity, or a
 failed/stale/conflicting safety-journal or recovery-copy commit/read-back, escalates the
 room block to global forced-off rather than claiming a scoped transition succeeded.
+Every global forced-off path closes local authority gates and issues cleanup for all
+active/queued rooms before any safety-journal or recovery-copy await; slow, hung, or
+failed durability cannot extend playback, business-event intake, worker disclosure, or
+pending publication.
+A delayed global-enable or room-removal response cannot clear a newer local global/room
+block: the final fence check and relaxation effect are atomic, and tightening wins in the
+opposite linearization order by immediately closing the path again.
 Runtime enforcement belongs to Issue #7; until it exists and is verified, all real
 acquisition stays off.
 

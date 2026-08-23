@@ -57,6 +57,14 @@ ordering, worker leases, persistence mediation, safety controls, exactly-one typ
 room-or-session deletion manifests, and audit. Internal modules may expose narrow typed
 interfaces, but remain in the same authority and deployment boundary.
 
+Alpha permits exactly one active serving authority process to own all active/queued rooms.
+A future multi-process or horizontally scaled deployment remains production-ineligible
+until a later design proves that the ingest-independent pending-tightening fence is
+synchronously visible to every active owner even while normal safety durability is slow
+or unavailable. An owner that cannot be enumerated or acknowledge the fence is isolated/
+terminated at the deployment or egress boundary and causes global off; it is never
+treated as an unaffected replica.
+
 No message broker, peer-to-peer worker control plane, separately authoritative ingest
 service, or separately authoritative history service may be introduced without a later
 owner-approved ADR and measured need. Postgres and the private Bucket are managed data
@@ -107,7 +115,10 @@ verification key material cannot be restored from an application-data backup, an
 restore key versions cannot remain in the active verification set.
 
 An operator or admin may disable globally or add a canonical room to the denylist. A
-global disable changes the global bit and cleans every active room. A successful
+global disable changes the global bit and starts cleanup for every active/queued room
+before the first journal/recovery-copy await; durable transition I/O may proceed only
+after local authority gates close and termination/revocation/clear/hide actions are
+issued, or concurrently with their completion, and cannot delay local cleanup. A successful
 denylist add changes only membership for its canonical room and cleans only sessions,
 leases, audio, locators, and pending publication bound to that room; an unrelated active
 room is not interrupted. The target-room block takes local effect before durability, but
@@ -118,10 +129,18 @@ starts a room automatically. Only an admin may
 technically re-enable or remove a denylist entry, and only after recorded repository-
 owner approval for the triggering governance review. Each transition is bound to its
 predecessor generation so a stale add cannot clear a newer global disable or lose another
-room entry. Ambiguous canonical identity or active-resource binding, a stale/conflicting
-snapshot, or a failed journal/recovery-copy commit or read-back escalates to immediate
-global forced-off. An emergency disable acts locally even when durable writes fail and
-leaves the system off.
+room entry. A high-priority pending-tightening fence lets global disable or `add(R)` latch/
+block locally without waiting behind an in-flight relaxation or durable I/O. Every enable/
+remove must recheck the captured fence and transition epoch immediately before durable
+commit; its final fence check and local effect are one atomic compare-and-set under the
+same logical authority. If relaxation linearizes first, the following tightening closes
+it immediately; if tightening linearizes first, relaxation fails without a reopen window.
+A newer/pending tightening, unfinished cleanup, or late response cannot clear the newer
+latch/block. At most one successor may commit for a predecessor, and unprovable ordering
+resolves globally off. Ambiguous canonical identity or active-resource binding, a stale/
+conflicting snapshot, or a failed journal/recovery-copy commit or read-back escalates to immediate
+global forced-off. An emergency disable acts and cleans up locally even when durable I/O
+is slow, hung, or fails, and leaves the system off.
 
 Every process start and every restore ignores any backed-up `enabled` value. Before an
 environment can accept authentication, ingest, worker, or viewer traffic, the Issue #4
@@ -202,10 +221,13 @@ containment**, not a fourth deletion state. The existing `DATA-DELETION-TOMBSTON
 identity, original request time, and generation must be committed to and read back from
 the independent recovery boundary before the request is accepted or acknowledged,
 `hidden` is externally reportable, or destructive purge begins. A durable intake record
-in that same recovery boundary preserves a valid selector across a pre-commit crash until
-the same admission is retried; it is a pre-admission control record, not a new service or
-deletion state. A post-commit/pre-response crash or lost response reuses the verified
-tombstone and original time. A commit result that cannot be proved, or an invalid/
+in that same recovery boundary atomically preserves the valid selector, idempotency
+identity, and immutable original initiating-request time assigned by authenticated intake
+before its first durability attempt. The tombstone must reuse that time unchanged; a
+missing/mismatched time fails admission rather than minting a later SLA clock. Intake is
+a pre-admission control record, not a new service or deletion state. A post-commit/pre-
+response crash or lost response reuses the verified tombstone and original time. A commit
+result that cannot be proved, or an invalid/
 ambiguous selector,
 is an unresolved deletion intake/admission: no success, no reportable deletion state, and
 no guessed purge; the environment remains globally forced-off and restore/re-enable is
@@ -411,7 +433,9 @@ are protocol no-flow constraints even though they are not separate diagram nodes
 - The backend is a security and availability concentration point. Issue #19 must provide
   observability and recovery evidence without promoting another service to authority.
 - Horizontal scaling must preserve one logical authority for safety generations,
-  sessions, ordering, and leases; a later scaling design may require another ADR.
+  sessions, ordering, leases, and the synchronous pending-tightening fence; until that is
+  evidenced, Alpha uses exactly one active serving authority process and a later scaling
+  design may require another ADR.
 - Maintenance operations require downtime or proven mutual exclusion during Alpha.
 - Restricted persistence, raw archival, admin export, real community PCM, and production
   ingest remain unavailable until their independent gates pass.
@@ -455,7 +479,7 @@ are protocol no-flow constraints even though they are not separate diagram nodes
 | --- | --- | --- |
 | `GATE-ADR-OWNER` | Repository owner explicitly approves this final ADR. | **PENDING** |
 | `GATE-PLATFORM-RIGHTS` | Current authoritative terms, acquisition channel, purpose, rights, worker disclosure, output use, takedown contact, and review evidence are approved. | **PENDING; production ingest OFF** |
-| `GATE-SAFETY-RUNTIME` | Default-off, one-generation orthogonal global/denylist state, matching-room versus global cleanup and unrelated-room noninterference, monotonic journal/recovery copy, stateful/stateless restored-credential rejection, unresolved deletion-admission blocking, deletion/revocation replay, fresh recovery-admin authentication, audit, and re-enable controls have executable evidence. | **PENDING; production auth/ingest OFF** |
+| `GATE-SAFETY-RUNTIME` | Default-off, one-generation orthogonal global/denylist state, exactly one active Alpha serving authority (or future synchronous-fence owner acknowledgement/isolation), pre-durability global-cleanup start under slow/hung/failing safety I/O, pending-tightening precedence and atomic final relaxation check/effect under both race orders, matching-room versus global cleanup and unrelated-room noninterference, crash/split-commit/response-loss recovery, monotonic journal/recovery copy, stateful/stateless restored-credential rejection, unresolved deletion-admission blocking, deletion/revocation replay, fresh recovery-admin authentication, audit, and re-enable controls have executable evidence. | **PENDING; production auth/ingest OFF** |
 | `GATE-PERSISTENCE` | Issue #16 implements approved access, sanitization, encryption, retention, exactly-one deletion selectors, durable-intake and `hidden` tombstone commit/read-back barriers, crash/response-loss recovery, room-all-child/session-sibling/dominance proofs, identity revocation checkpoints, independent auth-invalidation state, backup, export, and recovery controls. | **PENDING; production persistence/export OFF** |
 | `GATE-WORKER-PCM` | Rights allow third-party disclosure and the owner individually accepts `RISK-WORKER-AUDIO-RETENTION`. | **NOT MET; High risk NOT ACCEPTED; synthetic only** |
 | `GATE-RESIDUAL-RISK` | Every Critical/High residual in the threat model has an individual owner record with date, scope, compensating control, review date, and disable owner. | **PENDING; no blanket approval** |

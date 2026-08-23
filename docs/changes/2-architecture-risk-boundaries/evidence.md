@@ -21,12 +21,13 @@
 
 | Command | Result | Date/commit |
 | --- | --- | --- |
-| `make bootstrap` | Passed; uv checked 10 packages and pnpm reported the frozen workspace already up to date. | 2026-08-24 / post-third-remote-review worktree |
-| `make verify` | Passed; Ruff, workspace lint, mypy, typecheck, 40 pytest tests, pnpm tests, artifact gate, and build all succeeded. | 2026-08-24 / post-third-remote-review worktree |
-| `git diff --check && git diff --cached --check` | Passed with no whitespace errors. | 2026-08-24 / final staged post-third-review tree |
-| Mermaid CLI render command below | Passed with `@mermaid-js/mermaid-cli` 11.12.0 and system Google Chrome; the ADR Markdown produced a rendered SVG. | 2026-08-24 / post-third-remote-review worktree |
-| GitHub Markdown API table-render comparison | Passed; all 35 Markdown table delimiter rows rendered as 35 HTML tables across the six records. | 2026-08-24 / post-third-remote-review worktree |
-| Local Markdown link existence check | Passed; all 18 relative links in `README.md`, `SECURITY.md`, and the six records resolved to existing repository paths. | 2026-08-24 / post-third-remote-review worktree |
+| `make bootstrap` | Passed; uv checked 10 packages and pnpm 11.21.0 reported the frozen workspace already up to date. | 2026-08-24 / final staged tree after r3839563695 and r3839566055 |
+| `make verify` | Passed; Ruff check/format, workspace lint, mypy, typecheck, 40 pytest tests, pnpm tests, change-artifact gate, and build all succeeded. | 2026-08-24 / final staged tree after r3839563695 and r3839566055 |
+| `git diff --check && git diff --cached --check` | Passed with no whitespace errors on the final staged tree. | 2026-08-24 / final staged tree after r3839563695 and r3839566055 |
+| `git diff --quiet origin/main -- docs/changes/2-architecture-risk-boundaries/intent.md docs/changes/2-architecture-risk-boundaries/spec.md docs/changes/2-architecture-risk-boundaries/plan.md` | Passed; the owner-merged intent/spec/plan are unchanged from `origin/main` (`a44fc1f`). | 2026-08-24 / final staged tree after r3839563695 and r3839566055 |
+| Mermaid CLI render command below | Passed with `@mermaid-js/mermaid-cli` 11.12.0 and system Google Chrome; one 94,811-byte SVG was produced. | 2026-08-24 / final staged tree after r3839563695 and r3839566055 |
+| GitHub Markdown API table-render command below | Passed; 35 delimiter tables rendered as 35 GitHub HTML tables; raw and rendered row-width mismatches: 0. | 2026-08-24 / final staged tree after r3839563695 and r3839566055 |
+| Local-link and stable-ID audit command below | Passed; links 18/18; CTRL 50 rows/30 unique/16 shared with 0 shared later-Issue owner-set mismatches and 0 undefined; DATA 12 with 0 undefined; FLOW-ALLOW-001–020 and FLOW-DENY-001–018 exact; the 13 High threat rows exactly match 13 decision rows, all `NOT ACCEPTED`; Critical rows: 0. | 2026-08-24 / final staged tree after r3839563695 and r3839566055 |
 
 The isolated Mermaid render used no repository dependency or output path:
 
@@ -40,7 +41,208 @@ PUPPETEER_EXECUTABLE_PATH='/Applications/Google Chrome.app/Contents/MacOS/Google
   ./node_modules/.bin/mmdc -q \
   -i /Users/szmg/Documents/Livecho/docs/architecture/adr/0001-alpha-modular-monolith.md \
   -o "$livecho_mmdc_tmp/rendered.md"
+wc -c "$livecho_mmdc_tmp/rendered-1.svg"
 ```
+
+It produced one 94,811-byte SVG.
+
+The exact GitHub GFM table-render audit was:
+
+```sh
+gfm_audit_tmp=$(mktemp -d)
+records=(
+  docs/architecture/adr/0001-alpha-modular-monolith.md
+  docs/security/alpha-threat-model.md
+  docs/security/data-lifecycle-and-deletion.md
+  docs/policy/bilibili-public-ingest.md
+  docs/policy/independent-implementation.md
+  docs/operations/incident-disable-and-recovery.md
+)
+for file in "${records[@]}"; do
+  gh api markdown --method POST -f mode=gfm -f context=Shuang-su/Livecho \
+    -F text="@$file" > "$gfm_audit_tmp/$(basename "$file").html"
+done
+GFM_AUDIT_DIR="$gfm_audit_tmp" uv run python - <<'PY'
+from html.parser import HTMLParser
+from pathlib import Path
+import os
+import re
+
+records = [
+    Path("docs/architecture/adr/0001-alpha-modular-monolith.md"),
+    Path("docs/security/alpha-threat-model.md"),
+    Path("docs/security/data-lifecycle-and-deletion.md"),
+    Path("docs/policy/bilibili-public-ingest.md"),
+    Path("docs/policy/independent-implementation.md"),
+    Path("docs/operations/incident-disable-and-recovery.md"),
+]
+
+class Tables(HTMLParser):
+    def __init__(self):
+        super().__init__()
+        self.tables, self.table, self.row = [], None, None
+    def handle_starttag(self, tag, attrs):
+        if tag == "table": self.table = []
+        elif tag == "tr" and self.table is not None: self.row = []
+        elif tag in ("th", "td") and self.row is not None: self.row.append(tag)
+    def handle_endtag(self, tag):
+        if tag == "tr" and self.row is not None:
+            self.table.append(self.row); self.row = None
+        elif tag == "table" and self.table is not None:
+            self.tables.append(self.table); self.table = None
+
+raw_total = html_total = 0
+raw_bad, html_bad = [], []
+for path in records:
+    lines = path.read_text().splitlines()
+    delimiters = [i for i, line in enumerate(lines) if re.match(r"^\|\s*:?-{3,}", line)]
+    raw_total += len(delimiters)
+    for i in delimiters:
+        expected = len(lines[i].split("|")[1:-1])
+        row_indexes = [i - 1]
+        j = i + 1
+        while j < len(lines) and lines[j].startswith("|") and lines[j].endswith("|"):
+            row_indexes.append(j); j += 1
+        for row_index in row_indexes:
+            actual = len(lines[row_index].split("|")[1:-1])
+            if actual != expected:
+                raw_bad.append((str(path), i + 1, row_index + 1, expected, actual))
+    rendered = Path(os.environ["GFM_AUDIT_DIR"]) / f"{path.name}.html"
+    parsed = Tables(); parsed.feed(rendered.read_text())
+    html_total += len(parsed.tables)
+    for table_index, table in enumerate(parsed.tables, 1):
+        expected = len(table[0])
+        for row_index, row in enumerate(table, 1):
+            if len(row) != expected:
+                html_bad.append((str(path), table_index, row_index, expected, len(row)))
+assert raw_total == 35, raw_total
+assert html_total == 35, html_total
+assert not raw_bad, raw_bad
+assert not html_bad, html_bad
+print("GFM_TABLES=35/35 RAW_WIDTH_MISMATCHES=0 HTML_WIDTH_MISMATCHES=0")
+PY
+```
+
+It printed `GFM_TABLES=35/35 RAW_WIDTH_MISMATCHES=0 HTML_WIDTH_MISMATCHES=0`.
+
+The exact local-link and stable-ID audit was:
+
+```sh
+uv run python - <<'PY'
+from pathlib import Path
+import re
+
+records = [
+    Path("docs/architecture/adr/0001-alpha-modular-monolith.md"),
+    Path("docs/security/alpha-threat-model.md"),
+    Path("docs/security/data-lifecycle-and-deletion.md"),
+    Path("docs/policy/bilibili-public-ingest.md"),
+    Path("docs/policy/independent-implementation.md"),
+    Path("docs/operations/incident-disable-and-recovery.md"),
+]
+text = "\n".join(path.read_text() for path in records)
+
+link_pattern = re.compile(r"(?<!!)\[[^\]]+\]\(([^)]+)\)")
+links = []
+for source in [Path("README.md"), Path("SECURITY.md"), *records]:
+    for line_number, line in enumerate(source.read_text().splitlines(), 1):
+        for target in link_pattern.findall(line):
+            target = target.strip().removeprefix("<").removesuffix(">")
+            if re.match(r"^[a-z][a-z0-9+.-]*:", target, re.I) or target.startswith("#"):
+                continue
+            destination = (source.parent / target.split("#", 1)[0].split("?", 1)[0]).resolve()
+            links.append((source, line_number, target, destination.exists()))
+missing = [(str(s), n, t) for s, n, t, exists in links if not exists]
+assert len(links) == 18, len(links)
+assert not missing, missing
+
+control_rows = []
+for source in records:
+    for line_number, line in enumerate(source.read_text().splitlines(), 1):
+        match = re.match(r"^\|\s*`(CTRL-[A-Z0-9-]+)`\s*\|(.*)\|\s*$", line)
+        if match:
+            cells = [cell.strip() for cell in line.split("|")[1:-1]]
+            issues = tuple(sorted({int(value) for value in re.findall(r"#(\d+)", cells[-1])}))
+            control_rows.append((match.group(1), source, line_number, issues))
+control_ids = {row[0] for row in control_rows}
+control_references = set(re.findall(r"\bCTRL-[A-Z0-9-]+\b", text))
+by_control = {
+    identifier: [row for row in control_rows if row[0] == identifier]
+    for identifier in control_ids
+}
+shared = {identifier: rows for identifier, rows in by_control.items() if len(rows) > 1}
+owner_mismatches = {
+    identifier: rows for identifier, rows in shared.items()
+    if len({row[3] for row in rows}) > 1
+}
+assert len(control_rows) == 50, len(control_rows)
+assert len(control_ids) == 30, len(control_ids)
+assert len(shared) == 16, len(shared)
+assert not owner_mismatches, owner_mismatches
+assert not control_references - control_ids, sorted(control_references - control_ids)
+
+data_rows = []
+for source in records:
+    for line_number, line in enumerate(source.read_text().splitlines(), 1):
+        match = re.match(r"^\|\s*`(DATA-[A-Z0-9-]+)`(?::[^|]*)?\s*\|", line)
+        if match:
+            data_rows.append((match.group(1), source, line_number))
+data_ids = {row[0] for row in data_rows}
+data_references = set(re.findall(r"(?<![A-Z0-9-])DATA-[A-Z0-9-]+\b", text))
+assert len(data_rows) == 12, len(data_rows)
+assert len(data_ids) == 12, len(data_ids)
+assert not data_references - data_ids, sorted(data_references - data_ids)
+
+flows = {"ALLOW": [], "DENY": []}
+for line in records[0].read_text().splitlines():
+    if not line.startswith("| `FLOW-"):
+        continue
+    first_cell = line.split("|")[1]
+    for kind, start, end in re.findall(
+        r"FLOW-(ALLOW|DENY)-(\d{3})(?:`?–`?FLOW-\1-(\d{3}))?", first_cell
+    ):
+        flows[kind].extend(
+            f"FLOW-{kind}-{number:03d}"
+            for number in range(int(start), int(end or start) + 1)
+        )
+for kind, maximum in (("ALLOW", 20), ("DENY", 18)):
+    expected = {f"FLOW-{kind}-{number:03d}" for number in range(1, maximum + 1)}
+    assert len(flows[kind]) == maximum, (kind, len(flows[kind]))
+    assert set(flows[kind]) == expected, (kind, sorted(set(flows[kind]) ^ expected))
+
+threat_rows, decision_rows, critical_rows = [], [], []
+for line_number, line in enumerate(records[1].read_text().splitlines(), 1):
+    if not re.match(r"^\|\s*`(?:THREAT|RISK)-", line):
+        continue
+    cells = [cell.strip() for cell in line.split("|")[1:-1]]
+    if len(cells) == 11:
+        if "**High**" in cells[-2]:
+            threat_rows.append((cells[0].strip("`"), cells[-1]))
+        if "**Critical**" in cells[-2]:
+            critical_rows.append(line_number)
+    elif len(cells) == 6:
+        if cells[2] == "High":
+            decision_rows.append((cells[0].strip("`"), cells[-1]))
+        if cells[2] == "Critical":
+            critical_rows.append(line_number)
+assert len(threat_rows) == 13, len(threat_rows)
+assert len(decision_rows) == 13, len(decision_rows)
+assert {row[0] for row in threat_rows} == {row[0] for row in decision_rows}
+assert all("NOT ACCEPTED" in row[1] for row in threat_rows)
+assert all("NOT ACCEPTED" in row[1] for row in decision_rows)
+assert not critical_rows, critical_rows
+print(
+    "LINKS=18/18 CTRL_ROWS=50 CTRL_UNIQUE=30 CTRL_SHARED=16 "
+    "SHARED_ISSUE_OWNER_MISMATCHES=0 CTRL_UNDEFINED=0 DATA=12 "
+    "DATA_UNDEFINED=0 FLOW_ALLOW=1-20 FLOW_DENY=1-18 "
+    "HIGH=13/13_ALL_NOT_ACCEPTED CRITICAL=0"
+)
+PY
+```
+
+It printed `LINKS=18/18 CTRL_ROWS=50 CTRL_UNIQUE=30 CTRL_SHARED=16
+SHARED_ISSUE_OWNER_MISMATCHES=0 CTRL_UNDEFINED=0 DATA=12 DATA_UNDEFINED=0
+FLOW_ALLOW=1-20 FLOW_DENY=1-18 HIGH=13/13_ALL_NOT_ACCEPTED CRITICAL=0`.
 
 ## Manual or hardware evidence
 
@@ -69,28 +271,39 @@ update; it adds no runtime or deployment resource.
   starts no guessed purge, and room tombstones dominate child manifests. Immediate
   containment is provisional: the existing `hidden` tombstone must commit/read back from
   the independent recovery boundary before acknowledgement, reportable state, or purge;
-  unresolved intake, empty application state, crashes, and response loss cannot bypass
-  restore/re-enable. The exact audio ceilings, no-retry-queue rule, three truthful deletion
+  durable intake atomically retains selector, idempotency, and immutable original
+  initiating-request time for tombstone reuse, so unresolved intake, empty application
+  state, crashes, and response loss cannot bypass restore/re-enable or reset the SLA
+  clock. The exact audio ceilings, no-retry-queue rule, three truthful deletion
   states, immutable late-SLA result, provider-window boundary, checkpoint durability, and
   forced-off restore order are explicit. This is not runtime enforcement evidence.
 - **Tabletop 1A — active-room global disable: Passed on paper.** The runbook immediately
-  latches off, denies starts/reconnects, stops the platform session, revokes the lease,
-  rejects late output, clears conforming audio/locator RAM, hides publication, and keeps
-  the system off after a journal/recovery-copy write failure.
+  latches off, closes admission/publication/lease/output authority, and issues every
+  active/queued-room termination, revocation, clear, and hide action before the first
+  journal/recovery-copy await. Slow, hung, failed, or split durability cannot postpone
+  locally controlled cleanup. The pending-tightening fence and atomic final relaxation
+  check/effect prevent a late enable from reopening either race order; pre-/mid-/post-
+  commit crashes and response loss restart default-off and reconcile without losing the
+  complete denylist. Alpha has one active serving authority; a future unacknowledged owner
+  is isolated/terminated and keeps the deployment off.
 - **Tabletop 1B — room-scoped denylist: Passed on paper.** With room `A` active, a
   committed `add(B)` denies unrelated room `B` without touching `A`'s session, lease,
-  audio/locator RAM, or publication; `add(A)` cleans only `A`. Canonical/binding,
-  predecessor-generation, journal, or recovery-copy uncertainty escalates to global off.
-  Global enable preserves the complete denylist, room removal never enables globally,
-  and generation change alone only triggers re-evaluation.
+  audio/locator RAM, or publication; `add(A)` begins target cleanup before durability.
+  Canonical/binding, predecessor-generation, journal, or recovery-copy uncertainty
+  escalates to global off and starts all-room cleanup without another durability wait.
+  Disable/add same-predecessor races, add response loss, and add/remove both
+  linearization orders preserve the newest complete snapshot and never reopen a newer
+  block. Global enable preserves the complete denylist, room removal never enables
+  globally, and generation change alone only triggers re-evaluation.
 - **Tabletop 2 — typed room/session partial and late deletion: Passed on paper.** Separate
   room and session subcases prove exactly-one selector validation; unknown/conflicting/
   composite rejection without guessed purge; room-wide discovery of initial and stale-
   restored sessions; session-only sibling/shared-state preservation; room-over-session
   tombstone dominance; and shared-projection recomputation. Primary-store outage,
   intake/tombstone commit/read-back failure, pre-commit crash, post-commit response loss,
-  restart, and empty-store variants return no false success or purge and reuse the same
-  selector/manifest/original time. A failed raw-object deletion cannot report active
+  restart, and empty-store variants return no false success or purge. Durable intake and
+  the tombstone reuse the same selector/idempotency/original-time triple. A failed raw-
+  object deletion cannot report active
   completion, retry is idempotent, late success records `sla_breached=true`, and final
   state waits for every window and restore check.
 - **Tabletop 3 — stale restore: Passed on paper.** The environment starts isolated and
@@ -211,14 +424,36 @@ valid findings:
   conflicting canonical/resource binding, stale state, or journal/recovery commit/read-
   back failure escalates to global forced-off, while generation change alone re-evaluates.
 
-Final independent semantic and mechanical re-reviews found no remaining P1/P2. The
-semantic review found one intermediate P2 in the revised text—the 24-hour active-purge
-SLA was measured from admission rather than the original initiating request—and the final
-tree now includes admission delay in that immutable clock. Fresh `make bootstrap && make
-verify` passed with 40 pytest tests. The latest worktree has 30 stable controls, 12 data
-classes, 13 individually unaccepted High rows, continuous `FLOW-ALLOW-001`–`020` and
-`FLOW-DENY-001`–`018`, no shared-control owner mismatch, 35/35 GitHub-rendered GFM tables,
-18/18 local links, and a successful Mermaid 11.12.0 render.
+Independent semantic and mechanical re-reviews found no remaining P1/P2 in the resulting
+head `4d7e0a9`. The semantic review found one intermediate P2 in the revised text—the
+24-hour active-purge SLA was measured from admission rather than the original initiating
+request—and that head included admission delay in the immutable clock. Fresh `make
+bootstrap && make verify` passed with 40 pytest tests.
+
+The next delayed remote review found another valid P1:
+[global disable waited for journal/recovery durability before active cleanup started](https://github.com/Shuang-su/Livecho/pull/22#discussion_r3839563695). The resolution
+separates the immediate local safety path from durable transition I/O: one Alpha serving
+authority atomically latches off, closes local admission/publication/lease/output gates,
+and starts every active/queued-room cleanup before the first durability await. Cleanup
+continues independently under slow, hung, failed, split, or ambiguous I/O; failure keeps
+the deployment off, alerts, retries, and blocks relaxation. A high-priority tightening
+fence plus atomic final relaxation check/effect closes late enable/remove races in both
+linearization orders. The paper tests also cover future-owner fence failure, crash and
+response loss, disable/add predecessor races, and room-scoped noninterference.
+
+Cursor Bugbot on the same prior head found a valid P2:
+[durable intake omitted the original request time and could reset the 24-hour SLA clock before tombstone admission](https://github.com/Shuang-su/Livecho/pull/22#discussion_r3839566055).
+The authenticated intake now assigns one immutable original initiating-request time before
+its first durability attempt and atomically stores it with selector/idempotency. If the
+write fails, the initiating source retains/retries that same triple; once durable, every
+pre-tombstone crash, tombstone admission, response-loss retry, and restore reuses the
+unchanged time. Missing or mismatched time fails admission and cannot mint a later clock.
+
+Final independent semantic and mechanical re-reviews found no remaining P1/P2 after this
+fix. Fresh verification passed with 40 pytest tests. The final worktree has 30 stable
+controls, 12 data classes, 13 individually unaccepted High rows, continuous
+`FLOW-ALLOW-001`–`020` and `FLOW-DENY-001`–`018`, no shared-control owner mismatch, 35/35
+GitHub-rendered GFM tables, 18/18 local links, and a successful Mermaid 11.12.0 render.
 
 ## Deviations
 
