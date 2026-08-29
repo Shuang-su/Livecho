@@ -55,8 +55,8 @@ optional `ViewerCursorV1`, and `ViewerReadyV1`, with the selected minor, minimum
 version, current session/epoch, next viewer sequence, and whether the cursor resumed.
 
 `ProtocolAckV1` is available on both subprotocols and contains only the envelope,
-`outcome` (`accepted`, `seq_duplicate`, or `revision_duplicate`), and the applicable
-message identity/sequence/revision. `ProtocolErrorV1` contains only the envelope, stable
+`outcome` (`accepted`, `seq_duplicate`, `revision_duplicate`, or `cancel_duplicate`),
+and the applicable message identity/sequence/revision. `ProtocolErrorV1` contains only the envelope, stable
 rejection `code`, bounded public `message`, `retryable`, and optional
 `expected`/`received` uint64 decimal values. Neither response may echo an invalid
 payload, transcript, secret, locator, or audio.
@@ -68,12 +68,12 @@ path, command, environment, or options field. `AudioFormatV1` is exactly
 `encoding: "pcm_s16le"`, `sample_rate_hz: 16000`, `channels: 1`.
 
 The backend-to-worker control set also exports `LeaseCancelV1`, containing only the
-envelope, `lease_id`, `session_id`, `epoch`, the exact current lease `revision`, and one
-reason literal: `operator_stop`, `lease_expired`, `worker_replaced`, `policy_disable`,
-`protocol_violation`, or `session_end`. It is idempotent by message ID and bound lease
-revision, immediately prevents later PCM/output acceptance for that lease, and contains
-no arbitrary instruction or reason text. Repeating the identical cancellation is an
-accepted no-op; changing the reason under the same identity/revision is a conflict.
+envelope, `lease_id`, `session_id`, `epoch`, `expected_revision` as a compare-and-swap
+guard for the exact current lease revision, and one reason literal: `operator_stop`,
+`lease_expired`, `worker_replaced`, `policy_disable`, `protocol_violation`, or
+`session_end`. It immediately prevents later PCM/output acceptance for that lease and
+contains no arbitrary instruction or reason text. Cancellation is a terminal state
+transition, not a lease revision update.
 
 Known worker capability literals in minor 0 are `asr.transcribe` and
 `protocol.binary-pcm`. A worker must advertise both. The backend intersects only known
@@ -149,11 +149,16 @@ the current revision is a no-op; a changed value at the current revision is
 An `is_final: true` transcript cannot be revised. A revision cannot move an object to a
 different session, lease, epoch, time range, or identity.
 
-`LeaseCancelV1` closes the named lease at its exact current revision without consuming
-the PCM input sequence. It is checked before any later input/output message, and closed
-lease traffic returns `lease_closed` while expiry returns `lease_expired`. Cancellation
-clears bounded PCM/deduplication state; a cancellation cannot be undone or converted
-into a different reason by replay.
+`LeaseCancelV1` closes the named active lease atomically only when `expected_revision`
+equals the current lease revision; it neither increments that revision nor consumes the
+PCM input sequence. The initial matching cancellation returns `accepted`. Repeating the
+same message ID and canonical content returns `cancel_duplicate`; reusing that message
+ID with changed binding, expected revision, or reason is `cancel_conflict`. While a lease
+is still active, a lower CAS value is `revision_stale` and a higher value is
+`revision_gap`. A new cancellation after terminal closure is `lease_closed`. All are
+pinned by golden cases. Cancellation is checked before later input/output, clears
+bounded PCM/deduplication state, and cannot be undone or converted to a different reason
+by replay. Expiry independently returns `lease_expired`.
 
 `WorkerHelloV1` and `ViewerSubscribeV1` may include a reconnect cursor. Resume succeeds
 only when the named connection/session, exact lease where applicable, epoch, and next
@@ -173,13 +178,14 @@ text. Minor 0 defines at least:
 `control_frame_too_large`, `unknown_major`, `unsupported_minor`,
 `worker_version_too_old`, `capability_required`, `manifest_not_allowed`,
 `lease_unknown`, `lease_expired`, `lease_closed`, `binding_mismatch`, `epoch_stale`, `epoch_unknown`,
-`seq_duplicate`, `seq_conflict`, `seq_gap`, `revision_duplicate`,
-`revision_conflict`, `revision_stale`, `revision_gap`, `object_final`,
+`seq_duplicate`, `seq_conflict`, `seq_gap`, `revision_duplicate`, `cancel_duplicate`,
+`revision_conflict`, `revision_stale`, `revision_gap`, `cancel_conflict`, `object_final`,
 `resync_required`, `binary_header_invalid`, `binary_frame_too_large`,
 `audio_pts_invalid`, and `audio_budget_exceeded`.
 
-`seq_duplicate` and `revision_duplicate` describe successful `ProtocolAckV1` no-op
-outcomes; every other listed code is a `ProtocolErrorV1` rejection. Tests must prove no
+`seq_duplicate`, `revision_duplicate`, and `cancel_duplicate` describe successful
+`ProtocolAckV1` no-op outcomes; every other listed code is a `ProtocolErrorV1`
+rejection. Tests must prove no
 rejected message advances a counter,
 changes a revision, consumes audio budget, or emits a timeline event. Protocol errors
 are bounded and safe to return; detailed parser/validator diagnostics remain internal
@@ -226,6 +232,10 @@ and revision, final-object mutation, reconnect resume/refusal, manifest/capabili
 policy, and binary-header metadata. Binary metadata cases contain header field values
 only, never payload bytes. Case IDs and expected codes are unique and deterministically
 ordered.
+
+The cancellation subset must contain an accepted exact-CAS initial close, its identical
+`cancel_duplicate` replay, a same-ID changed-reason `cancel_conflict`, lower and higher
+CAS rejections, and a new cancellation after closure returning `lease_closed`.
 
 ### Version policy
 

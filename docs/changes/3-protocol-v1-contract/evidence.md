@@ -36,6 +36,10 @@ generation, shared golden cases, minimum versions, and the Issue #2 audio ceilin
 - A second interface trace resolved the missing bounded cancellation control required by
   the accepted architecture: `LeaseCancelV1` now has exact bindings, fixed reasons,
   idempotency, terminal behavior, and no arbitrary instruction text.
+- Codex review P1 found that cancellation reused the ordinary lease `revision` field
+  while ordinary updates require current plus one. Resolved by defining
+  `expected_revision` as a non-advancing CAS guard and pinning initial close, identical
+  replay, changed replay, stale/gapped CAS, and already-closed outcomes.
 - Security/data review found no permitted field for a credential, playback/download URL,
   arbitrary path/command/code/container, raw platform payload, or extensible metadata.
   The documents expressly prohibit audio fixtures, encodings, digests, persistence, and
