@@ -448,6 +448,7 @@ def rejected_cases() -> list[dict[str, Any]]:
     hello = values["WorkerHelloV1"]
     ack = values["ProtocolAckV1"]
     error = values["ProtocolErrorV1"]
+    heartbeat = values["HeartbeatV1"]
     timeline = values["TimelineEventV1"]
     partial_timeline = deepcopy(timeline)
     partial_payload = partial_timeline["payload"]
@@ -510,6 +511,36 @@ def rejected_cases() -> list[dict[str, Any]]:
                 "rejected",
                 StableCode.SCHEMA_INVALID,
                 wire=_changed(transcript, end_ms=0),
+            ),
+            _case(
+                "schema.integral_fraction_integer",
+                "HeartbeatV1",
+                "accepted",
+                StableCode.ACCEPTED,
+                raw_text=json.dumps(
+                    _changed(heartbeat, audio_buffer_bytes=0.0),
+                    separators=(",", ":"),
+                ),
+            ),
+            _case(
+                "schema.nonintegral_fraction_integer",
+                "HeartbeatV1",
+                "rejected",
+                StableCode.SCHEMA_INVALID,
+                raw_text=json.dumps(
+                    _changed(heartbeat, audio_buffer_bytes=0.5),
+                    separators=(",", ":"),
+                ),
+            ),
+            _case(
+                "schema.string_integer",
+                "HeartbeatV1",
+                "rejected",
+                StableCode.SCHEMA_INVALID,
+                raw_text=json.dumps(
+                    _changed(heartbeat, audio_buffer_bytes="0"),
+                    separators=(",", ":"),
+                ),
             ),
             _case(
                 "schema.timeline_payload_value",
@@ -799,6 +830,23 @@ def rejected_cases() -> list[dict[str, Any]]:
                     "candidate_final": False,
                 },
             ),
+            _semantic_case(
+                "revision.capacity_precedes_gap",
+                "RevisionDecisionV1",
+                StableCode.REVISION_CAPACITY_EXCEEDED,
+                {
+                    "existing": False,
+                    "fill_count": 4096,
+                    "current_revision": 1,
+                    "current_projection": "a",
+                    "current_immutable": "a",
+                    "current_final": False,
+                    "candidate_revision": 2,
+                    "candidate_projection": "new",
+                    "candidate_immutable": "new",
+                    "candidate_final": False,
+                },
+            ),
             _case(
                 "revision.uint64_next",
                 "RevisionDecisionV1",
@@ -867,6 +915,7 @@ def rejected_cases() -> list[dict[str, Any]]:
                 },
             ),
             _binary_case("binary.header", StableCode.BINARY_HEADER_INVALID, flags=2),
+            _binary_case("binary.epoch_zero", StableCode.BINARY_HEADER_INVALID, epoch="0"),
             _binary_case(
                 "binary.frame_large", StableCode.BINARY_FRAME_TOO_LARGE, total_length=32_057
             ),
@@ -1153,6 +1202,7 @@ def _evaluate_binary(metadata: dict[str, Any]) -> StableCode:
         or metadata["minor"] != 0
         or int(metadata["flags"]) & ~1
         or metadata["header_length"] != 56
+        or int(metadata["epoch"]) < 1
         or int(metadata["total_length"]) != 56 + int(metadata["payload_length"])
         or not 1 <= int(metadata["sample_count"]) <= 16_000
         or int(metadata["payload_length"]) != int(metadata["sample_count"]) * 2

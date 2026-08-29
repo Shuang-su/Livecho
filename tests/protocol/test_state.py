@@ -177,6 +177,10 @@ def test_revision_capacity_allows_existing_update_at_cap(
         domain.preview(revision_identity(overflow), 1, full, immutable, False).decision.code
         == StableCode.REVISION_CAPACITY_EXCEEDED
     )
+    assert (
+        domain.preview(revision_identity(overflow), 2, full, immutable, False).decision.code
+        == StableCode.REVISION_CAPACITY_EXCEEDED
+    )
     assert first_identity is not None and first_message is not None
     update = {**first_message, "revision": "2", "text": "updated"}
     update_full, update_immutable = _revision_values(update)

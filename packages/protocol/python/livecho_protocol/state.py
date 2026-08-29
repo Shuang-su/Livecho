@@ -134,10 +134,10 @@ class RevisionDomain:
     ) -> RevisionPreview:
         existing = self._records.get(identity)
         if existing is None:
-            if revision != 1:
-                return RevisionPreview(Decision(StableCode.REVISION_GAP))
             if len(self._records) >= self.capacity:
                 return RevisionPreview(Decision(StableCode.REVISION_CAPACITY_EXCEEDED))
+            if revision != 1:
+                return RevisionPreview(Decision(StableCode.REVISION_GAP))
             return RevisionPreview(
                 Decision(StableCode.ACCEPTED),
                 RevisionRecord(revision, projection_digest, immutable_digest, is_final),

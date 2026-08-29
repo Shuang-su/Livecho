@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
+import math
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, field_validator, model_validator
 
 from .scalars import (
     LanguageTag,
@@ -28,10 +29,33 @@ PROTOCOL_MINOR = 0
 MINIMUM_WORKER_VERSION = "0.1.0"
 MINIMUM_VIEWER_VERSION = "0.1.0"
 
-Minor = Annotated[int, Field(strict=True, ge=0, le=255)]
-BoundedCount = Annotated[int, Field(strict=True, ge=0, le=2_147_483_647)]
-AudioBufferBytes = Annotated[int, Field(strict=True, ge=0, le=960_000)]
-Milliseconds = Annotated[int, Field(strict=True, ge=0, le=2_147_483_647)]
+
+def _json_integer(value: object) -> int:
+    if isinstance(value, bool):
+        raise ValueError("boolean is not a JSON integer")
+    if isinstance(value, int):
+        return value
+    if isinstance(value, float) and math.isfinite(value) and value.is_integer():
+        return int(value)
+    raise ValueError("value is not a JSON integer")
+
+
+Minor = Annotated[int, Field(strict=True, ge=0, le=255), BeforeValidator(_json_integer)]
+BoundedCount = Annotated[
+    int,
+    Field(strict=True, ge=0, le=2_147_483_647),
+    BeforeValidator(_json_integer),
+]
+AudioBufferBytes = Annotated[
+    int,
+    Field(strict=True, ge=0, le=960_000),
+    BeforeValidator(_json_integer),
+]
+Milliseconds = Annotated[
+    int,
+    Field(strict=True, ge=0, le=2_147_483_647),
+    BeforeValidator(_json_integer),
+]
 Confidence = Annotated[float, Field(strict=True, ge=0, le=1)]
 RealtimeFactor = Annotated[float, Field(strict=True, ge=0, le=100)]
 RejectCode = Literal[

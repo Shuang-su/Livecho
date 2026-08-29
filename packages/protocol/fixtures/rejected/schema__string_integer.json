@@ -1,0 +1,7 @@
+{
+  "case_id": "schema.string_integer",
+  "code": "schema_invalid",
+  "expect": "rejected",
+  "model": "HeartbeatV1",
+  "raw_text": "{\"protocol\":\"livecho.worker.v1\",\"protocol_minor\":0,\"message_id\":\"00000000-0000-4000-8000-000000000001\",\"type\":\"worker.heartbeat\",\"sent_at\":\"2026-01-01T00:00:00.000Z\",\"lease_id\":\"00000000-0000-4000-8000-000000000020\",\"session_id\":\"00000000-0000-4000-8000-000000000030\",\"epoch\":\"1\",\"seq\":\"0\",\"state\":\"ready\",\"last_input_seq\":null,\"last_output_seq\":null,\"audio_buffer_bytes\":\"0\",\"observed_at\":\"2026-01-01T00:00:00.000Z\"}"
+}

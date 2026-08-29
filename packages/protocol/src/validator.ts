@@ -549,6 +549,7 @@ function binaryDecision(value: Record<string, unknown>): StableCode {
     value.minor !== 0 ||
     (Number(value.flags) & ~1) !== 0 ||
     value.header_length !== 56 ||
+    uint64(value.epoch) < 1n ||
     Number(value.total_length) !== 56 + Number(value.payload_length) ||
     Number(value.sample_count) < 1 ||
     Number(value.sample_count) > 16_000 ||
