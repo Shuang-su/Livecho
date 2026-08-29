@@ -12,6 +12,7 @@
 | --- | --- | --- |
 | `make bootstrap` | Passed; uv checked the frozen environment and pnpm 11.21.0 reported the frozen workspace already up to date. | 2026-08-30 / staged artifact tree |
 | `make verify` | Passed after the two exact-head P2 corrections; Ruff check/format, workspace lint, mypy, typecheck, 40 pytest tests, pnpm tests, artifact gate, and build all succeeded. | 2026-08-30 / corrected artifact tree |
+| GitHub Actions `verify` | Passed in 43 seconds on the material contract head after all P1/P2 corrections. | 2026-08-30 / `3d9ffdf` / run `33269409446` |
 | `make artifacts` | Passed: `change artifacts: ok`. | 2026-08-30 / staged artifact tree |
 | `git diff --check && git diff --cached --check` | Passed with no whitespace errors. | 2026-08-30 / staged artifact tree |
 | `git diff --cached --name-only` | Passed; exactly the four required files under `docs/changes/3-protocol-v1-contract/` were listed. | 2026-08-30 / staged artifact tree |
@@ -76,8 +77,10 @@ generation, shared golden cases, minimum versions, and the Issue #2 audio ceilin
   arbitrary path/command/code/container, raw platform payload, or extensible metadata.
   The documents expressly prohibit audio fixtures, encodings, digests, persistence, and
   logging; only bounded in-memory synthetic codec bytes are planned.
-- Repository-owner merge authorization is recorded above. External PR review remains
-  pending. Implementation and generated files wait for the artifact PR to merge.
+- Repository-owner merge authorization is recorded above. Codex completed its review of
+  material contract head `3d9ffdf` with no remaining major finding; every P1/P2 review
+  thread is resolved. Cursor Bugbot is optional and remained pending, so it is not a
+  merge gate. Implementation and generated files wait for the artifact PR to merge.
 
 ## Deviations
 
