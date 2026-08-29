@@ -30,17 +30,17 @@
 
 | Command | Result | Date/commit |
 | --- | --- | --- |
-| `make bootstrap` | Passed; uv verified the frozen Python environment and pnpm 11.21.0 verified the frozen two-workspace install and supply-chain policy. | 2026-08-30 / `b9f65db` |
-| `make protocol-generate` | Passed; rewrote the complete generated tree transactionally from the Pydantic source and pinned generator. | 2026-08-30 / `b9f65db` |
-| `git diff --exit-code -- packages/protocol/schema packages/protocol/src/generated packages/protocol/fixtures` | Passed after regeneration; generated Schema, TypeScript, compatibility, and fixture bytes match the committed output. | 2026-08-30 / `b9f65db` |
-| `make protocol-check` | Passed: `protocol generated artifacts: ok`; the checker compared all expected paths and bytes from a temporary generation. | 2026-08-30 / `b9f65db` |
-| `uv run pytest -q tests/protocol` | Passed: 38 protocol tests. | 2026-08-30 / `b9f65db` |
-| `pnpm --filter @livecho/protocol typecheck` | Passed with TypeScript strict mode; also rerun by `make verify`. | 2026-08-30 / `b9f65db` |
-| `pnpm --filter @livecho/protocol test` | Passed: one Vitest file and 72 tests, comprising 71 generated parity cases plus the corpus integrity assertion; also rerun by `make verify`. | 2026-08-30 / `b9f65db` |
-| `make verify` | Passed; Ruff, workspace lint, mypy, TypeScript checks, 78 pytest tests, 72 Vitest tests, artifact lifecycle, protocol drift, and build all succeeded. | 2026-08-30 / `b9f65db` |
-| `git diff --check && git diff --cached --check` | Passed with no whitespace errors. | 2026-08-30 / `b9f65db` |
+| `make bootstrap` | Passed; uv verified the frozen Python environment and pnpm 11.21.0 verified the frozen two-workspace install and supply-chain policy. | 2026-08-30 / `ff6af97` |
+| `make protocol-generate` | Passed; rewrote the complete generated tree transactionally from the Pydantic source and pinned generator. | 2026-08-30 / `ff6af97` |
+| `git diff --exit-code -- packages/protocol/schema packages/protocol/src/generated packages/protocol/fixtures` | Passed after regeneration; generated Schema, TypeScript, compatibility, and fixture bytes match the committed output. | 2026-08-30 / `ff6af97` |
+| `make protocol-check` | Passed: `protocol generated artifacts: ok`; the checker compared all expected paths and bytes from a temporary generation. | 2026-08-30 / `ff6af97` |
+| `uv run pytest -q tests/protocol` | Passed: 52 protocol tests. | 2026-08-30 / `ff6af97` |
+| `pnpm --filter @livecho/protocol typecheck` | Passed with TypeScript strict mode; also rerun by `make verify`. | 2026-08-30 / `ff6af97` |
+| `pnpm --filter @livecho/protocol test` | Passed: one Vitest file and 81 tests, comprising 80 generated parity cases plus the corpus integrity assertion; also rerun by `make verify`. | 2026-08-30 / `ff6af97` |
+| `make verify` | Passed; Ruff, workspace lint, mypy, TypeScript checks, 92 pytest tests, 81 Vitest tests, artifact lifecycle, protocol drift, and build all succeeded. | 2026-08-30 / `ff6af97` |
+| `git diff --check && git diff --cached --check` | Passed with no whitespace errors. | 2026-08-30 / `ff6af97` |
 
-The generated corpus contains 71 unique cases: 30 accepted and 41 rejected. Every
+The generated corpus contains 80 unique cases: 34 accepted and 46 rejected. Every
 `StableCode` value occurs as an expected result. All 18 public Pydantic models have an
 accepted case; the remaining cases cover parser/version/capability/manifest failures,
 JSON and record-free PCM sequence boundaries, revision precedence/capacity/immutability,
@@ -48,7 +48,7 @@ all four final-object outcomes, cancellation CAS/tombstones, reconnect, RFC 8785
 representation variants, and metadata-only binary/PTS/budget boundaries.
 
 Generated output contains 21 Schema/compatibility files, one TypeScript contract, and
-72 fixture files including the manifest. Negative drift tests independently prove that
+81 fixture files including the manifest. Negative drift tests independently prove that
 a changed file, a missing file, and an unexpected extra file each fail comparison.
 
 ## Manual or hardware evidence
@@ -143,6 +143,20 @@ generation, shared golden cases, minimum versions, and the Issue #2 audio ceilin
   enforce `expires_at`. Resolved with one deadline gate before PCM, output, lease-update,
   and cancellation decisions; expiry atomically clears all three ordinary state domains,
   removes the active cancellation entry, and remains terminal as `lease_expired`.
+- Corrected-head Codex review P2 found that per-runtime cancellation registries violated
+  the 64-tombstone process ceiling. Resolved with one module process-scoped registry,
+  coordinator-created runtimes, cross-coordinator capacity tests, and authoritative
+  `lease_closed` after oldest-entry eviction.
+- Corrected-head Codex review P2 found that idle tombstones were pruned only by a later
+  cancellation. Resolved with a coordinator `prune(now)` scheduling entry point and an
+  exact 120-second idle-prune test that requires no new cancellation.
+- Corrected-head Codex review P2 found that JavaScript accepted timestamp year `0000`
+  while Python rejected it. Resolved in the TypeScript canonical timestamp format and a
+  shared year-zero golden case.
+- Corrected-head Codex review P2 found that acknowledgement positions were not tied to
+  their outcomes. Resolved in Python and TypeScript with exact sequence/cancellation
+  positions, required revision plus optional sequence for revision duplicates, and
+  eight accepted/rejected shared Ack combinations.
 
 ## Deviations
 
