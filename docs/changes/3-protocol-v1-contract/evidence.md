@@ -11,7 +11,7 @@
 
 - Implementation branch: `codex/issue-3-protocol-v1-implementation`, based on
   `77fb21b`
-- Implementation PR: pending at this evidence checkpoint
+- Implementation PR: #24
 - Authorized by/date: @Shuang-su / 2026-08-30 (continue implementation and merge after
   repository checks and review gates pass)
 
@@ -30,15 +30,15 @@
 
 | Command | Result | Date/commit |
 | --- | --- | --- |
-| `make bootstrap` | Passed; uv verified the frozen Python environment and pnpm 11.21.0 verified the frozen two-workspace install and supply-chain policy. | 2026-08-30 / staged implementation tree |
-| `make protocol-generate` | Passed; rewrote the complete generated tree transactionally from the Pydantic source and pinned generator. | 2026-08-30 / staged implementation tree |
-| `git diff --exit-code -- packages/protocol/schema packages/protocol/src/generated packages/protocol/fixtures` | Passed after regeneration; generated Schema, TypeScript, compatibility, and fixture bytes match the staged output. | 2026-08-30 / staged implementation tree |
-| `make protocol-check` | Passed: `protocol generated artifacts: ok`; the checker compared all expected paths and bytes from a temporary generation. | 2026-08-30 / staged implementation tree |
-| `uv run pytest -q tests/protocol` | Passed: 36 protocol tests. | 2026-08-30 / staged implementation tree |
-| `pnpm --filter @livecho/protocol typecheck` | Passed with TypeScript strict mode. | 2026-08-30 / staged implementation tree |
-| `pnpm --filter @livecho/protocol test` | Passed: one Vitest file and 72 tests, comprising 71 generated parity cases plus the corpus integrity assertion. | 2026-08-30 / staged implementation tree |
-| `make verify` | Passed; Ruff, workspace lint, mypy, TypeScript checks, 76 pytest tests, 72 Vitest tests, artifact lifecycle, protocol drift, and build all succeeded. | 2026-08-30 / implementation working tree |
-| `git diff --check && git diff --cached --check` | Passed with no whitespace errors. | 2026-08-30 / staged implementation tree |
+| `make bootstrap` | Passed; uv verified the frozen Python environment and pnpm 11.21.0 verified the frozen two-workspace install and supply-chain policy. | 2026-08-30 / `2457dbc` |
+| `make protocol-generate` | Passed; rewrote the complete generated tree transactionally from the Pydantic source and pinned generator. | 2026-08-30 / `2457dbc` |
+| `git diff --exit-code -- packages/protocol/schema packages/protocol/src/generated packages/protocol/fixtures` | Passed after regeneration; generated Schema, TypeScript, compatibility, and fixture bytes match the committed output. | 2026-08-30 / `2457dbc` |
+| `make protocol-check` | Passed: `protocol generated artifacts: ok`; the checker compared all expected paths and bytes from a temporary generation. | 2026-08-30 / `2457dbc` |
+| `uv run pytest -q tests/protocol` | Passed: 36 protocol tests. | 2026-08-30 / `2457dbc` |
+| `pnpm --filter @livecho/protocol typecheck` | Passed with TypeScript strict mode. | 2026-08-30 / `2457dbc` |
+| `pnpm --filter @livecho/protocol test` | Passed: one Vitest file and 72 tests, comprising 71 generated parity cases plus the corpus integrity assertion. | 2026-08-30 / `2457dbc` |
+| `make verify` | Passed; Ruff, workspace lint, mypy, TypeScript checks, 76 pytest tests, 72 Vitest tests, artifact lifecycle, protocol drift, and build all succeeded. | 2026-08-30 / `2457dbc` |
+| `git diff --check && git diff --cached --check` | Passed with no whitespace errors. | 2026-08-30 / `2457dbc` |
 
 The generated corpus contains 71 unique cases: 30 accepted and 41 rejected. Every
 `StableCode` value occurs as an expected result. All 18 public Pydantic models have an
