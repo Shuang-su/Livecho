@@ -45,6 +45,10 @@ generation, shared golden cases, minimum versions, and the Issue #2 audio ceilin
   120-second, in-memory terminal cancellation tombstone containing only bindings,
   message/reason/CAS metadata, and a canonical JSON digest while immediately clearing
   PCM and ordinary deduplication state.
+- Final-head Codex review P2 found that the ordinary JSON deduplication window lacked a
+  shared capacity and eviction rule. Resolved with an exact 256-record per-domain FIFO
+  window of fixed logical records and explicit 255/256 boundary, duplicate, conflict,
+  eviction, and cleanup test requirements.
 - Security/data review found no permitted field for a credential, playback/download URL,
   arbitrary path/command/code/container, raw platform payload, or extensible metadata.
   The documents expressly prohibit audio fixtures, encodings, digests, persistence, and

@@ -131,16 +131,30 @@ sequence. In each domain:
 
 1. The receiver accepts only the exact next expected `seq` and then increments it.
 2. A lower JSON `seq` is an idempotent no-op only when its message identity and canonical
-   content digest match the previously accepted value in the current bounded in-memory
-   deduplication window. It yields `seq_duplicate` without reapplying side effects. A
+   content digest match the previously accepted value in the exact in-memory
+   deduplication window defined below. It yields `seq_duplicate` without reapplying side
+   effects. A
    lower binary PCM `seq` in the current window is always discarded unread as the same
    no-op; audio bytes are neither compared nor hashed.
 3. Reusing a sequence with different identity or content is `seq_conflict`.
 4. A higher sequence is `seq_gap`; the receiver does not buffer, skip, or advance.
 5. JSON deduplication digests remain in memory only, are never logged or persisted, and
    must never be computed for or from PCM payload bytes. A sequence older than the
-   bounded current window yields `resync_required`; no historical or audio retry store
-   is created.
+   current window yields `resync_required`; no historical or audio retry store is
+   created.
+
+Each sequence domain retains exactly the most recent 256 accepted JSON records. A record
+logically contains only the uint64 sequence (8 bytes), UUID message ID (16 bytes), and
+SHA-256 digest of canonical JSON (32 bytes), for 56 bytes and 14,336 logical bytes per
+full domain; it contains no message body. Records are ordered by sequence, and accepting
+a 257th record evicts the lowest sequence before inserting the new one. Access does not
+refresh order. With accepted sequences 0-255, all remain comparable; accepting sequence
+256 evicts only sequence 0, so a replay of 0 returns `resync_required`, an exact replay
+of 1 returns `seq_duplicate`, and changed identity/content at 1 returns `seq_conflict`.
+Lease cancellation, expiry, session teardown, or non-resumed replacement clears the
+domain. Later gateway Issues bound concurrent connections/domains; they may impose a
+lower concurrent-domain limit but cannot change this minor-0 per-domain window or replay
+result for an admitted domain.
 
 Revision domains are per stable lease, transcript segment, stats window, or timeline
 event identity within one session/epoch. A new object starts at revision `"1"`. The
@@ -249,6 +263,10 @@ policy, and binary-header metadata. Binary metadata cases contain header field v
 only, never payload bytes. Case IDs and expected codes are unique and deterministically
 ordered.
 
+The sequence subset must cover an empty window, exact duplicate and conflict, all 256
+retained positions, deterministic insertion/eviction at sequence 256, replay immediately
+inside and outside the lower boundary, and cleanup on lease/session termination.
+
 The cancellation subset must contain an accepted exact-CAS initial close, its identical
 `cancel_duplicate` replay, a same-ID changed-reason `cancel_conflict`, lower and higher
 CAS rejections, and a new cancellation after closure returning `lease_closed`.
@@ -337,7 +355,8 @@ fixture retains its result. There is no silent downgrade.
   fixture or persistence.
 - [ ] Focused executable tests cover epoch authority, exact-next sequencing, idempotent
   duplicate versus conflict, out-of-order rejection without buffering, revision rules,
-  final-object behavior, reconnect resume/refusal, and unchanged state on rejection.
+  the exact 256-record deduplication boundary/eviction, final-object behavior, reconnect
+  resume/refusal, and unchanged state on rejection.
 - [ ] `make protocol-generate` is deterministic, `make protocol-check` detects changed,
   missing, and extra generated output, and `make verify` enforces drift.
 - [ ] Python and TypeScript run the identical accepted/rejected golden corpus and agree
