@@ -14,6 +14,7 @@ from .errors import SUCCESS_CODES, ProtocolValidationError, StableCode
 from .models import (
     MODEL_BY_NAME,
     LeaseCancelV1,
+    LeaseV1,
     StrictModel,
     ViewerSubscribeV1,
     WorkerHelloV1,
@@ -771,6 +772,16 @@ def rejected_cases() -> list[dict[str, Any]]:
                     model_manifests=[{**MANIFEST, "provider": "other-synthetic"}],
                 ),
             ),
+            _case(
+                "manifest.lease_not_allowed",
+                "LeaseV1",
+                "rejected",
+                StableCode.MANIFEST_NOT_ALLOWED,
+                wire=_changed(
+                    values["LeaseV1"],
+                    model_manifest={**MANIFEST, "sha256": "b" * 64},
+                ),
+            ),
             _semantic_case(
                 "lease.unknown",
                 "CancellationDecisionV1",
@@ -1235,6 +1246,15 @@ def _evaluate_public(case: GoldenCaseV1) -> StableCode:
         return negotiate_worker(parsed, allowed).decision.code
     if isinstance(parsed, ViewerSubscribeV1):
         return negotiate_viewer(parsed).decision.code
+    if isinstance(parsed, LeaseV1):
+        allowed_manifest = manifest_key(
+            LeaseV1.model_validate(_public_values()["LeaseV1"]).model_manifest
+        )
+        return (
+            StableCode.ACCEPTED
+            if manifest_key(parsed.model_manifest) == allowed_manifest
+            else StableCode.MANIFEST_NOT_ALLOWED
+        )
     return StableCode.ACCEPTED
 
 

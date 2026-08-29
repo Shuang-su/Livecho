@@ -481,6 +481,17 @@ function publicDecision(model: string, value: Record<string, unknown>): StableCo
       return "manifest_not_allowed";
     }
   }
+  if (model === "LeaseV1") {
+    const manifest = value.model_manifest as Record<string, unknown>;
+    if (
+      manifest.provider !== "synthetic" ||
+      manifest.model_id !== "fixture-asr" ||
+      manifest.revision !== "1" ||
+      manifest.sha256 !== "a".repeat(64)
+    ) {
+      return "manifest_not_allowed";
+    }
+  }
   if (model === "ViewerSubscribeV1") {
     if (!semverAtLeast(String(value.client_version), "0.1.0")) return "worker_version_too_old";
   }

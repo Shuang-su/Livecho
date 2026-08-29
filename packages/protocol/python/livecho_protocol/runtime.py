@@ -7,6 +7,7 @@ from datetime import datetime
 from typing import Any
 
 from .binary import LEASE_AUDIO_BUDGET, PROCESS_AUDIO_BUDGET, PcmLeaseState
+from .compatibility import manifest_key
 from .errors import Decision, ProtocolValidationError, StableCode
 from .models import LeaseCancelV1, LeaseV1
 from .scalars import parse_timestamp
@@ -54,7 +55,12 @@ _PROCESS_PCM_BUDGET = _ProcessPcmBudget()
 class LeaseRuntimeCoordinator:
     """Process-scoped owner for lease runtimes and bounded cancellation tombstones."""
 
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        *,
+        accepted_manifests: frozenset[tuple[str, str, str, str]],
+    ) -> None:
+        self._accepted_manifests = accepted_manifests
         self._cancellations = _PROCESS_CANCELLATIONS
         self._runtimes = _PROCESS_RUNTIMES
         self._session_epochs = _PROCESS_SESSION_EPOCHS
@@ -76,6 +82,8 @@ class LeaseRuntimeCoordinator:
         return self._process_pcm.session_bytes(session_id)
 
     def create(self, lease: LeaseV1) -> LeaseRuntimeState:
+        if manifest_key(lease.model_manifest) not in self._accepted_manifests:
+            raise ProtocolValidationError(StableCode.MANIFEST_NOT_ALLOWED)
         replacement_epoch = int(lease.epoch)
         current_epoch = self._session_epochs.get(lease.session_id)
         if current_epoch is not None and replacement_epoch < current_epoch:

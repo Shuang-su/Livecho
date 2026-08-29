@@ -76,6 +76,7 @@
     "rejected/lease__expired.json",
     "rejected/lease__invalid_replacement_revision.json",
     "rejected/lease__unknown.json",
+    "rejected/manifest__lease_not_allowed.json",
     "rejected/manifest__not_allowed.json",
     "rejected/manifest__reference_mismatch.json",
     "rejected/object__final.json",
