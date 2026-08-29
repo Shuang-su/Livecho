@@ -438,6 +438,7 @@ def rejected_cases() -> list[dict[str, Any]]:
     values = _public_values()
     hello = values["WorkerHelloV1"]
     ack = values["ProtocolAckV1"]
+    error = values["ProtocolErrorV1"]
     transcript = values["TranscriptSegmentV1"]
     non_nfc = deepcopy(transcript)
     non_nfc["text"] = "e\u0301"
@@ -552,6 +553,20 @@ def rejected_cases() -> list[dict[str, Any]]:
                 "rejected",
                 StableCode.UNKNOWN_MAJOR,
                 wire=_changed(hello, protocol="livecho.worker.v2"),
+            ),
+            _case(
+                "version.shared_ack_major",
+                "ProtocolAckV1",
+                "rejected",
+                StableCode.UNKNOWN_MAJOR,
+                wire=_changed(ack, protocol="livecho.worker.v2"),
+            ),
+            _case(
+                "version.shared_error_major",
+                "ProtocolErrorV1",
+                "rejected",
+                StableCode.UNKNOWN_MAJOR,
+                wire=_changed(error, protocol="livecho.viewer.v2"),
             ),
             _case(
                 "version.minor",

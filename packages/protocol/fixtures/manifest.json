@@ -81,6 +81,8 @@
     "rejected/sequence__resync.json",
     "rejected/version__major.json",
     "rejected/version__minor.json",
+    "rejected/version__shared_ack_major.json",
+    "rejected/version__shared_error_major.json",
     "rejected/version__worker_old.json"
   ],
   "version": 1

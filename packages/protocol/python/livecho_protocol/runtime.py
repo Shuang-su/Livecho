@@ -20,18 +20,23 @@ class LeaseRuntimeCoordinator:
 
     def __init__(self) -> None:
         self._cancellations = _PROCESS_CANCELLATIONS
+        self._runtimes = _PROCESS_RUNTIMES
 
     @property
     def tombstone_count(self) -> int:
         return len(self._cancellations.tombstones)
 
     def create(self, lease: LeaseV1) -> LeaseRuntimeState:
-        return LeaseRuntimeState(lease=lease, cancellations=self._cancellations)
+        runtime = LeaseRuntimeState(lease=lease, cancellations=self._cancellations)
+        self._runtimes.setdefault(runtime.session_id, set()).add(runtime)
+        return runtime
 
     def prune(self, now: datetime) -> None:
         self._cancellations.prune(now)
 
     def session_teardown(self, session_id: str) -> None:
+        for runtime in self._runtimes.pop(session_id, set()):
+            runtime._session_teardown()
         self._cancellations.session_teardown(session_id)
 
 
@@ -49,6 +54,7 @@ class LeaseRuntimeState:
         self.epoch = int(lease.epoch)
         self.expires_at = parse_timestamp(lease.expires_at)
         self._terminal_code: StableCode | None = None
+        self._allow_cancel_replay = False
         self._cancellations = cancellations
         self._cancellations.add_active(
             ActiveLease(self.lease_id, self.session_id, self.epoch, int(lease.revision))
@@ -98,14 +104,23 @@ class LeaseRuntimeState:
     def cancellation_active(self) -> bool:
         return self.lease_id in self._cancellations.active
 
+    def _clear_state(self) -> None:
+        self._pcm.clear()
+        self._output.clear()
+        self._lease.clear()
+
+    def _session_teardown(self) -> None:
+        self._clear_state()
+        self._allow_cancel_replay = False
+        if self._terminal_code is None:
+            self._terminal_code = StableCode.LEASE_CLOSED
+
     def _expire_if_due(self, now: datetime) -> Decision | None:
         if self._terminal_code is not None:
             return Decision(self._terminal_code)
         if now < self.expires_at:
             return None
-        self._pcm.clear()
-        self._output.clear()
-        self._lease.clear()
+        self._clear_state()
         self._cancellations.expire_active(self.lease_id)
         self._terminal_code = StableCode.LEASE_EXPIRED
         return Decision(StableCode.LEASE_EXPIRED)
@@ -144,12 +159,16 @@ class LeaseRuntimeState:
 
     def cancel(self, message: LeaseCancelV1, raw: Mapping[str, Any], now: datetime) -> Decision:
         terminal = self._expire_if_due(now)
-        if terminal is not None and terminal.code == StableCode.LEASE_EXPIRED:
+        if terminal is not None and (
+            terminal.code == StableCode.LEASE_EXPIRED or not self._allow_cancel_replay
+        ):
             return terminal
         decision = self._cancellations.cancel(message, raw, now)
         if decision.code == StableCode.ACCEPTED:
-            self._pcm.clear()
-            self._output.clear()
-            self._lease.clear()
+            self._clear_state()
             self._terminal_code = StableCode.LEASE_CLOSED
+            self._allow_cancel_replay = True
         return decision
+
+
+_PROCESS_RUNTIMES: dict[str, set[LeaseRuntimeState]] = {}

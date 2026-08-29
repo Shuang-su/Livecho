@@ -73,11 +73,11 @@ def canonical_digest(value: Any) -> bytes:
     return hashlib.sha256(canonical_json(value)).digest()
 
 
-def _precheck_version(value: dict[str, Any], expected_protocol: str | None) -> None:
-    if expected_protocol is None and "protocol" not in value:
+def _precheck_version(value: dict[str, Any], allowed_protocols: frozenset[str] | None) -> None:
+    if allowed_protocols is None and "protocol" not in value:
         return
     protocol = value.get("protocol")
-    if expected_protocol is not None and protocol != expected_protocol:
+    if allowed_protocols is not None and protocol not in allowed_protocols:
         raise ProtocolValidationError(StableCode.UNKNOWN_MAJOR)
     if value.get("protocol_minor") != 0:
         raise ProtocolValidationError(StableCode.UNSUPPORTED_MINOR)
@@ -93,15 +93,15 @@ def _validation_code(error: ValidationError) -> StableCode:
 
 
 def validate_object[ModelT: StrictModel](value: dict[str, Any], model: type[ModelT]) -> ModelT:
-    expected: str | None = None
+    allowed: set[str] = set()
     protocol_annotation = model.model_fields.get("protocol")
     if protocol_annotation is not None:
         annotation_text = str(protocol_annotation.annotation)
-        if WORKER_PROTOCOL in annotation_text and VIEWER_PROTOCOL not in annotation_text:
-            expected = WORKER_PROTOCOL
-        elif VIEWER_PROTOCOL in annotation_text and WORKER_PROTOCOL not in annotation_text:
-            expected = VIEWER_PROTOCOL
-    _precheck_version(value, expected)
+        if WORKER_PROTOCOL in annotation_text:
+            allowed.add(WORKER_PROTOCOL)
+        if VIEWER_PROTOCOL in annotation_text:
+            allowed.add(VIEWER_PROTOCOL)
+    _precheck_version(value, frozenset(allowed) if protocol_annotation is not None else None)
     try:
         return model.model_validate(value)
     except ValidationError as error:

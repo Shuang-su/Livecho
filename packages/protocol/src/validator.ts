@@ -95,6 +95,7 @@ const VIEWER_MODELS = new Set([
   "ViewerReadyV1",
   "ViewerSubscribeV1",
 ]);
+const SHARED_ENVELOPE_MODELS = new Set(["ProtocolAckV1", "ProtocolErrorV1"]);
 const publicModelSet = new Set<string>(PUBLIC_MODELS);
 const ajv = new Ajv2020({
   allErrors: true,
@@ -269,12 +270,16 @@ function classifySchemaErrors(errors: ErrorObject[] | null | undefined): StableC
 }
 
 function precheckVersion(model: string, value: Record<string, unknown>): StableCode | undefined {
-  const expected = WORKER_MODELS.has(model)
-    ? WORKER_PROTOCOL
+  const allowed = WORKER_MODELS.has(model)
+    ? [WORKER_PROTOCOL]
     : VIEWER_MODELS.has(model)
-      ? VIEWER_PROTOCOL
-      : undefined;
-  if (expected !== undefined && value.protocol !== expected) return "unknown_major";
+      ? [VIEWER_PROTOCOL]
+      : SHARED_ENVELOPE_MODELS.has(model)
+        ? [WORKER_PROTOCOL, VIEWER_PROTOCOL]
+        : undefined;
+  if (allowed !== undefined && !allowed.includes(value.protocol as typeof WORKER_PROTOCOL)) {
+    return "unknown_major";
+  }
   if ("protocol" in value && value.protocol_minor !== PROTOCOL_MINOR) return "unsupported_minor";
   return undefined;
 }

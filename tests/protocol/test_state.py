@@ -3,6 +3,7 @@ from __future__ import annotations
 from copy import deepcopy
 from datetime import UTC, datetime, timedelta
 
+import pytest
 from livecho_protocol.binary import PcmHeaderV1, encode_header
 from livecho_protocol.errors import StableCode
 from livecho_protocol.models import LeaseCancelV1, LeaseV1, ViewerCursorV1, WorkerResumeV1
@@ -349,6 +350,36 @@ def test_runtime_expires_before_pcm_output_lease_update_or_cancellation(
     cancellation = LeaseCancelV1.model_validate(cancel_raw)
     assert runtime.cancel(cancellation, cancel_raw, deadline).code == StableCode.LEASE_EXPIRED
     assert not runtime.cancellation_active
+
+
+def test_session_teardown_closes_all_runtime_state_domains(
+    valid_messages: dict[str, dict[str, object]],
+) -> None:
+    lease_raw = deepcopy(valid_messages["LeaseV1"])
+    lease = LeaseV1.model_validate(lease_raw)
+    coordinator = LeaseRuntimeCoordinator()
+    coordinator.session_teardown(SESSION_ID)
+    runtime = coordinator.create(lease)
+    now = datetime(2026, 1, 1, tzinfo=UTC)
+    output = deepcopy(valid_messages["TranscriptSegmentV1"])
+    frame = bytearray(encode_header(PcmHeaderV1(LEASE_ID, 1, 0, 0, 1, 2))) + bytearray(2)
+
+    assert runtime.accept_pcm(frame, now=now).code == StableCode.ACCEPTED
+    assert runtime.accept_output(output, now=now).code == StableCode.ACCEPTED
+    LeaseRuntimeCoordinator().session_teardown(SESSION_ID)
+
+    assert runtime.buffered_audio_bytes == 0
+    assert runtime.output_revision_count == 0
+    with pytest.raises(RuntimeError, match="lease revision state is cleared"):
+        _ = runtime.lease_revision
+    assert not runtime.cancellation_active
+    assert runtime.accept_pcm(frame, now=now).code == StableCode.LEASE_CLOSED
+    assert runtime.accept_output(output, now=now).code == StableCode.LEASE_CLOSED
+    assert runtime.accept_lease_update(lease, now=now).code == StableCode.LEASE_CLOSED
+
+    cancel_raw = _cancel()
+    cancellation = LeaseCancelV1.model_validate(cancel_raw)
+    assert runtime.cancel(cancellation, cancel_raw, now).code == StableCode.LEASE_CLOSED
 
 
 def test_runtime_coordinator_enforces_process_wide_tombstone_capacity(
