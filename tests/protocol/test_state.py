@@ -342,7 +342,7 @@ def test_runtime_expires_before_pcm_output_lease_update_or_cancellation(
     cancel_raw = _cancel()
     cancellation = LeaseCancelV1.model_validate(cancel_raw)
     assert runtime.cancel(cancellation, cancel_raw, deadline).code == StableCode.LEASE_EXPIRED
-    assert LEASE_ID not in runtime.cancellations.active
+    assert not runtime.cancellation_active
 
 
 def test_resume_requires_exact_live_cursor() -> None:

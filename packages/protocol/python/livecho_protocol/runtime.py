@@ -26,8 +26,8 @@ class LeaseRuntimeState:
         self.epoch = int(lease.epoch)
         self.expires_at = parse_timestamp(lease.expires_at)
         self._terminal_code: StableCode | None = None
-        self.cancellations = CancellationRegistry()
-        self.cancellations.add_active(
+        self._cancellations = CancellationRegistry()
+        self._cancellations.add_active(
             ActiveLease(self.lease_id, self.session_id, self.epoch, int(lease.revision))
         )
         self._pcm = PcmLeaseState(
@@ -71,6 +71,10 @@ class LeaseRuntimeState:
             raise RuntimeError("lease revision state is cleared")
         return record.current_revision
 
+    @property
+    def cancellation_active(self) -> bool:
+        return self.lease_id in self._cancellations.active
+
     def _expire_if_due(self, now: datetime) -> Decision | None:
         if self._terminal_code is not None:
             return Decision(self._terminal_code)
@@ -79,7 +83,7 @@ class LeaseRuntimeState:
         self._pcm.clear()
         self._output.clear()
         self._lease.clear()
-        self.cancellations.expire_active(self.lease_id)
+        self._cancellations.expire_active(self.lease_id)
         self._terminal_code = StableCode.LEASE_EXPIRED
         return Decision(StableCode.LEASE_EXPIRED)
 
@@ -112,14 +116,14 @@ class LeaseRuntimeState:
             return terminal
         decision = self._lease.accept(message.model_dump(mode="json"))
         if decision.code == StableCode.ACCEPTED:
-            self.cancellations.update_active_revision(self.lease_id, int(message.revision))
+            self._cancellations.update_active_revision(self.lease_id, int(message.revision))
         return decision
 
     def cancel(self, message: LeaseCancelV1, raw: Mapping[str, Any], now: datetime) -> Decision:
         terminal = self._expire_if_due(now)
         if terminal is not None and terminal.code == StableCode.LEASE_EXPIRED:
             return terminal
-        decision = self.cancellations.cancel(message, raw, now)
+        decision = self._cancellations.cancel(message, raw, now)
         if decision.code == StableCode.ACCEPTED:
             self._pcm.clear()
             self._output.clear()
