@@ -3,7 +3,8 @@
 ## Artifact approval
 
 - Artifact PR: #23
-- Approved by/date: Pending
+- Approved by/date: @Shuang-su / 2026-08-30 (delegated merge after repository checks and
+  review gates pass)
 
 ## Automated verification
 
@@ -36,8 +37,8 @@ generation, shared golden cases, minimum versions, and the Issue #2 audio ceilin
   arbitrary path/command/code/container, raw platform payload, or extensible metadata.
   The documents expressly prohibit audio fixtures, encodings, digests, persistence, and
   logging; only bounded in-memory synthetic codec bytes are planned.
-- Repository-owner approval and external PR review remain pending. Implementation and
-  generated files wait for the artifact PR to merge.
+- Repository-owner merge authorization is recorded above. External PR review remains
+  pending. Implementation and generated files wait for the artifact PR to merge.
 
 ## Deviations
 

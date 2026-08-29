@@ -81,5 +81,7 @@ negotiation, and the binary boundary without writing audio anywhere.
 
 ## Human decision
 
-- Status: Proposed
-- Approved by/date: Pending
+- Status: Approved for artifact review and merge; implementation remains gated on this
+  artifact landing in `main` and uses a separate branch and PR.
+- Approved by/date: @Shuang-su / 2026-08-30 (authorized this agent to continue and merge
+  after repository checks and review gates pass).
