@@ -7,7 +7,7 @@ from livecho_protocol.binary import PcmHeaderV1, encode_header
 from livecho_protocol.errors import StableCode
 from livecho_protocol.models import LeaseCancelV1, LeaseV1, ViewerCursorV1, WorkerResumeV1
 from livecho_protocol.parser import canonical_digest
-from livecho_protocol.runtime import LeaseRuntimeState
+from livecho_protocol.runtime import LeaseRuntimeCoordinator
 from livecho_protocol.state import (
     ActiveLease,
     CancellationRegistry,
@@ -265,7 +265,9 @@ def test_cancellation_closes_pcm_and_output_atomically(
     valid_messages: dict[str, dict[str, object]],
 ) -> None:
     lease = LeaseV1.model_validate(valid_messages["LeaseV1"])
-    runtime = LeaseRuntimeState(lease=lease)
+    coordinator = LeaseRuntimeCoordinator()
+    coordinator.session_teardown(SESSION_ID)
+    runtime = coordinator.create(lease)
     now = datetime(2026, 1, 1, tzinfo=UTC)
     output = deepcopy(valid_messages["TranscriptSegmentV1"])
     assert runtime.accept_output(output, now=now).code == StableCode.ACCEPTED
@@ -290,7 +292,9 @@ def test_non_sequenced_lease_revision_updates_cancellation_cas(
 ) -> None:
     initial_raw = deepcopy(valid_messages["LeaseV1"])
     initial = LeaseV1.model_validate(initial_raw)
-    runtime = LeaseRuntimeState(lease=initial)
+    coordinator = LeaseRuntimeCoordinator()
+    coordinator.session_teardown(SESSION_ID)
+    runtime = coordinator.create(initial)
     now = datetime(2026, 1, 1, tzinfo=UTC)
 
     replay_raw = {**initial_raw, "message_id": MESSAGE_ID_2}
@@ -326,7 +330,9 @@ def test_runtime_expires_before_pcm_output_lease_update_or_cancellation(
 ) -> None:
     lease_raw = deepcopy(valid_messages["LeaseV1"])
     lease = LeaseV1.model_validate(lease_raw)
-    runtime = LeaseRuntimeState(lease=lease)
+    coordinator = LeaseRuntimeCoordinator()
+    coordinator.session_teardown(SESSION_ID)
+    runtime = coordinator.create(lease)
     before = datetime(2026, 1, 1, 0, 1, 59, 999000, tzinfo=UTC)
     deadline = datetime(2026, 1, 1, 0, 2, tzinfo=UTC)
     output = deepcopy(valid_messages["TranscriptSegmentV1"])
@@ -343,6 +349,59 @@ def test_runtime_expires_before_pcm_output_lease_update_or_cancellation(
     cancellation = LeaseCancelV1.model_validate(cancel_raw)
     assert runtime.cancel(cancellation, cancel_raw, deadline).code == StableCode.LEASE_EXPIRED
     assert not runtime.cancellation_active
+
+
+def test_runtime_coordinator_enforces_process_wide_tombstone_capacity(
+    valid_messages: dict[str, dict[str, object]],
+) -> None:
+    coordinator = LeaseRuntimeCoordinator()
+    coordinator.session_teardown(SESSION_ID)
+    now = datetime(2026, 1, 1, tzinfo=UTC)
+    first_runtime = None
+    first_cancel = None
+    first_raw = None
+    for index in range(65):
+        lease_id = f"{index + 100:08x}-0000-4000-8000-{index + 100:012x}"
+        lease_raw = {
+            **deepcopy(valid_messages["LeaseV1"]),
+            "message_id": f"{index + 200:08x}-0000-4000-8000-{index + 200:012x}",
+            "lease_id": lease_id,
+        }
+        runtime = coordinator.create(LeaseV1.model_validate(lease_raw))
+        cancel_raw = {
+            **_cancel(f"{index + 300:08x}-0000-4000-8000-{index + 300:012x}"),
+            "lease_id": lease_id,
+        }
+        cancellation = LeaseCancelV1.model_validate(cancel_raw)
+        assert runtime.cancel(
+            cancellation, cancel_raw, now + timedelta(milliseconds=index)
+        ).accepted
+        if index == 0:
+            first_runtime = runtime
+            first_cancel = cancellation
+            first_raw = cancel_raw
+
+    assert coordinator.tombstone_count == 64
+    assert LeaseRuntimeCoordinator().tombstone_count == 64
+    assert first_runtime is not None and first_cancel is not None and first_raw is not None
+    assert first_runtime.cancel(first_cancel, first_raw, now).code == StableCode.LEASE_CLOSED
+
+
+def test_runtime_coordinator_prunes_idle_tombstones(
+    valid_messages: dict[str, dict[str, object]],
+) -> None:
+    coordinator = LeaseRuntimeCoordinator()
+    coordinator.session_teardown(SESSION_ID)
+    runtime = coordinator.create(LeaseV1.model_validate(valid_messages["LeaseV1"]))
+    now = datetime(2026, 1, 1, tzinfo=UTC)
+    cancel_raw = _cancel()
+    cancellation = LeaseCancelV1.model_validate(cancel_raw)
+    assert runtime.cancel(cancellation, cancel_raw, now).code == StableCode.ACCEPTED
+    assert coordinator.tombstone_count == 1
+
+    LeaseRuntimeCoordinator().prune(now + timedelta(seconds=120))
+    assert coordinator.tombstone_count == 0
+    assert runtime.cancel(cancellation, cancel_raw, now).code == StableCode.LEASE_CLOSED
 
 
 def test_resume_requires_exact_live_cursor() -> None:

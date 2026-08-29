@@ -157,7 +157,7 @@ def test_manifest_shape_has_no_locator_or_execution_surface() -> None:
         WorkerHelloV1.model_validate(hello)
 
 
-def test_handshake_collections_are_unique_and_ack_has_a_position(
+def test_handshake_collections_are_unique(
     valid_messages: dict[str, dict[str, object]],
 ) -> None:
     hello = deepcopy(valid_messages["WorkerHelloV1"])
@@ -177,13 +177,41 @@ def test_handshake_collections_are_unique_and_ack_has_a_position(
     with pytest.raises(ValidationError):
         WorkerWelcomeV1.model_validate(welcome)
 
+
+@pytest.mark.parametrize(
+    ("outcome", "seq", "revision", "expected_revision", "valid"),
+    [
+        ("accepted", "0", None, None, True),
+        ("accepted", None, "1", None, True),
+        ("accepted", None, None, "1", True),
+        ("accepted", None, None, None, False),
+        ("seq_duplicate", "0", None, None, True),
+        ("seq_duplicate", None, "1", None, False),
+        ("seq_duplicate", "0", None, "1", False),
+        ("revision_duplicate", None, "1", None, True),
+        ("revision_duplicate", "0", "1", None, True),
+        ("revision_duplicate", "0", None, None, False),
+        ("cancel_duplicate", None, None, "1", True),
+        ("cancel_duplicate", "0", None, None, False),
+    ],
+)
+def test_ack_position_is_outcome_specific(
+    outcome: str,
+    seq: str | None,
+    revision: str | None,
+    expected_revision: str | None,
+    valid: bool,
+) -> None:
     ack = {
         **worker_envelope("protocol.ack"),
-        "outcome": "accepted",
+        "outcome": outcome,
         "acknowledged_message_id": MESSAGE_ID,
-        "seq": None,
-        "revision": None,
-        "expected_revision": None,
+        "seq": seq,
+        "revision": revision,
+        "expected_revision": expected_revision,
     }
-    with pytest.raises(ValidationError):
+    if valid:
         ProtocolAckV1.model_validate(ack)
+    else:
+        with pytest.raises(ValidationError):
+            ProtocolAckV1.model_validate(ack)

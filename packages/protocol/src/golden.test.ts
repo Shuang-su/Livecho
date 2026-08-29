@@ -22,7 +22,7 @@ describe("protocol v1 golden parity", () => {
   const cases = loadCases();
 
   it("loads one deterministic result for every generated case", () => {
-    expect(cases).toHaveLength(71);
+    expect(cases).toHaveLength(80);
     expect(new Set(cases.map((testCase) => testCase.case_id)).size).toBe(cases.length);
   });
 

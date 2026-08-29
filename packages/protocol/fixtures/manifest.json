@@ -1,5 +1,9 @@
 {
   "accepted": [
+    "accepted/ack__cancel_duplicate.json",
+    "accepted/ack__revision_duplicate_lease.json",
+    "accepted/ack__revision_duplicate_sequenced.json",
+    "accepted/ack__seq_duplicate.json",
     "accepted/cancel__duplicate.json",
     "accepted/cancel__initial.json",
     "accepted/canonical__changed_value.json",
@@ -32,6 +36,10 @@
     "accepted/sequence__duplicate.json"
   ],
   "rejected": [
+    "rejected/ack__cancel_position_required.json",
+    "rejected/ack__revision_position_required.json",
+    "rejected/ack__seq_position_required.json",
+    "rejected/ack__seq_rejects_cas.json",
     "rejected/audio__budget.json",
     "rejected/audio__pts.json",
     "rejected/binary__frame_large.json",
@@ -65,6 +73,7 @@
     "rejected/revision__stale.json",
     "rejected/schema__invalid.json",
     "rejected/schema__timestamp_invalid.json",
+    "rejected/schema__timestamp_year_zero.json",
     "rejected/schema__uint64_overflow.json",
     "rejected/schema__unknown_field.json",
     "rejected/sequence__conflict.json",

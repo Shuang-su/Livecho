@@ -120,6 +120,7 @@ function validateCanonicalTimestamp(value: string): boolean {
   if (!/^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\.[0-9]{3}Z$/u.test(value)) {
     return false;
   }
+  if (value.startsWith("0000-")) return false;
   const parsed = new Date(value);
   return !Number.isNaN(parsed.valueOf()) && parsed.toISOString() === value;
 }
@@ -327,13 +328,23 @@ function semanticModelCode(model: string, value: Record<string, unknown>): Stabl
     }
   }
   if (model === "ProtocolErrorV1" && !isNfcScalarText(value.message)) return "schema_invalid";
-  if (
-    model === "ProtocolAckV1" &&
-    value.seq == null &&
-    value.revision == null &&
-    value.expected_revision == null
-  ) {
-    return "schema_invalid";
+  if (model === "ProtocolAckV1") {
+    const outcome = value.outcome;
+    const hasSeq = value.seq != null;
+    const hasRevision = value.revision != null;
+    const hasExpectedRevision = value.expected_revision != null;
+    if (outcome === "accepted" && !hasSeq && !hasRevision && !hasExpectedRevision) {
+      return "schema_invalid";
+    }
+    if (outcome === "seq_duplicate" && (!hasSeq || hasRevision || hasExpectedRevision)) {
+      return "schema_invalid";
+    }
+    if (outcome === "revision_duplicate" && (!hasRevision || hasExpectedRevision)) {
+      return "schema_invalid";
+    }
+    if (outcome === "cancel_duplicate" && (!hasExpectedRevision || hasSeq || hasRevision)) {
+      return "schema_invalid";
+    }
   }
   return "accepted";
 }

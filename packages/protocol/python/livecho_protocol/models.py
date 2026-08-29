@@ -355,8 +355,17 @@ class ProtocolAckV1(EitherEnvelopeV1):
 
     @model_validator(mode="after")
     def applicable_position(self) -> ProtocolAckV1:
-        if self.seq is None and self.revision is None and self.expected_revision is None:
-            raise ValueError("ack requires a sequence, revision, or CAS value")
+        if self.outcome == "accepted":
+            if self.seq is None and self.revision is None and self.expected_revision is None:
+                raise ValueError("accepted ack requires a sequence, revision, or CAS value")
+        elif self.outcome == "seq_duplicate":
+            if self.seq is None or self.revision is not None or self.expected_revision is not None:
+                raise ValueError("sequence duplicate ack requires only seq")
+        elif self.outcome == "revision_duplicate":
+            if self.revision is None or self.expected_revision is not None:
+                raise ValueError("revision duplicate ack requires revision and optional seq")
+        elif self.expected_revision is None or self.seq is not None or self.revision is not None:
+            raise ValueError("cancellation duplicate ack requires only expected_revision")
         return self
 
 

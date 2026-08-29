@@ -4,12 +4,12 @@ from .compatibility import COMPATIBILITY_MATRIX, negotiate_viewer, negotiate_wor
 from .errors import Decision, ProtocolValidationError, StableCode
 from .models import *  # noqa: F403
 from .parser import canonical_digest, canonical_json, parse_control, strict_json_loads
-from .runtime import LeaseRuntimeState
+from .runtime import LeaseRuntimeCoordinator
 
 __all__ = [
     "COMPATIBILITY_MATRIX",
     "Decision",
-    "LeaseRuntimeState",
+    "LeaseRuntimeCoordinator",
     "ProtocolValidationError",
     "StableCode",
     "canonical_digest",

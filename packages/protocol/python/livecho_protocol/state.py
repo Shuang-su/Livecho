@@ -419,7 +419,8 @@ class CancellationRegistry:
     def expire_active(self, lease_id: str) -> None:
         self.active.pop(lease_id, None)
 
-    def _expire(self, now: datetime) -> None:
+    def prune(self, now: datetime) -> None:
+        """Erase tombstones at the deadline even when no new cancellation arrives."""
         expired = [
             lease_id
             for lease_id, tombstone in self.tombstones.items()
@@ -429,7 +430,7 @@ class CancellationRegistry:
             del self.tombstones[lease_id]
 
     def cancel(self, message: LeaseCancelV1, raw: Mapping[str, Any], now: datetime) -> Decision:
-        self._expire(now)
+        self.prune(now)
         digest = canonical_digest(raw)
         for tombstone in self.tombstones.values():
             if tombstone.message_id == message.message_id:

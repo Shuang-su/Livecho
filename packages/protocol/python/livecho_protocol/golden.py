@@ -279,6 +279,51 @@ def accepted_cases() -> list[dict[str, Any]]:
     cases.extend(
         [
             _case(
+                "ack.seq_duplicate",
+                "ProtocolAckV1",
+                "accepted",
+                StableCode.ACCEPTED,
+                wire=_changed(
+                    values["ProtocolAckV1"],
+                    outcome="seq_duplicate",
+                ),
+            ),
+            _case(
+                "ack.revision_duplicate_sequenced",
+                "ProtocolAckV1",
+                "accepted",
+                StableCode.ACCEPTED,
+                wire=_changed(
+                    values["ProtocolAckV1"],
+                    outcome="revision_duplicate",
+                    revision="1",
+                ),
+            ),
+            _case(
+                "ack.revision_duplicate_lease",
+                "ProtocolAckV1",
+                "accepted",
+                StableCode.ACCEPTED,
+                wire=_changed(
+                    values["ProtocolAckV1"],
+                    outcome="revision_duplicate",
+                    seq=None,
+                    revision="1",
+                ),
+            ),
+            _case(
+                "ack.cancel_duplicate",
+                "ProtocolAckV1",
+                "accepted",
+                StableCode.ACCEPTED,
+                wire=_changed(
+                    values["ProtocolAckV1"],
+                    outcome="cancel_duplicate",
+                    seq=None,
+                    expected_revision="1",
+                ),
+            ),
+            _case(
                 "sequence.duplicate",
                 "JsonSequenceDecisionV1",
                 "accepted",
@@ -392,6 +437,7 @@ def _changed(value: dict[str, Any], **updates: Any) -> dict[str, Any]:
 def rejected_cases() -> list[dict[str, Any]]:
     values = _public_values()
     hello = values["WorkerHelloV1"]
+    ack = values["ProtocolAckV1"]
     transcript = values["TranscriptSegmentV1"]
     non_nfc = deepcopy(transcript)
     non_nfc["text"] = "e\u0301"
@@ -441,6 +487,57 @@ def rejected_cases() -> list[dict[str, Any]]:
                 "rejected",
                 StableCode.SCHEMA_INVALID,
                 wire=_changed(transcript, sent_at="2026-02-31T00:00:00.000Z"),
+            ),
+            _case(
+                "schema.timestamp_year_zero",
+                "TranscriptSegmentV1",
+                "rejected",
+                StableCode.SCHEMA_INVALID,
+                wire=_changed(transcript, sent_at="0000-01-01T00:00:00.000Z"),
+            ),
+            _case(
+                "ack.seq_position_required",
+                "ProtocolAckV1",
+                "rejected",
+                StableCode.SCHEMA_INVALID,
+                wire=_changed(
+                    ack,
+                    outcome="seq_duplicate",
+                    seq=None,
+                    revision="1",
+                ),
+            ),
+            _case(
+                "ack.seq_rejects_cas",
+                "ProtocolAckV1",
+                "rejected",
+                StableCode.SCHEMA_INVALID,
+                wire=_changed(
+                    ack,
+                    outcome="seq_duplicate",
+                    expected_revision="1",
+                ),
+            ),
+            _case(
+                "ack.revision_position_required",
+                "ProtocolAckV1",
+                "rejected",
+                StableCode.SCHEMA_INVALID,
+                wire=_changed(
+                    ack,
+                    outcome="revision_duplicate",
+                    revision=None,
+                ),
+            ),
+            _case(
+                "ack.cancel_position_required",
+                "ProtocolAckV1",
+                "rejected",
+                StableCode.SCHEMA_INVALID,
+                wire=_changed(
+                    ack,
+                    outcome="cancel_duplicate",
+                ),
             ),
             _case(
                 "schema.uint64_overflow",

@@ -12,6 +12,28 @@ from .models import LeaseCancelV1, LeaseV1
 from .scalars import parse_timestamp
 from .state import ActiveLease, CancellationRegistry, LeaseRevisionState, StreamOrderingState
 
+_PROCESS_CANCELLATIONS = CancellationRegistry()
+
+
+class LeaseRuntimeCoordinator:
+    """Process-scoped owner for lease runtimes and bounded cancellation tombstones."""
+
+    def __init__(self) -> None:
+        self._cancellations = _PROCESS_CANCELLATIONS
+
+    @property
+    def tombstone_count(self) -> int:
+        return len(self._cancellations.tombstones)
+
+    def create(self, lease: LeaseV1) -> LeaseRuntimeState:
+        return LeaseRuntimeState(lease=lease, cancellations=self._cancellations)
+
+    def prune(self, now: datetime) -> None:
+        self._cancellations.prune(now)
+
+    def session_teardown(self, session_id: str) -> None:
+        self._cancellations.session_teardown(session_id)
+
 
 class LeaseRuntimeState:
     """Pure in-memory protocol state for one synthetic lease, without scheduling."""
@@ -20,13 +42,14 @@ class LeaseRuntimeState:
         self,
         *,
         lease: LeaseV1,
+        cancellations: CancellationRegistry,
     ) -> None:
         self.lease_id = lease.lease_id
         self.session_id = lease.session_id
         self.epoch = int(lease.epoch)
         self.expires_at = parse_timestamp(lease.expires_at)
         self._terminal_code: StableCode | None = None
-        self._cancellations = CancellationRegistry()
+        self._cancellations = cancellations
         self._cancellations.add_active(
             ActiveLease(self.lease_id, self.session_id, self.epoch, int(lease.revision))
         )
