@@ -628,6 +628,7 @@ export function evaluateGoldenCase(testCase: GoldenCaseV1): StableCode {
     const replacementEpoch = uint64(value.replacement_epoch);
     if (replacementEpoch < currentEpoch) return "epoch_stale";
     if (replacementEpoch === currentEpoch) return "resync_required";
+    if (uint64(value.replacement_revision ?? 1) !== 1n) return "revision_gap";
     const isReplacement =
       !Boolean(value.resumed) && replacementEpoch > currentEpoch;
     const cleared =

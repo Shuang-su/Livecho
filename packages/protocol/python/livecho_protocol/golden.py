@@ -840,6 +840,20 @@ def rejected_cases() -> list[dict[str, Any]]:
                 },
             ),
             _semantic_case(
+                "lease.invalid_replacement_revision",
+                "LeaseReplacementDecisionV1",
+                StableCode.REVISION_GAP,
+                {
+                    "current_epoch": "1",
+                    "replacement_epoch": "2",
+                    "replacement_revision": "2",
+                    "resumed": False,
+                    "superseded_active_after": True,
+                    "retained_pcm_bytes": 2,
+                    "retained_output_revisions": 1,
+                },
+            ),
+            _semantic_case(
                 "sequence.exhausted",
                 "JsonSequenceDecisionV1",
                 StableCode.RESYNC_REQUIRED,
@@ -1403,6 +1417,8 @@ def evaluate_case(value: dict[str, Any]) -> StableCode:
                 return StableCode.EPOCH_STALE
             if replacement_epoch == current_epoch:
                 return StableCode.RESYNC_REQUIRED
+            if int(case.wire.get("replacement_revision", 1)) != 1:
+                return StableCode.REVISION_GAP
             is_replacement = not bool(case.wire["resumed"]) and replacement_epoch > current_epoch
             cleared = (
                 not bool(case.wire["superseded_active_after"])

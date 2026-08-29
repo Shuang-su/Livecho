@@ -65,6 +65,10 @@ class LeaseRuntimeCoordinator:
         return len(self._cancellations.tombstones)
 
     @property
+    def active_lease_count(self) -> int:
+        return len(self._cancellations.active)
+
+    @property
     def buffered_audio_bytes(self) -> int:
         return self._process_pcm.buffered_bytes
 
@@ -78,16 +82,17 @@ class LeaseRuntimeCoordinator:
             raise ProtocolValidationError(StableCode.EPOCH_STALE)
         if current_epoch == replacement_epoch:
             raise ProtocolValidationError(StableCode.RESYNC_REQUIRED)
-        session_runtimes = self._runtimes.setdefault(lease.session_id, set())
-        for previous in tuple(session_runtimes):
-            if previous.epoch < replacement_epoch:
-                previous._session_teardown()
-                session_runtimes.remove(previous)
         runtime = LeaseRuntimeState(
             lease=lease,
             cancellations=self._cancellations,
             process_pcm=self._process_pcm,
         )
+        session_runtimes = self._runtimes.setdefault(lease.session_id, set())
+        for previous in tuple(session_runtimes):
+            if previous.epoch < replacement_epoch:
+                previous._session_teardown()
+                session_runtimes.remove(previous)
+        runtime._activate()
         self._session_epochs[lease.session_id] = replacement_epoch
         session_runtimes.add(runtime)
         return runtime
@@ -124,11 +129,9 @@ class LeaseRuntimeState:
         self.expires_at = parse_timestamp(lease.expires_at)
         self._terminal_code: StableCode | None = None
         self._allow_cancel_replay = False
+        self._activated = False
         self._cancellations = cancellations
         self._process_pcm = process_pcm
-        self._cancellations.add_active(
-            ActiveLease(self.lease_id, self.session_id, self.epoch, int(lease.revision))
-        )
         self._pcm = PcmLeaseState(
             lease_id=self.lease_id,
             epoch=self.epoch,
@@ -147,7 +150,15 @@ class LeaseRuntimeState:
         )
         initial = self._lease.accept(lease.model_dump(mode="json"))
         if initial.code != StableCode.ACCEPTED:
-            raise ValueError("initial lease revision was not accepted")
+            raise ProtocolValidationError(initial.code)
+
+    def _activate(self) -> None:
+        if self._activated:
+            raise RuntimeError("lease runtime is already active")
+        self._cancellations.add_active(
+            ActiveLease(self.lease_id, self.session_id, self.epoch, self.lease_revision)
+        )
+        self._activated = True
 
     @property
     def buffered_audio_bytes(self) -> int:

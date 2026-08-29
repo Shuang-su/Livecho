@@ -432,6 +432,38 @@ def test_higher_epoch_replacement_retires_prior_runtime(
     coordinator.session_teardown(SESSION_ID)
 
 
+def test_invalid_replacement_is_rejected_before_live_state_retirement(
+    valid_messages: dict[str, dict[str, object]],
+) -> None:
+    coordinator = LeaseRuntimeCoordinator()
+    coordinator.session_teardown(SESSION_ID)
+    previous = coordinator.create(LeaseV1.model_validate(valid_messages["LeaseV1"]))
+    now = datetime(2026, 1, 1, tzinfo=UTC)
+    frame = bytearray(encode_header(PcmHeaderV1(LEASE_ID, 1, 0, 0, 1, 2))) + bytearray(2)
+    output = deepcopy(valid_messages["TranscriptSegmentV1"])
+    assert previous.accept_pcm(frame, now=now).code == StableCode.ACCEPTED
+    assert previous.accept_output(output, now=now).code == StableCode.ACCEPTED
+    assert coordinator.active_lease_count == 1
+
+    invalid_raw = {
+        **deepcopy(valid_messages["LeaseV1"]),
+        "message_id": "00000000-0000-4000-8000-000000000090",
+        "lease_id": "00000000-0000-4000-8000-000000000091",
+        "epoch": "2",
+        "revision": "2",
+    }
+    with pytest.raises(ProtocolValidationError) as invalid:
+        coordinator.create(LeaseV1.model_validate(invalid_raw))
+
+    assert invalid.value.code == StableCode.REVISION_GAP
+    assert coordinator.active_lease_count == 1
+    assert previous.cancellation_active
+    assert previous.buffered_audio_bytes == 2
+    assert previous.output_revision_count == 1
+    assert previous.accept_pcm(frame, now=now).code == StableCode.SEQ_DUPLICATE
+    coordinator.session_teardown(SESSION_ID)
+
+
 def test_stale_epoch_runtime_creation_is_rejected(
     valid_messages: dict[str, dict[str, object]],
 ) -> None:

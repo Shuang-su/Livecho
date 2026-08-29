@@ -1,0 +1,15 @@
+{
+  "case_id": "lease.invalid_replacement_revision",
+  "code": "revision_gap",
+  "expect": "rejected",
+  "model": "LeaseReplacementDecisionV1",
+  "wire": {
+    "current_epoch": "1",
+    "replacement_epoch": "2",
+    "replacement_revision": "2",
+    "resumed": false,
+    "retained_output_revisions": 1,
+    "retained_pcm_bytes": 2,
+    "superseded_active_after": true
+  }
+}
