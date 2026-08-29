@@ -1,0 +1,10 @@
+{
+  "case_id": "cancellation.replay_binding_conflict",
+  "code": "cancel_conflict",
+  "expect": "rejected",
+  "model": "CancellationDecisionV1",
+  "wire": {
+    "candidate": "conflict_binding",
+    "initial": "cancelled"
+  }
+}

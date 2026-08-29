@@ -436,6 +436,12 @@ class CancellationRegistry:
         for lease_id in expired:
             del self.tombstones[lease_id]
 
+    def has_tombstone_message(self, lease_id: str, message_id: str, now: datetime) -> bool:
+        """Return whether this lease owns a live tombstone for the message identity."""
+        self.prune(now)
+        tombstone = self.tombstones.get(lease_id)
+        return tombstone is not None and tombstone.message_id == message_id
+
     def cancel(self, message: LeaseCancelV1, raw: Mapping[str, Any], now: datetime) -> Decision:
         self.prune(now)
         digest = canonical_digest(raw)

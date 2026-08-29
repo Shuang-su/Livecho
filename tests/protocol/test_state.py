@@ -324,6 +324,14 @@ def test_cancellation_closes_pcm_and_output_atomically(
     assert runtime.accept_pcm(frame, now=now).code == StableCode.LEASE_CLOSED
     assert runtime.accept_output(output, now=now).code == StableCode.LEASE_CLOSED
     assert runtime.cancel(cancellation, raw, now).code == StableCode.CANCEL_DUPLICATE
+    changed_session_raw = {**raw, "session_id": CONNECTION_ID}
+    changed_session = LeaseCancelV1.model_validate(changed_session_raw)
+    assert (
+        runtime.cancel(changed_session, changed_session_raw, now).code == StableCode.CANCEL_CONFLICT
+    )
+    changed_epoch_raw = {**raw, "epoch": "2"}
+    changed_epoch = LeaseCancelV1.model_validate(changed_epoch_raw)
+    assert runtime.cancel(changed_epoch, changed_epoch_raw, now).code == StableCode.CANCEL_CONFLICT
 
 
 def test_non_sequenced_lease_revision_updates_cancellation_cas(

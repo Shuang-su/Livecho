@@ -64,6 +64,7 @@
     "rejected/cancel__cas_gap.json",
     "rejected/cancel__cas_stale.json",
     "rejected/cancel__conflict.json",
+    "rejected/cancellation__replay_binding_conflict.json",
     "rejected/canonical__changed.json",
     "rejected/canonical__non_nfc.json",
     "rejected/capability__missing_field.json",

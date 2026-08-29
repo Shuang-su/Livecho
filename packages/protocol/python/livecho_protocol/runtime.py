@@ -270,6 +270,10 @@ class LeaseRuntimeState:
             terminal.code == StableCode.LEASE_EXPIRED or not self._allow_cancel_replay
         ):
             return terminal
+        if self._allow_cancel_replay and self._cancellations.has_tombstone_message(
+            self.lease_id, message.message_id, now
+        ):
+            return self._cancellations.cancel(message, raw, now)
         if message.lease_id != self.lease_id or message.session_id != self.session_id:
             return Decision(StableCode.BINDING_MISMATCH)
         received_epoch = int(message.epoch)

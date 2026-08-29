@@ -860,6 +860,12 @@ def rejected_cases() -> list[dict[str, Any]]:
                 {"initial": "active", "candidate": "binding_mismatch"},
             ),
             _semantic_case(
+                "cancellation.replay_binding_conflict",
+                "CancellationDecisionV1",
+                StableCode.CANCEL_CONFLICT,
+                {"initial": "cancelled", "candidate": "conflict_binding"},
+            ),
+            _semantic_case(
                 "epoch.stale",
                 "EpochDecisionV1",
                 StableCode.EPOCH_STALE,
@@ -1385,6 +1391,8 @@ def _evaluate_cancellation(wire: dict[str, Any]) -> StableCode:
         raw = initial_raw
     elif candidate == "conflict":
         raw = _cancel_raw(MESSAGE_ID, "session_end")
+    elif candidate == "conflict_binding":
+        raw = _cancel_raw(MESSAGE_ID, "operator_stop", session_id=WORKER_ID)
     elif candidate == "binding_mismatch":
         raw = _cancel_raw(MESSAGE_ID_2, "operator_stop", session_id=WORKER_ID)
     elif candidate == "cas_stale":
