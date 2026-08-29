@@ -1,0 +1,25 @@
+{
+  "case_id": "schema.timestamp_year_zero",
+  "code": "schema_invalid",
+  "expect": "rejected",
+  "model": "TranscriptSegmentV1",
+  "wire": {
+    "confidence": 0.9,
+    "end_ms": 1000,
+    "epoch": "1",
+    "is_final": false,
+    "language": "en",
+    "lease_id": "00000000-0000-4000-8000-000000000020",
+    "message_id": "00000000-0000-4000-8000-000000000001",
+    "protocol": "livecho.worker.v1",
+    "protocol_minor": 0,
+    "revision": "1",
+    "segment_id": "00000000-0000-4000-8000-000000000040",
+    "sent_at": "0000-01-01T00:00:00.000Z",
+    "seq": "0",
+    "session_id": "00000000-0000-4000-8000-000000000030",
+    "start_ms": 0,
+    "text": "synthetic caption",
+    "type": "worker.transcript"
+  }
+}

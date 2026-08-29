@@ -1,0 +1,18 @@
+{
+  "case_id": "ack.accepted_revision_rejects_cas",
+  "code": "schema_invalid",
+  "expect": "rejected",
+  "model": "ProtocolAckV1",
+  "wire": {
+    "acknowledged_message_id": "00000000-0000-4000-8000-000000000002",
+    "expected_revision": "1",
+    "message_id": "00000000-0000-4000-8000-000000000001",
+    "outcome": "accepted",
+    "protocol": "livecho.worker.v1",
+    "protocol_minor": 0,
+    "revision": "1",
+    "sent_at": "2026-01-01T00:00:00.000Z",
+    "seq": null,
+    "type": "protocol.ack"
+  }
+}

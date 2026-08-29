@@ -1,0 +1,11 @@
+{
+  "case_id": "canonical.missing_null",
+  "code": "accepted",
+  "expect": "accepted",
+  "model": "CanonicalRawDecisionV1",
+  "wire": {
+    "expect_equal": false,
+    "left_raw": "{\"a\":\"synthetic\"}",
+    "right_raw": "{\"a\":\"synthetic\",\"b\":null}"
+  }
+}

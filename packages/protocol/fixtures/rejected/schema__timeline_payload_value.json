@@ -1,0 +1,29 @@
+{
+  "case_id": "schema.timeline_payload_value",
+  "code": "schema_invalid",
+  "expect": "rejected",
+  "model": "TimelineEventV1",
+  "wire": {
+    "epoch": "1",
+    "event_id": "00000000-0000-4000-8000-000000000060",
+    "message_id": "00000000-0000-4000-8000-000000000001",
+    "occurred_at": "2026-01-01T00:00:00.000Z",
+    "payload": {
+      "confidence": 0.9,
+      "end_ms": 1000,
+      "is_final": false,
+      "language": "en",
+      "segment_id": "00000000-0000-4000-8000-000000000040",
+      "start_ms": 0,
+      "text": ""
+    },
+    "protocol": "livecho.viewer.v1",
+    "protocol_minor": 0,
+    "revision": "1",
+    "room_id": "synthetic-room",
+    "sent_at": "2026-01-01T00:00:00.000Z",
+    "seq": "0",
+    "session_id": "00000000-0000-4000-8000-000000000030",
+    "type": "viewer.timeline_event"
+  }
+}

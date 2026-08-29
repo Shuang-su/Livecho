@@ -1,0 +1,11 @@
+{
+  "case_id": "model.viewercursorv1",
+  "code": "accepted",
+  "expect": "accepted",
+  "model": "ViewerCursorV1",
+  "wire": {
+    "epoch": "1",
+    "next_seq": "0",
+    "session_id": "00000000-0000-4000-8000-000000000030"
+  }
+}

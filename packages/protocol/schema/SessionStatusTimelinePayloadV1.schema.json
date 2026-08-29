@@ -1,0 +1,38 @@
+{
+  "$id": "https://livecho.invalid/protocol/v1/SessionStatusTimelinePayloadV1.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "reason_code": {
+      "anyOf": [
+        {
+          "maxLength": 64,
+          "minLength": 1,
+          "pattern": "^[a-z][a-z0-9_]*$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Reason Code"
+    },
+    "status": {
+      "enum": [
+        "starting",
+        "live",
+        "stopping",
+        "stopped",
+        "failed"
+      ],
+      "title": "Status",
+      "type": "string"
+    }
+  },
+  "required": [
+    "status"
+  ],
+  "title": "SessionStatusTimelinePayloadV1",
+  "type": "object"
+}

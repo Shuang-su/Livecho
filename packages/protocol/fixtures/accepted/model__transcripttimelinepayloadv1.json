@@ -1,0 +1,15 @@
+{
+  "case_id": "model.transcripttimelinepayloadv1",
+  "code": "accepted",
+  "expect": "accepted",
+  "model": "TranscriptTimelinePayloadV1",
+  "wire": {
+    "confidence": 0.9,
+    "end_ms": 1000,
+    "is_final": false,
+    "language": "en",
+    "segment_id": "00000000-0000-4000-8000-000000000040",
+    "start_ms": 0,
+    "text": "synthetic caption"
+  }
+}

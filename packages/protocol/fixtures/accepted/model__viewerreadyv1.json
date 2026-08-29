@@ -1,0 +1,19 @@
+{
+  "case_id": "model.viewerreadyv1",
+  "code": "accepted",
+  "expect": "accepted",
+  "model": "ViewerReadyV1",
+  "wire": {
+    "cursor_resumed": false,
+    "epoch": "1",
+    "message_id": "00000000-0000-4000-8000-000000000001",
+    "minimum_client_version": "0.1.0",
+    "next_seq": "0",
+    "protocol": "livecho.viewer.v1",
+    "protocol_minor": 0,
+    "selected_minor": 0,
+    "sent_at": "2026-01-01T00:00:00.000Z",
+    "session_id": "00000000-0000-4000-8000-000000000030",
+    "type": "viewer.ready"
+  }
+}

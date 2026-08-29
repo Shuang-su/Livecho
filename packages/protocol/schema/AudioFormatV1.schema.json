@@ -1,0 +1,29 @@
+{
+  "$id": "https://livecho.invalid/protocol/v1/AudioFormatV1.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "channels": {
+      "const": 1,
+      "title": "Channels",
+      "type": "integer"
+    },
+    "encoding": {
+      "const": "pcm_s16le",
+      "title": "Encoding",
+      "type": "string"
+    },
+    "sample_rate_hz": {
+      "const": 16000,
+      "title": "Sample Rate Hz",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "encoding",
+    "sample_rate_hz",
+    "channels"
+  ],
+  "title": "AudioFormatV1",
+  "type": "object"
+}

@@ -1,4 +1,4 @@
-.PHONY: bootstrap build dev lint test typecheck verify artifacts
+.PHONY: bootstrap build dev lint test typecheck verify artifacts protocol-generate protocol-check
 
 bootstrap:
 	uv sync --all-groups --frozen
@@ -26,4 +26,10 @@ typecheck:
 artifacts:
 	uv run python tools/check_change_artifacts.py
 
-verify: lint typecheck test artifacts build
+protocol-generate:
+	uv run python tools/protocol_codegen.py
+
+protocol-check:
+	uv run python tools/protocol_codegen.py --check
+
+verify: lint typecheck test artifacts protocol-check build

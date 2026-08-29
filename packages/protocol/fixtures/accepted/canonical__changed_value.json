@@ -1,0 +1,11 @@
+{
+  "case_id": "canonical.changed_value",
+  "code": "accepted",
+  "expect": "accepted",
+  "model": "CanonicalRawDecisionV1",
+  "wire": {
+    "expect_equal": false,
+    "left_raw": "{\"a\":1}",
+    "right_raw": "{\"a\":2}"
+  }
+}

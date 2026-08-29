@@ -1,0 +1,7 @@
+{
+  "case_id": "schema.boolean_sample_rate",
+  "code": "schema_invalid",
+  "expect": "rejected",
+  "model": "AudioFormatV1",
+  "raw_text": "{\"encoding\":\"pcm_s16le\",\"sample_rate_hz\":true,\"channels\":1}"
+}

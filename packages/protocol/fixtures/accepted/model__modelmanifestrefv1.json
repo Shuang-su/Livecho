@@ -1,0 +1,12 @@
+{
+  "case_id": "model.modelmanifestrefv1",
+  "code": "accepted",
+  "expect": "accepted",
+  "model": "ModelManifestRefV1",
+  "wire": {
+    "model_id": "fixture-asr",
+    "provider": "synthetic",
+    "revision": "1",
+    "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  }
+}

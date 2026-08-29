@@ -1,0 +1,11 @@
+{
+  "case_id": "pcm_sequence.resync",
+  "code": "resync_required",
+  "expect": "rejected",
+  "model": "PcmSequenceDecisionV1",
+  "wire": {
+    "accepted_count": 257,
+    "candidate_seq": 0,
+    "start_seq": 0
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "case_id": "epoch.stale",
+  "code": "epoch_stale",
+  "expect": "rejected",
+  "model": "EpochDecisionV1",
+  "wire": {
+    "current": 2,
+    "received": 1
+  }
+}

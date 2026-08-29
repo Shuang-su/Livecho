@@ -1,0 +1,1568 @@
+{
+  "$defs": {
+    "AudioFormatV1": {
+      "additionalProperties": false,
+      "properties": {
+        "channels": {
+          "const": 1,
+          "title": "Channels",
+          "type": "integer"
+        },
+        "encoding": {
+          "const": "pcm_s16le",
+          "title": "Encoding",
+          "type": "string"
+        },
+        "sample_rate_hz": {
+          "const": 16000,
+          "title": "Sample Rate Hz",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "encoding",
+        "sample_rate_hz",
+        "channels"
+      ],
+      "title": "AudioFormatV1",
+      "type": "object"
+    },
+    "HeartbeatV1": {
+      "additionalProperties": false,
+      "properties": {
+        "audio_buffer_bytes": {
+          "maximum": 960000,
+          "minimum": 0,
+          "title": "Audio Buffer Bytes",
+          "type": "integer"
+        },
+        "epoch": {
+          "format": "uint64-decimal",
+          "pattern": "^(?:[1-9][0-9]{0,19})$",
+          "title": "Epoch",
+          "type": "string"
+        },
+        "last_input_seq": {
+          "anyOf": [
+            {
+              "format": "uint64-decimal",
+              "pattern": "^(?:0|[1-9][0-9]{0,19})$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Last Input Seq"
+        },
+        "last_output_seq": {
+          "anyOf": [
+            {
+              "format": "uint64-decimal",
+              "pattern": "^(?:0|[1-9][0-9]{0,19})$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Last Output Seq"
+        },
+        "lease_id": {
+          "format": "uuid",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+          "title": "Lease Id",
+          "type": "string"
+        },
+        "message_id": {
+          "format": "uuid",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+          "title": "Message Id",
+          "type": "string"
+        },
+        "observed_at": {
+          "format": "date-time",
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{3}Z$",
+          "title": "Observed At",
+          "type": "string"
+        },
+        "protocol": {
+          "const": "livecho.worker.v1",
+          "title": "Protocol",
+          "type": "string"
+        },
+        "protocol_minor": {
+          "const": 0,
+          "title": "Protocol Minor",
+          "type": "integer"
+        },
+        "sent_at": {
+          "format": "date-time",
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{3}Z$",
+          "title": "Sent At",
+          "type": "string"
+        },
+        "seq": {
+          "format": "uint64-decimal",
+          "pattern": "^(?:0|[1-9][0-9]{0,19})$",
+          "title": "Seq",
+          "type": "string"
+        },
+        "session_id": {
+          "format": "uuid",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+          "title": "Session Id",
+          "type": "string"
+        },
+        "state": {
+          "enum": [
+            "ready",
+            "busy",
+            "draining",
+            "error"
+          ],
+          "title": "State",
+          "type": "string"
+        },
+        "type": {
+          "const": "worker.heartbeat",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "protocol",
+        "protocol_minor",
+        "message_id",
+        "type",
+        "sent_at",
+        "lease_id",
+        "session_id",
+        "epoch",
+        "seq",
+        "state",
+        "audio_buffer_bytes",
+        "observed_at"
+      ],
+      "title": "HeartbeatV1",
+      "type": "object"
+    },
+    "LeaseCancelV1": {
+      "additionalProperties": false,
+      "properties": {
+        "epoch": {
+          "format": "uint64-decimal",
+          "pattern": "^(?:[1-9][0-9]{0,19})$",
+          "title": "Epoch",
+          "type": "string"
+        },
+        "expected_revision": {
+          "format": "uint64-decimal",
+          "pattern": "^(?:[1-9][0-9]{0,19})$",
+          "title": "Expected Revision",
+          "type": "string"
+        },
+        "lease_id": {
+          "format": "uuid",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+          "title": "Lease Id",
+          "type": "string"
+        },
+        "message_id": {
+          "format": "uuid",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+          "title": "Message Id",
+          "type": "string"
+        },
+        "protocol": {
+          "const": "livecho.worker.v1",
+          "title": "Protocol",
+          "type": "string"
+        },
+        "protocol_minor": {
+          "const": 0,
+          "title": "Protocol Minor",
+          "type": "integer"
+        },
+        "reason": {
+          "enum": [
+            "operator_stop",
+            "lease_expired",
+            "worker_replaced",
+            "policy_disable",
+            "protocol_violation",
+            "session_end"
+          ],
+          "title": "Reason",
+          "type": "string"
+        },
+        "sent_at": {
+          "format": "date-time",
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{3}Z$",
+          "title": "Sent At",
+          "type": "string"
+        },
+        "session_id": {
+          "format": "uuid",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+          "title": "Session Id",
+          "type": "string"
+        },
+        "type": {
+          "const": "worker.lease_cancel",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "protocol",
+        "protocol_minor",
+        "message_id",
+        "type",
+        "sent_at",
+        "lease_id",
+        "session_id",
+        "epoch",
+        "expected_revision",
+        "reason"
+      ],
+      "title": "LeaseCancelV1",
+      "type": "object"
+    },
+    "LeaseV1": {
+      "additionalProperties": false,
+      "properties": {
+        "audio_format": {
+          "$ref": "#/$defs/AudioFormatV1"
+        },
+        "audio_origin": {
+          "const": "synthetic",
+          "title": "Audio Origin",
+          "type": "string"
+        },
+        "epoch": {
+          "format": "uint64-decimal",
+          "pattern": "^(?:[1-9][0-9]{0,19})$",
+          "title": "Epoch",
+          "type": "string"
+        },
+        "expires_at": {
+          "format": "date-time",
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{3}Z$",
+          "title": "Expires At",
+          "type": "string"
+        },
+        "input_start_seq": {
+          "format": "uint64-decimal",
+          "pattern": "^(?:0|[1-9][0-9]{0,19})$",
+          "title": "Input Start Seq",
+          "type": "string"
+        },
+        "issued_at": {
+          "format": "date-time",
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{3}Z$",
+          "title": "Issued At",
+          "type": "string"
+        },
+        "lease_id": {
+          "format": "uuid",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+          "title": "Lease Id",
+          "type": "string"
+        },
+        "message_id": {
+          "format": "uuid",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+          "title": "Message Id",
+          "type": "string"
+        },
+        "model_manifest": {
+          "$ref": "#/$defs/ModelManifestRefV1"
+        },
+        "output_start_seq": {
+          "format": "uint64-decimal",
+          "pattern": "^(?:0|[1-9][0-9]{0,19})$",
+          "title": "Output Start Seq",
+          "type": "string"
+        },
+        "protocol": {
+          "const": "livecho.worker.v1",
+          "title": "Protocol",
+          "type": "string"
+        },
+        "protocol_minor": {
+          "const": 0,
+          "title": "Protocol Minor",
+          "type": "integer"
+        },
+        "revision": {
+          "format": "uint64-decimal",
+          "pattern": "^(?:[1-9][0-9]{0,19})$",
+          "title": "Revision",
+          "type": "string"
+        },
+        "room_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[a-z0-9][a-z0-9._:-]*$",
+          "title": "Room Id",
+          "type": "string"
+        },
+        "sent_at": {
+          "format": "date-time",
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{3}Z$",
+          "title": "Sent At",
+          "type": "string"
+        },
+        "session_id": {
+          "format": "uuid",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+          "title": "Session Id",
+          "type": "string"
+        },
+        "type": {
+          "const": "worker.lease",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "protocol",
+        "protocol_minor",
+        "message_id",
+        "type",
+        "sent_at",
+        "lease_id",
+        "session_id",
+        "room_id",
+        "epoch",
+        "revision",
+        "issued_at",
+        "expires_at",
+        "input_start_seq",
+        "output_start_seq",
+        "model_manifest",
+        "audio_format",
+        "audio_origin"
+      ],
+      "title": "LeaseV1",
+      "type": "object"
+    },
+    "ModelManifestRefV1": {
+      "additionalProperties": false,
+      "properties": {
+        "model_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+          "title": "Model Id",
+          "type": "string"
+        },
+        "provider": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+          "title": "Provider",
+          "type": "string"
+        },
+        "revision": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+          "title": "Revision",
+          "type": "string"
+        },
+        "sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Sha256",
+          "type": "string"
+        }
+      },
+      "required": [
+        "provider",
+        "model_id",
+        "revision",
+        "sha256"
+      ],
+      "title": "ModelManifestRefV1",
+      "type": "object"
+    },
+    "ProtocolAckV1": {
+      "additionalProperties": false,
+      "properties": {
+        "acknowledged_message_id": {
+          "format": "uuid",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+          "title": "Acknowledged Message Id",
+          "type": "string"
+        },
+        "expected_revision": {
+          "anyOf": [
+            {
+              "format": "uint64-decimal",
+              "pattern": "^(?:[1-9][0-9]{0,19})$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Expected Revision"
+        },
+        "message_id": {
+          "format": "uuid",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+          "title": "Message Id",
+          "type": "string"
+        },
+        "outcome": {
+          "enum": [
+            "accepted",
+            "seq_duplicate",
+            "revision_duplicate",
+            "cancel_duplicate"
+          ],
+          "title": "Outcome",
+          "type": "string"
+        },
+        "protocol": {
+          "enum": [
+            "livecho.worker.v1",
+            "livecho.viewer.v1"
+          ],
+          "title": "Protocol",
+          "type": "string"
+        },
+        "protocol_minor": {
+          "const": 0,
+          "title": "Protocol Minor",
+          "type": "integer"
+        },
+        "revision": {
+          "anyOf": [
+            {
+              "format": "uint64-decimal",
+              "pattern": "^(?:[1-9][0-9]{0,19})$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Revision"
+        },
+        "sent_at": {
+          "format": "date-time",
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{3}Z$",
+          "title": "Sent At",
+          "type": "string"
+        },
+        "seq": {
+          "anyOf": [
+            {
+              "format": "uint64-decimal",
+              "pattern": "^(?:0|[1-9][0-9]{0,19})$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Seq"
+        },
+        "type": {
+          "const": "protocol.ack",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "protocol",
+        "protocol_minor",
+        "message_id",
+        "type",
+        "sent_at",
+        "outcome",
+        "acknowledged_message_id"
+      ],
+      "title": "ProtocolAckV1",
+      "type": "object"
+    },
+    "ProtocolErrorV1": {
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "enum": [
+            "malformed_json",
+            "duplicate_key",
+            "unknown_field",
+            "schema_invalid",
+            "control_frame_too_large",
+            "unknown_major",
+            "unsupported_minor",
+            "worker_version_too_old",
+            "capability_required",
+            "manifest_not_allowed",
+            "lease_unknown",
+            "lease_expired",
+            "lease_closed",
+            "binding_mismatch",
+            "epoch_stale",
+            "epoch_unknown",
+            "seq_conflict",
+            "seq_gap",
+            "revision_conflict",
+            "revision_stale",
+            "revision_gap",
+            "revision_immutable",
+            "revision_capacity_exceeded",
+            "cancel_conflict",
+            "object_final",
+            "resync_required",
+            "binary_header_invalid",
+            "binary_frame_too_large",
+            "audio_pts_invalid",
+            "audio_budget_exceeded"
+          ],
+          "title": "Code",
+          "type": "string"
+        },
+        "expected": {
+          "anyOf": [
+            {
+              "format": "uint64-decimal",
+              "pattern": "^(?:0|[1-9][0-9]{0,19})$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Expected"
+        },
+        "message": {
+          "maxLength": 160,
+          "minLength": 1,
+          "title": "Message",
+          "type": "string"
+        },
+        "message_id": {
+          "format": "uuid",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+          "title": "Message Id",
+          "type": "string"
+        },
+        "protocol": {
+          "enum": [
+            "livecho.worker.v1",
+            "livecho.viewer.v1"
+          ],
+          "title": "Protocol",
+          "type": "string"
+        },
+        "protocol_minor": {
+          "const": 0,
+          "title": "Protocol Minor",
+          "type": "integer"
+        },
+        "received": {
+          "anyOf": [
+            {
+              "format": "uint64-decimal",
+              "pattern": "^(?:0|[1-9][0-9]{0,19})$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Received"
+        },
+        "retryable": {
+          "title": "Retryable",
+          "type": "boolean"
+        },
+        "sent_at": {
+          "format": "date-time",
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{3}Z$",
+          "title": "Sent At",
+          "type": "string"
+        },
+        "type": {
+          "const": "protocol.error",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "protocol",
+        "protocol_minor",
+        "message_id",
+        "type",
+        "sent_at",
+        "code",
+        "message",
+        "retryable"
+      ],
+      "title": "ProtocolErrorV1",
+      "type": "object"
+    },
+    "SessionStatusTimelinePayloadV1": {
+      "additionalProperties": false,
+      "properties": {
+        "reason_code": {
+          "anyOf": [
+            {
+              "maxLength": 64,
+              "minLength": 1,
+              "pattern": "^[a-z][a-z0-9_]*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Reason Code"
+        },
+        "status": {
+          "enum": [
+            "starting",
+            "live",
+            "stopping",
+            "stopped",
+            "failed"
+          ],
+          "title": "Status",
+          "type": "string"
+        }
+      },
+      "required": [
+        "status"
+      ],
+      "title": "SessionStatusTimelinePayloadV1",
+      "type": "object"
+    },
+    "TimelineEventV1": {
+      "additionalProperties": false,
+      "properties": {
+        "epoch": {
+          "format": "uint64-decimal",
+          "pattern": "^(?:[1-9][0-9]{0,19})$",
+          "title": "Epoch",
+          "type": "string"
+        },
+        "event_id": {
+          "format": "uuid",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+          "title": "Event Id",
+          "type": "string"
+        },
+        "message_id": {
+          "format": "uuid",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+          "title": "Message Id",
+          "type": "string"
+        },
+        "occurred_at": {
+          "format": "date-time",
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{3}Z$",
+          "title": "Occurred At",
+          "type": "string"
+        },
+        "payload": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TranscriptTimelinePayloadV1"
+            },
+            {
+              "$ref": "#/$defs/SessionStatusTimelinePayloadV1"
+            }
+          ],
+          "title": "Payload"
+        },
+        "protocol": {
+          "const": "livecho.viewer.v1",
+          "title": "Protocol",
+          "type": "string"
+        },
+        "protocol_minor": {
+          "const": 0,
+          "title": "Protocol Minor",
+          "type": "integer"
+        },
+        "revision": {
+          "format": "uint64-decimal",
+          "pattern": "^(?:[1-9][0-9]{0,19})$",
+          "title": "Revision",
+          "type": "string"
+        },
+        "room_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[a-z0-9][a-z0-9._:-]*$",
+          "title": "Room Id",
+          "type": "string"
+        },
+        "sent_at": {
+          "format": "date-time",
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{3}Z$",
+          "title": "Sent At",
+          "type": "string"
+        },
+        "seq": {
+          "format": "uint64-decimal",
+          "pattern": "^(?:0|[1-9][0-9]{0,19})$",
+          "title": "Seq",
+          "type": "string"
+        },
+        "session_id": {
+          "format": "uuid",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+          "title": "Session Id",
+          "type": "string"
+        },
+        "type": {
+          "const": "viewer.timeline_event",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "protocol",
+        "protocol_minor",
+        "message_id",
+        "type",
+        "sent_at",
+        "event_id",
+        "session_id",
+        "room_id",
+        "epoch",
+        "seq",
+        "revision",
+        "occurred_at",
+        "payload"
+      ],
+      "title": "TimelineEventV1",
+      "type": "object"
+    },
+    "TranscriptSegmentV1": {
+      "additionalProperties": false,
+      "properties": {
+        "confidence": {
+          "anyOf": [
+            {
+              "maximum": 1,
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Confidence"
+        },
+        "end_ms": {
+          "maximum": 2147483647,
+          "minimum": 0,
+          "title": "End Ms",
+          "type": "integer"
+        },
+        "epoch": {
+          "format": "uint64-decimal",
+          "pattern": "^(?:[1-9][0-9]{0,19})$",
+          "title": "Epoch",
+          "type": "string"
+        },
+        "is_final": {
+          "title": "Is Final",
+          "type": "boolean"
+        },
+        "language": {
+          "anyOf": [
+            {
+              "maxLength": 35,
+              "minLength": 2,
+              "pattern": "^[A-Za-z]{2,8}(?:-[A-Za-z0-9]{1,8})*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Language"
+        },
+        "lease_id": {
+          "format": "uuid",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+          "title": "Lease Id",
+          "type": "string"
+        },
+        "message_id": {
+          "format": "uuid",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+          "title": "Message Id",
+          "type": "string"
+        },
+        "protocol": {
+          "const": "livecho.worker.v1",
+          "title": "Protocol",
+          "type": "string"
+        },
+        "protocol_minor": {
+          "const": 0,
+          "title": "Protocol Minor",
+          "type": "integer"
+        },
+        "revision": {
+          "format": "uint64-decimal",
+          "pattern": "^(?:[1-9][0-9]{0,19})$",
+          "title": "Revision",
+          "type": "string"
+        },
+        "segment_id": {
+          "format": "uuid",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+          "title": "Segment Id",
+          "type": "string"
+        },
+        "sent_at": {
+          "format": "date-time",
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{3}Z$",
+          "title": "Sent At",
+          "type": "string"
+        },
+        "seq": {
+          "format": "uint64-decimal",
+          "pattern": "^(?:0|[1-9][0-9]{0,19})$",
+          "title": "Seq",
+          "type": "string"
+        },
+        "session_id": {
+          "format": "uuid",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+          "title": "Session Id",
+          "type": "string"
+        },
+        "start_ms": {
+          "maximum": 2147483647,
+          "minimum": 0,
+          "title": "Start Ms",
+          "type": "integer"
+        },
+        "text": {
+          "maxLength": 4096,
+          "minLength": 1,
+          "title": "Text",
+          "type": "string"
+        },
+        "type": {
+          "const": "worker.transcript",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "protocol",
+        "protocol_minor",
+        "message_id",
+        "type",
+        "sent_at",
+        "lease_id",
+        "session_id",
+        "segment_id",
+        "epoch",
+        "seq",
+        "revision",
+        "start_ms",
+        "end_ms",
+        "text",
+        "is_final"
+      ],
+      "title": "TranscriptSegmentV1",
+      "type": "object"
+    },
+    "TranscriptTimelinePayloadV1": {
+      "additionalProperties": false,
+      "properties": {
+        "confidence": {
+          "anyOf": [
+            {
+              "maximum": 1,
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Confidence"
+        },
+        "end_ms": {
+          "maximum": 2147483647,
+          "minimum": 0,
+          "title": "End Ms",
+          "type": "integer"
+        },
+        "is_final": {
+          "title": "Is Final",
+          "type": "boolean"
+        },
+        "language": {
+          "anyOf": [
+            {
+              "maxLength": 35,
+              "minLength": 2,
+              "pattern": "^[A-Za-z]{2,8}(?:-[A-Za-z0-9]{1,8})*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Language"
+        },
+        "segment_id": {
+          "format": "uuid",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+          "title": "Segment Id",
+          "type": "string"
+        },
+        "start_ms": {
+          "maximum": 2147483647,
+          "minimum": 0,
+          "title": "Start Ms",
+          "type": "integer"
+        },
+        "text": {
+          "maxLength": 4096,
+          "minLength": 1,
+          "title": "Text",
+          "type": "string"
+        }
+      },
+      "required": [
+        "segment_id",
+        "start_ms",
+        "end_ms",
+        "text",
+        "is_final"
+      ],
+      "title": "TranscriptTimelinePayloadV1",
+      "type": "object"
+    },
+    "ViewerCursorV1": {
+      "additionalProperties": false,
+      "properties": {
+        "epoch": {
+          "format": "uint64-decimal",
+          "pattern": "^(?:[1-9][0-9]{0,19})$",
+          "title": "Epoch",
+          "type": "string"
+        },
+        "next_seq": {
+          "format": "uint64-decimal",
+          "pattern": "^(?:0|[1-9][0-9]{0,19})$",
+          "title": "Next Seq",
+          "type": "string"
+        },
+        "session_id": {
+          "format": "uuid",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+          "title": "Session Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "session_id",
+        "epoch",
+        "next_seq"
+      ],
+      "title": "ViewerCursorV1",
+      "type": "object"
+    },
+    "ViewerReadyV1": {
+      "additionalProperties": false,
+      "properties": {
+        "cursor_resumed": {
+          "title": "Cursor Resumed",
+          "type": "boolean"
+        },
+        "epoch": {
+          "format": "uint64-decimal",
+          "pattern": "^(?:[1-9][0-9]{0,19})$",
+          "title": "Epoch",
+          "type": "string"
+        },
+        "message_id": {
+          "format": "uuid",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+          "title": "Message Id",
+          "type": "string"
+        },
+        "minimum_client_version": {
+          "const": "0.1.0",
+          "title": "Minimum Client Version",
+          "type": "string"
+        },
+        "next_seq": {
+          "format": "uint64-decimal",
+          "pattern": "^(?:0|[1-9][0-9]{0,19})$",
+          "title": "Next Seq",
+          "type": "string"
+        },
+        "protocol": {
+          "const": "livecho.viewer.v1",
+          "title": "Protocol",
+          "type": "string"
+        },
+        "protocol_minor": {
+          "const": 0,
+          "title": "Protocol Minor",
+          "type": "integer"
+        },
+        "selected_minor": {
+          "const": 0,
+          "title": "Selected Minor",
+          "type": "integer"
+        },
+        "sent_at": {
+          "format": "date-time",
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{3}Z$",
+          "title": "Sent At",
+          "type": "string"
+        },
+        "session_id": {
+          "format": "uuid",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+          "title": "Session Id",
+          "type": "string"
+        },
+        "type": {
+          "const": "viewer.ready",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "protocol",
+        "protocol_minor",
+        "message_id",
+        "type",
+        "sent_at",
+        "selected_minor",
+        "minimum_client_version",
+        "session_id",
+        "epoch",
+        "next_seq",
+        "cursor_resumed"
+      ],
+      "title": "ViewerReadyV1",
+      "type": "object"
+    },
+    "ViewerSubscribeV1": {
+      "additionalProperties": false,
+      "properties": {
+        "client_version": {
+          "maxLength": 64,
+          "minLength": 5,
+          "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(?:-((?:0|[1-9][0-9]*|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)(?:\\.(?:0|[1-9][0-9]*|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*))*))?$",
+          "title": "Client Version",
+          "type": "string"
+        },
+        "cursor": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ViewerCursorV1"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "message_id": {
+          "format": "uuid",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+          "title": "Message Id",
+          "type": "string"
+        },
+        "protocol": {
+          "const": "livecho.viewer.v1",
+          "title": "Protocol",
+          "type": "string"
+        },
+        "protocol_minor": {
+          "const": 0,
+          "title": "Protocol Minor",
+          "type": "integer"
+        },
+        "room_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[a-z0-9][a-z0-9._:-]*$",
+          "title": "Room Id",
+          "type": "string"
+        },
+        "sent_at": {
+          "format": "date-time",
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{3}Z$",
+          "title": "Sent At",
+          "type": "string"
+        },
+        "supported_minors": {
+          "items": {
+            "maximum": 255,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "maxItems": 16,
+          "minItems": 1,
+          "title": "Supported Minors",
+          "type": "array",
+          "uniqueItems": true
+        },
+        "type": {
+          "const": "viewer.subscribe",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "protocol",
+        "protocol_minor",
+        "message_id",
+        "type",
+        "sent_at",
+        "client_version",
+        "supported_minors",
+        "room_id"
+      ],
+      "title": "ViewerSubscribeV1",
+      "type": "object"
+    },
+    "WorkerHelloV1": {
+      "additionalProperties": false,
+      "properties": {
+        "capabilities": {
+          "items": {
+            "enum": [
+              "asr.transcribe",
+              "protocol.binary-pcm"
+            ],
+            "type": "string"
+          },
+          "maxItems": 16,
+          "minItems": 1,
+          "title": "Capabilities",
+          "type": "array",
+          "uniqueItems": true
+        },
+        "message_id": {
+          "format": "uuid",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+          "title": "Message Id",
+          "type": "string"
+        },
+        "model_manifests": {
+          "items": {
+            "$ref": "#/$defs/ModelManifestRefV1"
+          },
+          "maxItems": 16,
+          "title": "Model Manifests",
+          "type": "array",
+          "uniqueItems": true
+        },
+        "protocol": {
+          "const": "livecho.worker.v1",
+          "title": "Protocol",
+          "type": "string"
+        },
+        "protocol_minor": {
+          "const": 0,
+          "title": "Protocol Minor",
+          "type": "integer"
+        },
+        "resume": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/WorkerResumeV1"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "sent_at": {
+          "format": "date-time",
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{3}Z$",
+          "title": "Sent At",
+          "type": "string"
+        },
+        "supported_minors": {
+          "items": {
+            "maximum": 255,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "maxItems": 16,
+          "minItems": 1,
+          "title": "Supported Minors",
+          "type": "array",
+          "uniqueItems": true
+        },
+        "type": {
+          "const": "worker.hello",
+          "title": "Type",
+          "type": "string"
+        },
+        "worker_id": {
+          "format": "uuid",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+          "title": "Worker Id",
+          "type": "string"
+        },
+        "worker_version": {
+          "maxLength": 64,
+          "minLength": 5,
+          "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(?:-((?:0|[1-9][0-9]*|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)(?:\\.(?:0|[1-9][0-9]*|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*))*))?$",
+          "title": "Worker Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "protocol",
+        "protocol_minor",
+        "message_id",
+        "type",
+        "sent_at",
+        "worker_id",
+        "worker_version",
+        "supported_minors",
+        "capabilities",
+        "model_manifests"
+      ],
+      "title": "WorkerHelloV1",
+      "type": "object"
+    },
+    "WorkerResumeV1": {
+      "additionalProperties": false,
+      "properties": {
+        "connection_id": {
+          "format": "uuid",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+          "title": "Connection Id",
+          "type": "string"
+        },
+        "epoch": {
+          "format": "uint64-decimal",
+          "pattern": "^(?:[1-9][0-9]{0,19})$",
+          "title": "Epoch",
+          "type": "string"
+        },
+        "lease_id": {
+          "format": "uuid",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+          "title": "Lease Id",
+          "type": "string"
+        },
+        "next_input_seq": {
+          "format": "uint64-decimal",
+          "pattern": "^(?:0|[1-9][0-9]{0,19})$",
+          "title": "Next Input Seq",
+          "type": "string"
+        },
+        "next_output_seq": {
+          "format": "uint64-decimal",
+          "pattern": "^(?:0|[1-9][0-9]{0,19})$",
+          "title": "Next Output Seq",
+          "type": "string"
+        },
+        "session_id": {
+          "format": "uuid",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+          "title": "Session Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "connection_id",
+        "lease_id",
+        "session_id",
+        "epoch",
+        "next_input_seq",
+        "next_output_seq"
+      ],
+      "title": "WorkerResumeV1",
+      "type": "object"
+    },
+    "WorkerStatsV1": {
+      "additionalProperties": false,
+      "properties": {
+        "epoch": {
+          "format": "uint64-decimal",
+          "pattern": "^(?:[1-9][0-9]{0,19})$",
+          "title": "Epoch",
+          "type": "string"
+        },
+        "lease_id": {
+          "format": "uuid",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+          "title": "Lease Id",
+          "type": "string"
+        },
+        "message_id": {
+          "format": "uuid",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+          "title": "Message Id",
+          "type": "string"
+        },
+        "processed_audio_ms": {
+          "format": "uint64-decimal",
+          "pattern": "^(?:0|[1-9][0-9]{0,19})$",
+          "title": "Processed Audio Ms",
+          "type": "string"
+        },
+        "protocol": {
+          "const": "livecho.worker.v1",
+          "title": "Protocol",
+          "type": "string"
+        },
+        "protocol_minor": {
+          "const": 0,
+          "title": "Protocol Minor",
+          "type": "integer"
+        },
+        "realtime_factor": {
+          "maximum": 100,
+          "minimum": 0,
+          "title": "Realtime Factor",
+          "type": "number"
+        },
+        "revision": {
+          "format": "uint64-decimal",
+          "pattern": "^(?:[1-9][0-9]{0,19})$",
+          "title": "Revision",
+          "type": "string"
+        },
+        "segments_accepted": {
+          "format": "uint64-decimal",
+          "pattern": "^(?:0|[1-9][0-9]{0,19})$",
+          "title": "Segments Accepted",
+          "type": "string"
+        },
+        "segments_rejected": {
+          "format": "uint64-decimal",
+          "pattern": "^(?:0|[1-9][0-9]{0,19})$",
+          "title": "Segments Rejected",
+          "type": "string"
+        },
+        "sent_at": {
+          "format": "date-time",
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{3}Z$",
+          "title": "Sent At",
+          "type": "string"
+        },
+        "seq": {
+          "format": "uint64-decimal",
+          "pattern": "^(?:0|[1-9][0-9]{0,19})$",
+          "title": "Seq",
+          "type": "string"
+        },
+        "session_id": {
+          "format": "uuid",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+          "title": "Session Id",
+          "type": "string"
+        },
+        "stats_id": {
+          "format": "uuid",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+          "title": "Stats Id",
+          "type": "string"
+        },
+        "type": {
+          "const": "worker.stats",
+          "title": "Type",
+          "type": "string"
+        },
+        "window_ended_at": {
+          "format": "date-time",
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{3}Z$",
+          "title": "Window Ended At",
+          "type": "string"
+        },
+        "window_started_at": {
+          "format": "date-time",
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{3}Z$",
+          "title": "Window Started At",
+          "type": "string"
+        }
+      },
+      "required": [
+        "protocol",
+        "protocol_minor",
+        "message_id",
+        "type",
+        "sent_at",
+        "lease_id",
+        "session_id",
+        "stats_id",
+        "epoch",
+        "seq",
+        "revision",
+        "processed_audio_ms",
+        "segments_accepted",
+        "segments_rejected",
+        "realtime_factor",
+        "window_started_at",
+        "window_ended_at"
+      ],
+      "title": "WorkerStatsV1",
+      "type": "object"
+    },
+    "WorkerWelcomeV1": {
+      "additionalProperties": false,
+      "properties": {
+        "accepted_capabilities": {
+          "items": {
+            "enum": [
+              "asr.transcribe",
+              "protocol.binary-pcm"
+            ],
+            "type": "string"
+          },
+          "maxItems": 2,
+          "minItems": 2,
+          "title": "Accepted Capabilities",
+          "type": "array",
+          "uniqueItems": true
+        },
+        "accepted_manifests": {
+          "items": {
+            "$ref": "#/$defs/ModelManifestRefV1"
+          },
+          "maxItems": 16,
+          "title": "Accepted Manifests",
+          "type": "array",
+          "uniqueItems": true
+        },
+        "connection_id": {
+          "format": "uuid",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+          "title": "Connection Id",
+          "type": "string"
+        },
+        "message_id": {
+          "format": "uuid",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+          "title": "Message Id",
+          "type": "string"
+        },
+        "minimum_worker_version": {
+          "const": "0.1.0",
+          "title": "Minimum Worker Version",
+          "type": "string"
+        },
+        "protocol": {
+          "const": "livecho.worker.v1",
+          "title": "Protocol",
+          "type": "string"
+        },
+        "protocol_minor": {
+          "const": 0,
+          "title": "Protocol Minor",
+          "type": "integer"
+        },
+        "resume_succeeded": {
+          "title": "Resume Succeeded",
+          "type": "boolean"
+        },
+        "selected_minor": {
+          "const": 0,
+          "title": "Selected Minor",
+          "type": "integer"
+        },
+        "sent_at": {
+          "format": "date-time",
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{3}Z$",
+          "title": "Sent At",
+          "type": "string"
+        },
+        "type": {
+          "const": "worker.welcome",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "protocol",
+        "protocol_minor",
+        "message_id",
+        "type",
+        "sent_at",
+        "connection_id",
+        "selected_minor",
+        "minimum_worker_version",
+        "resume_succeeded",
+        "accepted_capabilities",
+        "accepted_manifests"
+      ],
+      "title": "WorkerWelcomeV1",
+      "type": "object"
+    }
+  },
+  "$id": "https://livecho.invalid/protocol/v1/protocol-v1.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "anyOf": [
+    {
+      "$ref": "#/$defs/WorkerHelloV1"
+    },
+    {
+      "$ref": "#/$defs/WorkerWelcomeV1"
+    },
+    {
+      "$ref": "#/$defs/LeaseV1"
+    },
+    {
+      "$ref": "#/$defs/LeaseCancelV1"
+    },
+    {
+      "$ref": "#/$defs/HeartbeatV1"
+    },
+    {
+      "$ref": "#/$defs/WorkerStatsV1"
+    },
+    {
+      "$ref": "#/$defs/TranscriptSegmentV1"
+    },
+    {
+      "$ref": "#/$defs/TimelineEventV1"
+    },
+    {
+      "$ref": "#/$defs/ViewerSubscribeV1"
+    },
+    {
+      "$ref": "#/$defs/ViewerReadyV1"
+    },
+    {
+      "$ref": "#/$defs/ProtocolAckV1"
+    },
+    {
+      "$ref": "#/$defs/ProtocolErrorV1"
+    }
+  ],
+  "title": "ProtocolMessageV1"
+}

@@ -1,0 +1,7 @@
+{
+  "case_id": "schema.boolean_selected_minor",
+  "code": "schema_invalid",
+  "expect": "rejected",
+  "model": "WorkerWelcomeV1",
+  "raw_text": "{\"protocol\":\"livecho.worker.v1\",\"protocol_minor\":0,\"message_id\":\"00000000-0000-4000-8000-000000000001\",\"type\":\"worker.welcome\",\"sent_at\":\"2026-01-01T00:00:00.000Z\",\"connection_id\":\"00000000-0000-4000-8000-000000000011\",\"selected_minor\":false,\"minimum_worker_version\":\"0.1.0\",\"resume_succeeded\":false,\"accepted_capabilities\":[\"asr.transcribe\",\"protocol.binary-pcm\"],\"accepted_manifests\":[{\"provider\":\"synthetic\",\"model_id\":\"fixture-asr\",\"revision\":\"1\",\"sha256\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"}]}"
+}

@@ -1,0 +1,18 @@
+{
+  "case_id": "revision.immutable",
+  "code": "revision_immutable",
+  "expect": "rejected",
+  "model": "RevisionDecisionV1",
+  "wire": {
+    "candidate_final": false,
+    "candidate_immutable": "changed",
+    "candidate_projection": "changed",
+    "candidate_revision": 2,
+    "current_final": false,
+    "current_immutable": "a",
+    "current_projection": "a",
+    "current_revision": 1,
+    "existing": true,
+    "fill_count": 0
+  }
+}

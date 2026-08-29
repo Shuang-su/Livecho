@@ -1,0 +1,22 @@
+{
+  "case_id": "model.heartbeatv1",
+  "code": "accepted",
+  "expect": "accepted",
+  "model": "HeartbeatV1",
+  "wire": {
+    "audio_buffer_bytes": 0,
+    "epoch": "1",
+    "last_input_seq": null,
+    "last_output_seq": null,
+    "lease_id": "00000000-0000-4000-8000-000000000020",
+    "message_id": "00000000-0000-4000-8000-000000000001",
+    "observed_at": "2026-01-01T00:00:00.000Z",
+    "protocol": "livecho.worker.v1",
+    "protocol_minor": 0,
+    "sent_at": "2026-01-01T00:00:00.000Z",
+    "seq": "0",
+    "session_id": "00000000-0000-4000-8000-000000000030",
+    "state": "ready",
+    "type": "worker.heartbeat"
+  }
+}

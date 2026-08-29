@@ -1,0 +1,18 @@
+{
+  "case_id": "revision.uint64_next",
+  "code": "accepted",
+  "expect": "accepted",
+  "model": "RevisionDecisionV1",
+  "wire": {
+    "candidate_final": false,
+    "candidate_immutable": "a",
+    "candidate_projection": "changed",
+    "candidate_revision": "9007199254740993",
+    "current_final": false,
+    "current_immutable": "a",
+    "current_projection": "a",
+    "current_revision": "9007199254740992",
+    "existing": true,
+    "fill_count": 0
+  }
+}

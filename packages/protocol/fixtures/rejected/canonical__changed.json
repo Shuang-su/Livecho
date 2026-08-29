@@ -1,0 +1,15 @@
+{
+  "case_id": "canonical.changed",
+  "code": "schema_invalid",
+  "expect": "rejected",
+  "model": "CanonicalDecisionV1",
+  "wire": {
+    "expect_equal": true,
+    "left": {
+      "a": 1
+    },
+    "right": {
+      "a": 2
+    }
+  }
+}

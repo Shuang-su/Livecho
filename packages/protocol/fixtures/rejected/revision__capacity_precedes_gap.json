@@ -1,0 +1,18 @@
+{
+  "case_id": "revision.capacity_precedes_gap",
+  "code": "revision_capacity_exceeded",
+  "expect": "rejected",
+  "model": "RevisionDecisionV1",
+  "wire": {
+    "candidate_final": false,
+    "candidate_immutable": "new",
+    "candidate_projection": "new",
+    "candidate_revision": 2,
+    "current_final": false,
+    "current_immutable": "a",
+    "current_projection": "a",
+    "current_revision": 1,
+    "existing": false,
+    "fill_count": 4096
+  }
+}

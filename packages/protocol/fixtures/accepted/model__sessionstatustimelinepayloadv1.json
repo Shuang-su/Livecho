@@ -1,0 +1,10 @@
+{
+  "case_id": "model.sessionstatustimelinepayloadv1",
+  "code": "accepted",
+  "expect": "accepted",
+  "model": "SessionStatusTimelinePayloadV1",
+  "wire": {
+    "reason_code": null,
+    "status": "live"
+  }
+}

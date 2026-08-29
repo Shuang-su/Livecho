@@ -1,0 +1,18 @@
+{
+  "case_id": "model.protocolerrorv1",
+  "code": "accepted",
+  "expect": "accepted",
+  "model": "ProtocolErrorV1",
+  "wire": {
+    "code": "schema_invalid",
+    "expected": null,
+    "message": "Invalid synthetic message",
+    "message_id": "00000000-0000-4000-8000-000000000001",
+    "protocol": "livecho.worker.v1",
+    "protocol_minor": 0,
+    "received": null,
+    "retryable": false,
+    "sent_at": "2026-01-01T00:00:00.000Z",
+    "type": "protocol.error"
+  }
+}

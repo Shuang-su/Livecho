@@ -1,0 +1,14 @@
+{
+  "case_id": "model.workerresumev1",
+  "code": "accepted",
+  "expect": "accepted",
+  "model": "WorkerResumeV1",
+  "wire": {
+    "connection_id": "00000000-0000-4000-8000-000000000011",
+    "epoch": "1",
+    "lease_id": "00000000-0000-4000-8000-000000000020",
+    "next_input_seq": "0",
+    "next_output_seq": "0",
+    "session_id": "00000000-0000-4000-8000-000000000030"
+  }
+}

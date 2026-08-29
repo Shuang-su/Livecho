@@ -1,0 +1,16 @@
+{
+  "viewer": {
+    "accepted_minors": [
+      0
+    ],
+    "major": 1,
+    "minimum_client_version": "0.1.0"
+  },
+  "worker": {
+    "accepted_minors": [
+      0
+    ],
+    "major": 1,
+    "minimum_client_version": "0.1.0"
+  }
+}

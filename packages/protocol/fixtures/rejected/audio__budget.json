@@ -1,0 +1,28 @@
+{
+  "binary_header": {
+    "buffered_bytes": 959999,
+    "epoch": 1,
+    "expected_epoch": 1,
+    "expected_lease_id": "00000000-0000-4000-8000-000000000020",
+    "flags": 0,
+    "header_length": 56,
+    "input_start_seq": 0,
+    "lease_id": "00000000-0000-4000-8000-000000000020",
+    "magic": "LPCM",
+    "major": 1,
+    "minor": 0,
+    "next_expected_seq": 0,
+    "payload_length": 2,
+    "previous_pts": null,
+    "process_buffered_bytes": 0,
+    "pts_ms": 0,
+    "sample_count": 1,
+    "seq": 0,
+    "session_buffered_bytes": 0,
+    "total_length": 58
+  },
+  "case_id": "audio.budget",
+  "code": "audio_budget_exceeded",
+  "expect": "rejected",
+  "model": "PcmHeaderV1"
+}

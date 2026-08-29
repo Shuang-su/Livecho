@@ -1,0 +1,124 @@
+{
+  "$id": "https://livecho.invalid/protocol/v1/HeartbeatV1.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "audio_buffer_bytes": {
+      "maximum": 960000,
+      "minimum": 0,
+      "title": "Audio Buffer Bytes",
+      "type": "integer"
+    },
+    "epoch": {
+      "format": "uint64-decimal",
+      "pattern": "^(?:[1-9][0-9]{0,19})$",
+      "title": "Epoch",
+      "type": "string"
+    },
+    "last_input_seq": {
+      "anyOf": [
+        {
+          "format": "uint64-decimal",
+          "pattern": "^(?:0|[1-9][0-9]{0,19})$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Last Input Seq"
+    },
+    "last_output_seq": {
+      "anyOf": [
+        {
+          "format": "uint64-decimal",
+          "pattern": "^(?:0|[1-9][0-9]{0,19})$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Last Output Seq"
+    },
+    "lease_id": {
+      "format": "uuid",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+      "title": "Lease Id",
+      "type": "string"
+    },
+    "message_id": {
+      "format": "uuid",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+      "title": "Message Id",
+      "type": "string"
+    },
+    "observed_at": {
+      "format": "date-time",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{3}Z$",
+      "title": "Observed At",
+      "type": "string"
+    },
+    "protocol": {
+      "const": "livecho.worker.v1",
+      "title": "Protocol",
+      "type": "string"
+    },
+    "protocol_minor": {
+      "const": 0,
+      "title": "Protocol Minor",
+      "type": "integer"
+    },
+    "sent_at": {
+      "format": "date-time",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{3}Z$",
+      "title": "Sent At",
+      "type": "string"
+    },
+    "seq": {
+      "format": "uint64-decimal",
+      "pattern": "^(?:0|[1-9][0-9]{0,19})$",
+      "title": "Seq",
+      "type": "string"
+    },
+    "session_id": {
+      "format": "uuid",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+      "title": "Session Id",
+      "type": "string"
+    },
+    "state": {
+      "enum": [
+        "ready",
+        "busy",
+        "draining",
+        "error"
+      ],
+      "title": "State",
+      "type": "string"
+    },
+    "type": {
+      "const": "worker.heartbeat",
+      "title": "Type",
+      "type": "string"
+    }
+  },
+  "required": [
+    "protocol",
+    "protocol_minor",
+    "message_id",
+    "type",
+    "sent_at",
+    "lease_id",
+    "session_id",
+    "epoch",
+    "seq",
+    "state",
+    "audio_buffer_bytes",
+    "observed_at"
+  ],
+  "title": "HeartbeatV1",
+  "type": "object"
+}

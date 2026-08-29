@@ -1,0 +1,18 @@
+{
+  "case_id": "revision.duplicate",
+  "code": "revision_duplicate",
+  "expect": "accepted",
+  "model": "RevisionDecisionV1",
+  "wire": {
+    "candidate_final": false,
+    "candidate_immutable": "a",
+    "candidate_projection": "a",
+    "candidate_revision": 1,
+    "current_final": false,
+    "current_immutable": "a",
+    "current_projection": "a",
+    "current_revision": 1,
+    "existing": true,
+    "fill_count": 0
+  }
+}
