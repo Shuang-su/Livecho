@@ -1,0 +1,41 @@
+{
+  "$id": "https://livecho.invalid/protocol/v1/ModelManifestRefV1.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "model_id": {
+      "maxLength": 128,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+      "title": "Model Id",
+      "type": "string"
+    },
+    "provider": {
+      "maxLength": 128,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+      "title": "Provider",
+      "type": "string"
+    },
+    "revision": {
+      "maxLength": 128,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+      "title": "Revision",
+      "type": "string"
+    },
+    "sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Sha256",
+      "type": "string"
+    }
+  },
+  "required": [
+    "provider",
+    "model_id",
+    "revision",
+    "sha256"
+  ],
+  "title": "ModelManifestRefV1",
+  "type": "object"
+}

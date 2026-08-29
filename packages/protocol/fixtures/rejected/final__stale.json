@@ -1,0 +1,18 @@
+{
+  "case_id": "final.stale",
+  "code": "revision_stale",
+  "expect": "rejected",
+  "model": "RevisionDecisionV1",
+  "wire": {
+    "candidate_final": true,
+    "candidate_immutable": "a",
+    "candidate_projection": "old",
+    "candidate_revision": 1,
+    "current_final": true,
+    "current_immutable": "a",
+    "current_projection": "final",
+    "current_revision": 2,
+    "existing": true,
+    "fill_count": 0
+  }
+}

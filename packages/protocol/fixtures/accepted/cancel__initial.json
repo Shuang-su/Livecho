@@ -1,0 +1,10 @@
+{
+  "case_id": "cancel.initial",
+  "code": "accepted",
+  "expect": "accepted",
+  "model": "CancellationDecisionV1",
+  "wire": {
+    "candidate": "new",
+    "initial": "active"
+  }
+}

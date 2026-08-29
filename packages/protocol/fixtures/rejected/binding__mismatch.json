@@ -1,0 +1,10 @@
+{
+  "case_id": "binding.mismatch",
+  "code": "binding_mismatch",
+  "expect": "rejected",
+  "model": "CancellationDecisionV1",
+  "wire": {
+    "candidate": "binding_mismatch",
+    "initial": "active"
+  }
+}

@@ -1,0 +1,127 @@
+{
+  "$id": "https://livecho.invalid/protocol/v1/WorkerStatsV1.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "epoch": {
+      "format": "uint64-decimal",
+      "pattern": "^(?:[1-9][0-9]{0,19})$",
+      "title": "Epoch",
+      "type": "string"
+    },
+    "lease_id": {
+      "format": "uuid",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+      "title": "Lease Id",
+      "type": "string"
+    },
+    "message_id": {
+      "format": "uuid",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+      "title": "Message Id",
+      "type": "string"
+    },
+    "processed_audio_ms": {
+      "format": "uint64-decimal",
+      "pattern": "^(?:0|[1-9][0-9]{0,19})$",
+      "title": "Processed Audio Ms",
+      "type": "string"
+    },
+    "protocol": {
+      "const": "livecho.worker.v1",
+      "title": "Protocol",
+      "type": "string"
+    },
+    "protocol_minor": {
+      "const": 0,
+      "title": "Protocol Minor",
+      "type": "integer"
+    },
+    "realtime_factor": {
+      "maximum": 100,
+      "minimum": 0,
+      "title": "Realtime Factor",
+      "type": "number"
+    },
+    "revision": {
+      "format": "uint64-decimal",
+      "pattern": "^(?:[1-9][0-9]{0,19})$",
+      "title": "Revision",
+      "type": "string"
+    },
+    "segments_accepted": {
+      "format": "uint64-decimal",
+      "pattern": "^(?:0|[1-9][0-9]{0,19})$",
+      "title": "Segments Accepted",
+      "type": "string"
+    },
+    "segments_rejected": {
+      "format": "uint64-decimal",
+      "pattern": "^(?:0|[1-9][0-9]{0,19})$",
+      "title": "Segments Rejected",
+      "type": "string"
+    },
+    "sent_at": {
+      "format": "date-time",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{3}Z$",
+      "title": "Sent At",
+      "type": "string"
+    },
+    "seq": {
+      "format": "uint64-decimal",
+      "pattern": "^(?:0|[1-9][0-9]{0,19})$",
+      "title": "Seq",
+      "type": "string"
+    },
+    "session_id": {
+      "format": "uuid",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+      "title": "Session Id",
+      "type": "string"
+    },
+    "stats_id": {
+      "format": "uuid",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+      "title": "Stats Id",
+      "type": "string"
+    },
+    "type": {
+      "const": "worker.stats",
+      "title": "Type",
+      "type": "string"
+    },
+    "window_ended_at": {
+      "format": "date-time",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{3}Z$",
+      "title": "Window Ended At",
+      "type": "string"
+    },
+    "window_started_at": {
+      "format": "date-time",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{3}Z$",
+      "title": "Window Started At",
+      "type": "string"
+    }
+  },
+  "required": [
+    "protocol",
+    "protocol_minor",
+    "message_id",
+    "type",
+    "sent_at",
+    "lease_id",
+    "session_id",
+    "stats_id",
+    "epoch",
+    "seq",
+    "revision",
+    "processed_audio_ms",
+    "segments_accepted",
+    "segments_rejected",
+    "realtime_factor",
+    "window_started_at",
+    "window_ended_at"
+  ],
+  "title": "WorkerStatsV1",
+  "type": "object"
+}

@@ -1,0 +1,13 @@
+{
+  "case_id": "sequence.conflict",
+  "code": "seq_conflict",
+  "expect": "rejected",
+  "model": "JsonSequenceDecisionV1",
+  "wire": {
+    "accepted_count": 1,
+    "candidate_message_id": "00000000-0000-4000-8000-000000000002",
+    "candidate_seq": 0,
+    "candidate_value_index": 1,
+    "start_seq": 0
+  }
+}

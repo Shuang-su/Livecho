@@ -1,0 +1,17 @@
+{
+  "case_id": "canonical.equal",
+  "code": "accepted",
+  "expect": "accepted",
+  "model": "CanonicalDecisionV1",
+  "wire": {
+    "expect_equal": true,
+    "left": {
+      "a": "synthetic",
+      "b": 1.0
+    },
+    "right": {
+      "a": "synthetic",
+      "b": 1
+    }
+  }
+}

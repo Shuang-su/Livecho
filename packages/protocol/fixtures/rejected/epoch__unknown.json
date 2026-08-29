@@ -1,0 +1,10 @@
+{
+  "case_id": "epoch.unknown",
+  "code": "epoch_unknown",
+  "expect": "rejected",
+  "model": "EpochDecisionV1",
+  "wire": {
+    "current": 1,
+    "received": 2
+  }
+}

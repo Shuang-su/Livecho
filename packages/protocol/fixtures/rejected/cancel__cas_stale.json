@@ -1,0 +1,10 @@
+{
+  "case_id": "cancel.cas_stale",
+  "code": "revision_stale",
+  "expect": "rejected",
+  "model": "CancellationDecisionV1",
+  "wire": {
+    "candidate": "cas_stale",
+    "initial": "active"
+  }
+}

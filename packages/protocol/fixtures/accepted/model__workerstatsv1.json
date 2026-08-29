@@ -1,0 +1,25 @@
+{
+  "case_id": "model.workerstatsv1",
+  "code": "accepted",
+  "expect": "accepted",
+  "model": "WorkerStatsV1",
+  "wire": {
+    "epoch": "1",
+    "lease_id": "00000000-0000-4000-8000-000000000020",
+    "message_id": "00000000-0000-4000-8000-000000000001",
+    "processed_audio_ms": "0",
+    "protocol": "livecho.worker.v1",
+    "protocol_minor": 0,
+    "realtime_factor": 1.0,
+    "revision": "1",
+    "segments_accepted": "0",
+    "segments_rejected": "0",
+    "sent_at": "2026-01-01T00:00:00.000Z",
+    "seq": "0",
+    "session_id": "00000000-0000-4000-8000-000000000030",
+    "stats_id": "00000000-0000-4000-8000-000000000050",
+    "type": "worker.stats",
+    "window_ended_at": "2026-01-01T00:00:01.000Z",
+    "window_started_at": "2026-01-01T00:00:00.000Z"
+  }
+}

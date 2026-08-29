@@ -1,0 +1,10 @@
+{
+  "case_id": "lease.unknown",
+  "code": "lease_unknown",
+  "expect": "rejected",
+  "model": "CancellationDecisionV1",
+  "wire": {
+    "candidate": "new",
+    "initial": "missing"
+  }
+}

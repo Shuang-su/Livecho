@@ -1,0 +1,33 @@
+{
+  "name": "@livecho/protocol",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Generated and executable Livecho protocol v1 contract.",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "schema"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "lint": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "ajv": "8.20.0",
+    "canonicalize": "4.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "26.4.0",
+    "json-schema-to-typescript": "16.0.0",
+    "typescript": "7.0.2",
+    "vitest": "4.1.11"
+  }
+}

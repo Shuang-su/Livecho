@@ -1,0 +1,11 @@
+{
+  "case_id": "canonical.number_spelling",
+  "code": "accepted",
+  "expect": "accepted",
+  "model": "CanonicalRawDecisionV1",
+  "wire": {
+    "expect_equal": true,
+    "left_raw": "{\"a\":1.0}",
+    "right_raw": "{\"a\":1e0}"
+  }
+}

@@ -1,0 +1,214 @@
+{
+  "$defs": {
+    "SessionStatusTimelinePayloadV1": {
+      "additionalProperties": false,
+      "properties": {
+        "reason_code": {
+          "anyOf": [
+            {
+              "maxLength": 64,
+              "minLength": 1,
+              "pattern": "^[a-z][a-z0-9_]*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Reason Code"
+        },
+        "status": {
+          "enum": [
+            "starting",
+            "live",
+            "stopping",
+            "stopped",
+            "failed"
+          ],
+          "title": "Status",
+          "type": "string"
+        }
+      },
+      "required": [
+        "status"
+      ],
+      "title": "SessionStatusTimelinePayloadV1",
+      "type": "object"
+    },
+    "TranscriptTimelinePayloadV1": {
+      "additionalProperties": false,
+      "properties": {
+        "confidence": {
+          "anyOf": [
+            {
+              "maximum": 1,
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Confidence"
+        },
+        "end_ms": {
+          "maximum": 2147483647,
+          "minimum": 0,
+          "title": "End Ms",
+          "type": "integer"
+        },
+        "is_final": {
+          "title": "Is Final",
+          "type": "boolean"
+        },
+        "language": {
+          "anyOf": [
+            {
+              "maxLength": 35,
+              "minLength": 2,
+              "pattern": "^[A-Za-z]{2,8}(?:-[A-Za-z0-9]{1,8})*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Language"
+        },
+        "segment_id": {
+          "format": "uuid",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+          "title": "Segment Id",
+          "type": "string"
+        },
+        "start_ms": {
+          "maximum": 2147483647,
+          "minimum": 0,
+          "title": "Start Ms",
+          "type": "integer"
+        },
+        "text": {
+          "maxLength": 4096,
+          "minLength": 1,
+          "title": "Text",
+          "type": "string"
+        }
+      },
+      "required": [
+        "segment_id",
+        "start_ms",
+        "end_ms",
+        "text",
+        "is_final"
+      ],
+      "title": "TranscriptTimelinePayloadV1",
+      "type": "object"
+    }
+  },
+  "$id": "https://livecho.invalid/protocol/v1/TimelineEventV1.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "epoch": {
+      "format": "uint64-decimal",
+      "pattern": "^(?:[1-9][0-9]{0,19})$",
+      "title": "Epoch",
+      "type": "string"
+    },
+    "event_id": {
+      "format": "uuid",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+      "title": "Event Id",
+      "type": "string"
+    },
+    "message_id": {
+      "format": "uuid",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+      "title": "Message Id",
+      "type": "string"
+    },
+    "occurred_at": {
+      "format": "date-time",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{3}Z$",
+      "title": "Occurred At",
+      "type": "string"
+    },
+    "payload": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/TranscriptTimelinePayloadV1"
+        },
+        {
+          "$ref": "#/$defs/SessionStatusTimelinePayloadV1"
+        }
+      ],
+      "title": "Payload"
+    },
+    "protocol": {
+      "const": "livecho.viewer.v1",
+      "title": "Protocol",
+      "type": "string"
+    },
+    "protocol_minor": {
+      "const": 0,
+      "title": "Protocol Minor",
+      "type": "integer"
+    },
+    "revision": {
+      "format": "uint64-decimal",
+      "pattern": "^(?:[1-9][0-9]{0,19})$",
+      "title": "Revision",
+      "type": "string"
+    },
+    "room_id": {
+      "maxLength": 128,
+      "minLength": 1,
+      "pattern": "^[a-z0-9][a-z0-9._:-]*$",
+      "title": "Room Id",
+      "type": "string"
+    },
+    "sent_at": {
+      "format": "date-time",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{3}Z$",
+      "title": "Sent At",
+      "type": "string"
+    },
+    "seq": {
+      "format": "uint64-decimal",
+      "pattern": "^(?:0|[1-9][0-9]{0,19})$",
+      "title": "Seq",
+      "type": "string"
+    },
+    "session_id": {
+      "format": "uuid",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+      "title": "Session Id",
+      "type": "string"
+    },
+    "type": {
+      "const": "viewer.timeline_event",
+      "title": "Type",
+      "type": "string"
+    }
+  },
+  "required": [
+    "protocol",
+    "protocol_minor",
+    "message_id",
+    "type",
+    "sent_at",
+    "event_id",
+    "session_id",
+    "room_id",
+    "epoch",
+    "seq",
+    "revision",
+    "occurred_at",
+    "payload"
+  ],
+  "title": "TimelineEventV1",
+  "type": "object"
+}

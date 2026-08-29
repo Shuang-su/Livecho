@@ -1,0 +1,32 @@
+{
+  "$id": "https://livecho.invalid/protocol/v1/ViewerCursorV1.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "epoch": {
+      "format": "uint64-decimal",
+      "pattern": "^(?:[1-9][0-9]{0,19})$",
+      "title": "Epoch",
+      "type": "string"
+    },
+    "next_seq": {
+      "format": "uint64-decimal",
+      "pattern": "^(?:0|[1-9][0-9]{0,19})$",
+      "title": "Next Seq",
+      "type": "string"
+    },
+    "session_id": {
+      "format": "uuid",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+      "title": "Session Id",
+      "type": "string"
+    }
+  },
+  "required": [
+    "session_id",
+    "epoch",
+    "next_seq"
+  ],
+  "title": "ViewerCursorV1",
+  "type": "object"
+}

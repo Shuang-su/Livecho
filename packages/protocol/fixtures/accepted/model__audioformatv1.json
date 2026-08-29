@@ -1,0 +1,11 @@
+{
+  "case_id": "model.audioformatv1",
+  "code": "accepted",
+  "expect": "accepted",
+  "model": "AudioFormatV1",
+  "wire": {
+    "channels": 1,
+    "encoding": "pcm_s16le",
+    "sample_rate_hz": 16000
+  }
+}

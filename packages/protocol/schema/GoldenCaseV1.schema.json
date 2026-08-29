@@ -1,0 +1,80 @@
+{
+  "$id": "https://livecho.invalid/protocol/v1/GoldenCaseV1.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "binary_header": {
+      "anyOf": [
+        {
+          "additionalProperties": true,
+          "type": "object"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Binary Header"
+    },
+    "case_id": {
+      "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$",
+      "title": "Case Id",
+      "type": "string"
+    },
+    "code": {
+      "maxLength": 64,
+      "minLength": 1,
+      "pattern": "^[a-z][a-z0-9_]*$",
+      "title": "Code",
+      "type": "string"
+    },
+    "expect": {
+      "enum": [
+        "accepted",
+        "rejected"
+      ],
+      "title": "Expect",
+      "type": "string"
+    },
+    "model": {
+      "maxLength": 64,
+      "minLength": 1,
+      "pattern": "^[A-Za-z][A-Za-z0-9]+$",
+      "title": "Model",
+      "type": "string"
+    },
+    "raw_text": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Raw Text"
+    },
+    "wire": {
+      "anyOf": [
+        {
+          "additionalProperties": true,
+          "type": "object"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Wire"
+    }
+  },
+  "required": [
+    "case_id",
+    "model",
+    "expect",
+    "code"
+  ],
+  "title": "GoldenCaseV1",
+  "type": "object"
+}

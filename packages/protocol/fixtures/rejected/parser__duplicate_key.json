@@ -1,0 +1,7 @@
+{
+  "case_id": "parser.duplicate_key",
+  "code": "duplicate_key",
+  "expect": "rejected",
+  "model": "WorkerHelloV1",
+  "raw_text": "{\"protocol\":\"livecho.worker.v1\",\"protocol\":\"livecho.worker.v1\"}"
+}

@@ -1,0 +1,84 @@
+{
+  "$id": "https://livecho.invalid/protocol/v1/LeaseCancelV1.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "epoch": {
+      "format": "uint64-decimal",
+      "pattern": "^(?:[1-9][0-9]{0,19})$",
+      "title": "Epoch",
+      "type": "string"
+    },
+    "expected_revision": {
+      "format": "uint64-decimal",
+      "pattern": "^(?:[1-9][0-9]{0,19})$",
+      "title": "Expected Revision",
+      "type": "string"
+    },
+    "lease_id": {
+      "format": "uuid",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+      "title": "Lease Id",
+      "type": "string"
+    },
+    "message_id": {
+      "format": "uuid",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+      "title": "Message Id",
+      "type": "string"
+    },
+    "protocol": {
+      "const": "livecho.worker.v1",
+      "title": "Protocol",
+      "type": "string"
+    },
+    "protocol_minor": {
+      "const": 0,
+      "title": "Protocol Minor",
+      "type": "integer"
+    },
+    "reason": {
+      "enum": [
+        "operator_stop",
+        "lease_expired",
+        "worker_replaced",
+        "policy_disable",
+        "protocol_violation",
+        "session_end"
+      ],
+      "title": "Reason",
+      "type": "string"
+    },
+    "sent_at": {
+      "format": "date-time",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{3}Z$",
+      "title": "Sent At",
+      "type": "string"
+    },
+    "session_id": {
+      "format": "uuid",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+      "title": "Session Id",
+      "type": "string"
+    },
+    "type": {
+      "const": "worker.lease_cancel",
+      "title": "Type",
+      "type": "string"
+    }
+  },
+  "required": [
+    "protocol",
+    "protocol_minor",
+    "message_id",
+    "type",
+    "sent_at",
+    "lease_id",
+    "session_id",
+    "epoch",
+    "expected_revision",
+    "reason"
+  ],
+  "title": "LeaseCancelV1",
+  "type": "object"
+}

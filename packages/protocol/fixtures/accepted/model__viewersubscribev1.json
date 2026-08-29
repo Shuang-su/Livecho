@@ -1,0 +1,19 @@
+{
+  "case_id": "model.viewersubscribev1",
+  "code": "accepted",
+  "expect": "accepted",
+  "model": "ViewerSubscribeV1",
+  "wire": {
+    "client_version": "0.1.0",
+    "cursor": null,
+    "message_id": "00000000-0000-4000-8000-000000000001",
+    "protocol": "livecho.viewer.v1",
+    "protocol_minor": 0,
+    "room_id": "synthetic-room",
+    "sent_at": "2026-01-01T00:00:00.000Z",
+    "supported_minors": [
+      0
+    ],
+    "type": "viewer.subscribe"
+  }
+}

@@ -1,0 +1,73 @@
+{
+  "$id": "https://livecho.invalid/protocol/v1/TranscriptTimelinePayloadV1.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "confidence": {
+      "anyOf": [
+        {
+          "maximum": 1,
+          "minimum": 0,
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Confidence"
+    },
+    "end_ms": {
+      "maximum": 2147483647,
+      "minimum": 0,
+      "title": "End Ms",
+      "type": "integer"
+    },
+    "is_final": {
+      "title": "Is Final",
+      "type": "boolean"
+    },
+    "language": {
+      "anyOf": [
+        {
+          "maxLength": 35,
+          "minLength": 2,
+          "pattern": "^[A-Za-z]{2,8}(?:-[A-Za-z0-9]{1,8})*$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Language"
+    },
+    "segment_id": {
+      "format": "uuid",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+      "title": "Segment Id",
+      "type": "string"
+    },
+    "start_ms": {
+      "maximum": 2147483647,
+      "minimum": 0,
+      "title": "Start Ms",
+      "type": "integer"
+    },
+    "text": {
+      "maxLength": 4096,
+      "minLength": 1,
+      "title": "Text",
+      "type": "string"
+    }
+  },
+  "required": [
+    "segment_id",
+    "start_ms",
+    "end_ms",
+    "text",
+    "is_final"
+  ],
+  "title": "TranscriptTimelinePayloadV1",
+  "type": "object"
+}

@@ -1,0 +1,13 @@
+{
+  "case_id": "sequence.resync",
+  "code": "resync_required",
+  "expect": "rejected",
+  "model": "JsonSequenceDecisionV1",
+  "wire": {
+    "accepted_count": 257,
+    "candidate_message_id": "00000000-0000-4000-8000-000000000001",
+    "candidate_seq": 0,
+    "candidate_value_index": 0,
+    "start_seq": 0
+  }
+}

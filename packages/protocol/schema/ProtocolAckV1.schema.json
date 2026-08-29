@@ -1,0 +1,106 @@
+{
+  "$id": "https://livecho.invalid/protocol/v1/ProtocolAckV1.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "acknowledged_message_id": {
+      "format": "uuid",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+      "title": "Acknowledged Message Id",
+      "type": "string"
+    },
+    "expected_revision": {
+      "anyOf": [
+        {
+          "format": "uint64-decimal",
+          "pattern": "^(?:[1-9][0-9]{0,19})$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Expected Revision"
+    },
+    "message_id": {
+      "format": "uuid",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+      "title": "Message Id",
+      "type": "string"
+    },
+    "outcome": {
+      "enum": [
+        "accepted",
+        "seq_duplicate",
+        "revision_duplicate",
+        "cancel_duplicate"
+      ],
+      "title": "Outcome",
+      "type": "string"
+    },
+    "protocol": {
+      "enum": [
+        "livecho.worker.v1",
+        "livecho.viewer.v1"
+      ],
+      "title": "Protocol",
+      "type": "string"
+    },
+    "protocol_minor": {
+      "const": 0,
+      "title": "Protocol Minor",
+      "type": "integer"
+    },
+    "revision": {
+      "anyOf": [
+        {
+          "format": "uint64-decimal",
+          "pattern": "^(?:[1-9][0-9]{0,19})$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Revision"
+    },
+    "sent_at": {
+      "format": "date-time",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{3}Z$",
+      "title": "Sent At",
+      "type": "string"
+    },
+    "seq": {
+      "anyOf": [
+        {
+          "format": "uint64-decimal",
+          "pattern": "^(?:0|[1-9][0-9]{0,19})$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Seq"
+    },
+    "type": {
+      "const": "protocol.ack",
+      "title": "Type",
+      "type": "string"
+    }
+  },
+  "required": [
+    "protocol",
+    "protocol_minor",
+    "message_id",
+    "type",
+    "sent_at",
+    "outcome",
+    "acknowledged_message_id"
+  ],
+  "title": "ProtocolAckV1",
+  "type": "object"
+}

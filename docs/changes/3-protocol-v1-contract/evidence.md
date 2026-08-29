@@ -3,8 +3,17 @@
 ## Artifact approval
 
 - Artifact PR: #23
+- Artifact merge: `77fb21b` on `main`
 - Approved by/date: @Shuang-su / 2026-08-30 (delegated merge after repository checks and
   review gates pass)
+
+## Implementation approval
+
+- Implementation branch: `codex/issue-3-protocol-v1-implementation`, based on
+  `77fb21b`
+- Implementation PR: pending at this evidence checkpoint
+- Authorized by/date: @Shuang-su / 2026-08-30 (continue implementation and merge after
+  repository checks and review gates pass)
 
 ## Automated verification
 
@@ -17,12 +26,37 @@
 | `git diff --check && git diff --cached --check` | Passed with no whitespace errors. | 2026-08-30 / staged artifact tree |
 | `git diff --cached --name-only` | Passed; exactly the four required files under `docs/changes/3-protocol-v1-contract/` were listed. | 2026-08-30 / staged artifact tree |
 
+## Implementation verification
+
+| Command | Result | Date/commit |
+| --- | --- | --- |
+| `make bootstrap` | Passed; uv verified the frozen Python environment and pnpm 11.21.0 verified the frozen two-workspace install and supply-chain policy. | 2026-08-30 / staged implementation tree |
+| `make protocol-generate` | Passed; rewrote the complete generated tree transactionally from the Pydantic source and pinned generator. | 2026-08-30 / staged implementation tree |
+| `git diff --exit-code -- packages/protocol/schema packages/protocol/src/generated packages/protocol/fixtures` | Passed after regeneration; generated Schema, TypeScript, compatibility, and fixture bytes match the staged output. | 2026-08-30 / staged implementation tree |
+| `make protocol-check` | Passed: `protocol generated artifacts: ok`; the checker compared all expected paths and bytes from a temporary generation. | 2026-08-30 / staged implementation tree |
+| `uv run pytest -q tests/protocol` | Passed: 36 protocol tests. | 2026-08-30 / staged implementation tree |
+| `pnpm --filter @livecho/protocol typecheck` | Passed with TypeScript strict mode. | 2026-08-30 / staged implementation tree |
+| `pnpm --filter @livecho/protocol test` | Passed: one Vitest file and 72 tests, comprising 71 generated parity cases plus the corpus integrity assertion. | 2026-08-30 / staged implementation tree |
+| `make verify` | Passed; Ruff, workspace lint, mypy, TypeScript checks, 76 pytest tests, 72 Vitest tests, artifact lifecycle, protocol drift, and build all succeeded. | 2026-08-30 / implementation working tree |
+| `git diff --check && git diff --cached --check` | Passed with no whitespace errors. | 2026-08-30 / staged implementation tree |
+
+The generated corpus contains 71 unique cases: 30 accepted and 41 rejected. Every
+`StableCode` value occurs as an expected result. All 18 public Pydantic models have an
+accepted case; the remaining cases cover parser/version/capability/manifest failures,
+JSON and record-free PCM sequence boundaries, revision precedence/capacity/immutability,
+all four final-object outcomes, cancellation CAS/tombstones, reconnect, RFC 8785
+representation variants, and metadata-only binary/PTS/budget boundaries.
+
+Generated output contains 21 Schema/compatibility files, one TypeScript contract, and
+72 fixture files including the manifest. Negative drift tests independently prove that
+a changed file, a missing file, and an unexpected extra file each fail comparison.
+
 ## Manual or hardware evidence
 
 No hardware, live source, model, deployment, real audio, or real platform/account data
-is required or permitted for this artifact-only change. A manual trace covered the six
-Issue models, supporting handshake/outcome/error models, both subprotocols, the fixed
-binary header, ordering/reconnect outcomes, stable rejection codes, deterministic
+is required or permitted for this contract implementation. A manual trace covered the
+six Issue models, supporting handshake/outcome/error models, both subprotocols, the
+fixed binary header, ordering/reconnect outcomes, stable rejection codes, deterministic
 generation, shared golden cases, minimum versions, and the Issue #2 audio ceilings.
 
 ## Review findings
@@ -80,7 +114,27 @@ generation, shared golden cases, minimum versions, and the Issue #2 audio ceilin
 - Repository-owner merge authorization is recorded above. Codex completed its review of
   material contract head `3d9ffdf` with no remaining major finding; every P1/P2 review
   thread is resolved. Cursor Bugbot is optional and remained pending, so it is not a
-  merge gate. Implementation and generated files wait for the artifact PR to merge.
+  merge gate. The artifact PR subsequently merged as `77fb21b` before implementation
+  began on the separate branch recorded above.
+- Implementation review confirmed that every public and nested model is recursively
+  closed and bounded, the manifest is an identifier/digest-only equality claim, and the
+  TypeScript Ajv layer enforces the generated schema plus the same semantic constraints
+  as Python.
+- Ordering review confirmed exact sequence-before-revision precedence, the 256-record
+  JSON FIFO, the record-free 256-position PCM window, the 4,096-identity revision
+  ceiling, immutable projections, final-object precedence, unchanged rejected state,
+  and cleanup into a terminal lease state.
+- Cancellation review confirmed a successful CAS close clears PCM bytes and ordinary
+  sequence/revision state immediately, retains only a bounded metadata tombstone, and
+  makes all later lease input/output return `lease_closed`.
+- Generation review confirmed pinned Python/Node dependencies, stable IDs/order/LF
+  output without timestamps or machine paths, rollback-capable directory replacement,
+  and changed/missing/extra drift detection in `make verify`.
+- Data/surface tests found no fixture audio file or binary payload and no public Schema
+  field for a URL/URI, playback locator, credential/cookie, arbitrary command/code path,
+  container/environment/options, raw platform payload, PCM/audio bytes, or audio base64.
+  Binary tests allocate only minimal synthetic byte arrays in memory and never print,
+  snapshot, or persist them.
 
 ## Deviations
 
@@ -88,4 +142,6 @@ None.
 
 ## Release and rollback evidence
 
-Not deployed. This artifact-only change has no runtime rollback.
+Not deployed or wired to production runtime paths. Before downstream integration, the
+complete rollback is a normal revert of the implementation commit; generated outputs
+are recreated from the reverted Pydantic source and pinned toolchain.

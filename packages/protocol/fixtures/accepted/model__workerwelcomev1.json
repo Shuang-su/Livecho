@@ -1,0 +1,29 @@
+{
+  "case_id": "model.workerwelcomev1",
+  "code": "accepted",
+  "expect": "accepted",
+  "model": "WorkerWelcomeV1",
+  "wire": {
+    "accepted_capabilities": [
+      "asr.transcribe",
+      "protocol.binary-pcm"
+    ],
+    "accepted_manifests": [
+      {
+        "model_id": "fixture-asr",
+        "provider": "synthetic",
+        "revision": "1",
+        "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      }
+    ],
+    "connection_id": "00000000-0000-4000-8000-000000000011",
+    "message_id": "00000000-0000-4000-8000-000000000001",
+    "minimum_worker_version": "0.1.0",
+    "protocol": "livecho.worker.v1",
+    "protocol_minor": 0,
+    "resume_succeeded": false,
+    "selected_minor": 0,
+    "sent_at": "2026-01-01T00:00:00.000Z",
+    "type": "worker.welcome"
+  }
+}

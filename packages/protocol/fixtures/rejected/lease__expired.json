@@ -1,0 +1,13 @@
+{
+  "case_id": "lease.expired",
+  "code": "lease_expired",
+  "expect": "rejected",
+  "model": "ResumeDecisionV1",
+  "wire": {
+    "binding": "same",
+    "epoch": 1,
+    "expired": true,
+    "live": true,
+    "sequence": "same"
+  }
+}

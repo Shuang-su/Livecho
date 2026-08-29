@@ -1,0 +1,10 @@
+{
+  "case_id": "lease.closed",
+  "code": "lease_closed",
+  "expect": "rejected",
+  "model": "CancellationDecisionV1",
+  "wire": {
+    "candidate": "new",
+    "initial": "closed"
+  }
+}

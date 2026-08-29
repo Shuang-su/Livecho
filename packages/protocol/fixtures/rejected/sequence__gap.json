@@ -1,0 +1,13 @@
+{
+  "case_id": "sequence.gap",
+  "code": "seq_gap",
+  "expect": "rejected",
+  "model": "JsonSequenceDecisionV1",
+  "wire": {
+    "accepted_count": 1,
+    "candidate_message_id": "00000000-0000-4000-8000-000000000001",
+    "candidate_seq": 2,
+    "candidate_value_index": 2,
+    "start_seq": 0
+  }
+}

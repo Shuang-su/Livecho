@@ -3,7 +3,10 @@ name = "livecho-dev"
 version = "0.0.0"
 description = "Development tooling for the Livecho monorepo"
 requires-python = ">=3.12,<3.13"
-dependencies = []
+dependencies = [
+    "pydantic==2.13.5",
+    "rfc8785==0.1.4",
+]
 
 [dependency-groups]
 dev = [
@@ -18,7 +21,7 @@ required-version = "==0.12.1"
 
 [tool.pytest.ini_options]
 addopts = "--strict-config --strict-markers --import-mode=importlib"
-pythonpath = ["."]
+pythonpath = [".", "packages/protocol/python"]
 testpaths = ["tests", "apps", "packages", "services", "workers", "tools"]
 norecursedirs = [
   ".*",
@@ -50,3 +53,4 @@ python_version = "3.12"
 strict = true
 files = ["."]
 exclude_gitignore = true
+mypy_path = "packages/protocol/python"

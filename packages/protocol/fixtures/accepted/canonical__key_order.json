@@ -1,0 +1,11 @@
+{
+  "case_id": "canonical.key_order",
+  "code": "accepted",
+  "expect": "accepted",
+  "model": "CanonicalRawDecisionV1",
+  "wire": {
+    "expect_equal": true,
+    "left_raw": "{\"b\":1,\"a\":\"synthetic\"}",
+    "right_raw": "{\"a\":\"synthetic\",\"b\":1}"
+  }
+}
