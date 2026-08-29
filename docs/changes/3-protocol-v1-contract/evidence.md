@@ -30,15 +30,15 @@
 
 | Command | Result | Date/commit |
 | --- | --- | --- |
-| `make bootstrap` | Passed; uv verified the frozen Python environment and pnpm 11.21.0 verified the frozen two-workspace install and supply-chain policy. | 2026-08-30 / `2457dbc` |
-| `make protocol-generate` | Passed; rewrote the complete generated tree transactionally from the Pydantic source and pinned generator. | 2026-08-30 / `2457dbc` |
-| `git diff --exit-code -- packages/protocol/schema packages/protocol/src/generated packages/protocol/fixtures` | Passed after regeneration; generated Schema, TypeScript, compatibility, and fixture bytes match the committed output. | 2026-08-30 / `2457dbc` |
-| `make protocol-check` | Passed: `protocol generated artifacts: ok`; the checker compared all expected paths and bytes from a temporary generation. | 2026-08-30 / `2457dbc` |
-| `uv run pytest -q tests/protocol` | Passed: 36 protocol tests. | 2026-08-30 / `2457dbc` |
-| `pnpm --filter @livecho/protocol typecheck` | Passed with TypeScript strict mode. | 2026-08-30 / `2457dbc` |
-| `pnpm --filter @livecho/protocol test` | Passed: one Vitest file and 72 tests, comprising 71 generated parity cases plus the corpus integrity assertion. | 2026-08-30 / `2457dbc` |
-| `make verify` | Passed; Ruff, workspace lint, mypy, TypeScript checks, 76 pytest tests, 72 Vitest tests, artifact lifecycle, protocol drift, and build all succeeded. | 2026-08-30 / `2457dbc` |
-| `git diff --check && git diff --cached --check` | Passed with no whitespace errors. | 2026-08-30 / `2457dbc` |
+| `make bootstrap` | Passed; uv verified the frozen Python environment and pnpm 11.21.0 verified the frozen two-workspace install and supply-chain policy. | 2026-08-30 / `b9f65db` |
+| `make protocol-generate` | Passed; rewrote the complete generated tree transactionally from the Pydantic source and pinned generator. | 2026-08-30 / `b9f65db` |
+| `git diff --exit-code -- packages/protocol/schema packages/protocol/src/generated packages/protocol/fixtures` | Passed after regeneration; generated Schema, TypeScript, compatibility, and fixture bytes match the committed output. | 2026-08-30 / `b9f65db` |
+| `make protocol-check` | Passed: `protocol generated artifacts: ok`; the checker compared all expected paths and bytes from a temporary generation. | 2026-08-30 / `b9f65db` |
+| `uv run pytest -q tests/protocol` | Passed: 38 protocol tests. | 2026-08-30 / `b9f65db` |
+| `pnpm --filter @livecho/protocol typecheck` | Passed with TypeScript strict mode; also rerun by `make verify`. | 2026-08-30 / `b9f65db` |
+| `pnpm --filter @livecho/protocol test` | Passed: one Vitest file and 72 tests, comprising 71 generated parity cases plus the corpus integrity assertion; also rerun by `make verify`. | 2026-08-30 / `b9f65db` |
+| `make verify` | Passed; Ruff, workspace lint, mypy, TypeScript checks, 78 pytest tests, 72 Vitest tests, artifact lifecycle, protocol drift, and build all succeeded. | 2026-08-30 / `b9f65db` |
+| `git diff --check && git diff --cached --check` | Passed with no whitespace errors. | 2026-08-30 / `b9f65db` |
 
 The generated corpus contains 71 unique cases: 30 accepted and 41 rejected. Every
 `StableCode` value occurs as an expected result. All 18 public Pydantic models have an
@@ -135,6 +135,14 @@ generation, shared golden cases, minimum versions, and the Issue #2 audio ceilin
   container/environment/options, raw platform payload, PCM/audio bytes, or audio base64.
   Binary tests allocate only minimal synthetic byte arrays in memory and never print,
   snapshot, or persist them.
+- Implementation-head Codex review P1 found that `LeaseV1` revisions have no `seq` and
+  therefore could not use the sequenced stream state. Resolved with a dedicated
+  non-sequenced lease revision domain that handles duplicate/gap/immutable decisions
+  and updates the cancellation CAS revision after an accepted lease revision.
+- Implementation-head Codex review P1 found that the composed lease runtime did not
+  enforce `expires_at`. Resolved with one deadline gate before PCM, output, lease-update,
+  and cancellation decisions; expiry atomically clears all three ordinary state domains,
+  removes the active cancellation entry, and remains terminal as `lease_expired`.
 
 ## Deviations
 
