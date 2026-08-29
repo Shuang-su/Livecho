@@ -1,0 +1,11 @@
+{
+  "case_id": "pcm_sequence.uint64_gap",
+  "code": "seq_gap",
+  "expect": "rejected",
+  "model": "PcmSequenceDecisionV1",
+  "wire": {
+    "accepted_count": 0,
+    "candidate_seq": "9007199254740993",
+    "start_seq": "9007199254740992"
+  }
+}

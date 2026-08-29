@@ -1,0 +1,12 @@
+{
+  "case_id": "version.nested_protocol_field",
+  "code": "unknown_field",
+  "expect": "rejected",
+  "model": "AudioFormatV1",
+  "wire": {
+    "channels": 1,
+    "encoding": "pcm_s16le",
+    "protocol": "livecho.worker.v1",
+    "sample_rate_hz": 16000
+  }
+}

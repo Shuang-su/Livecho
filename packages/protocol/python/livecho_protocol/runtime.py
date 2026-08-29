@@ -6,7 +6,7 @@ from collections.abc import Mapping
 from datetime import datetime
 from typing import Any
 
-from .binary import PROCESS_AUDIO_BUDGET, PcmLeaseState
+from .binary import LEASE_AUDIO_BUDGET, PROCESS_AUDIO_BUDGET, PcmLeaseState
 from .errors import Decision, StableCode
 from .models import LeaseCancelV1, LeaseV1
 from .scalars import parse_timestamp
@@ -20,16 +20,32 @@ class _ProcessPcmBudget:
 
     def __init__(self) -> None:
         self.buffered_bytes = 0
+        self._session_bytes: dict[str, int] = {}
 
-    def add(self, byte_count: int) -> None:
-        if byte_count < 0 or self.buffered_bytes + byte_count > PROCESS_AUDIO_BUDGET:
+    def session_bytes(self, session_id: str) -> int:
+        return self._session_bytes.get(session_id, 0)
+
+    def add(self, session_id: str, byte_count: int) -> None:
+        session_bytes = self.session_bytes(session_id)
+        if (
+            byte_count < 0
+            or session_bytes + byte_count > LEASE_AUDIO_BUDGET
+            or self.buffered_bytes + byte_count > PROCESS_AUDIO_BUDGET
+        ):
             raise RuntimeError("invalid process PCM budget increase")
         self.buffered_bytes += byte_count
+        self._session_bytes[session_id] = session_bytes + byte_count
 
-    def release(self, byte_count: int) -> None:
-        if byte_count < 0 or byte_count > self.buffered_bytes:
+    def release(self, session_id: str, byte_count: int) -> None:
+        session_bytes = self.session_bytes(session_id)
+        if byte_count < 0 or byte_count > session_bytes or byte_count > self.buffered_bytes:
             raise RuntimeError("invalid process PCM budget release")
         self.buffered_bytes -= byte_count
+        remaining = session_bytes - byte_count
+        if remaining == 0:
+            self._session_bytes.pop(session_id, None)
+        else:
+            self._session_bytes[session_id] = remaining
 
 
 _PROCESS_PCM_BUDGET = _ProcessPcmBudget()
@@ -50,6 +66,9 @@ class LeaseRuntimeCoordinator:
     @property
     def buffered_audio_bytes(self) -> int:
         return self._process_pcm.buffered_bytes
+
+    def session_buffered_audio_bytes(self, session_id: str) -> int:
+        return self._process_pcm.session_bytes(session_id)
 
     def create(self, lease: LeaseV1) -> LeaseRuntimeState:
         runtime = LeaseRuntimeState(
@@ -138,7 +157,7 @@ class LeaseRuntimeState:
     def _clear_state(self) -> None:
         buffered_bytes = self._pcm.buffered_bytes
         self._pcm.clear()
-        self._process_pcm.release(buffered_bytes)
+        self._process_pcm.release(self.session_id, buffered_bytes)
         self._output.clear()
         self._lease.clear()
 
@@ -170,15 +189,16 @@ class LeaseRuntimeState:
         before = self._pcm.buffered_bytes
         decision = self._pcm.accept(
             frame,
+            session_buffered_bytes=self._process_pcm.session_bytes(self.session_id),
             process_buffered_bytes=self._process_pcm.buffered_bytes,
         )
         if decision.code == StableCode.ACCEPTED:
-            self._process_pcm.add(self._pcm.buffered_bytes - before)
+            self._process_pcm.add(self.session_id, self._pcm.buffered_bytes - before)
         return decision
 
     def consume_pcm(self, byte_count: int) -> None:
         self._pcm.consume(byte_count)
-        self._process_pcm.release(byte_count)
+        self._process_pcm.release(self.session_id, byte_count)
 
     def accept_output(self, message: Mapping[str, Any], *, now: datetime) -> Decision:
         terminal = self._expire_if_due(now)
@@ -206,6 +226,13 @@ class LeaseRuntimeState:
             terminal.code == StableCode.LEASE_EXPIRED or not self._allow_cancel_replay
         ):
             return terminal
+        if message.lease_id != self.lease_id or message.session_id != self.session_id:
+            return Decision(StableCode.BINDING_MISMATCH)
+        received_epoch = int(message.epoch)
+        if received_epoch < self.epoch:
+            return Decision(StableCode.EPOCH_STALE)
+        if received_epoch > self.epoch:
+            return Decision(StableCode.EPOCH_UNKNOWN)
         decision = self._cancellations.cancel(message, raw, now)
         if decision.code == StableCode.ACCEPTED:
             self._clear_state()

@@ -281,6 +281,10 @@ function digest(value: unknown): string {
   return createHash("sha256").update(canonicalJson(value), "utf8").digest("hex");
 }
 
+function uint64(value: unknown): bigint {
+  return BigInt(String(value));
+}
+
 function classifySchemaErrors(errors: ErrorObject[] | null | undefined): StableCode {
   if (errors?.some((error) => error.keyword === "additionalProperties")) return "unknown_field";
   if (
@@ -314,10 +318,18 @@ function precheckVersion(model: string, value: Record<string, unknown>): StableC
       : SHARED_ENVELOPE_MODELS.has(model)
         ? [WORKER_PROTOCOL, VIEWER_PROTOCOL]
         : undefined;
-  if (allowed !== undefined && !allowed.includes(value.protocol as typeof WORKER_PROTOCOL)) {
+  if (allowed === undefined) return undefined;
+  if (
+    typeof value.protocol !== "string" ||
+    typeof value.protocol_minor !== "number" ||
+    !Number.isInteger(value.protocol_minor)
+  ) {
+    return undefined;
+  }
+  if (!allowed.includes(value.protocol as typeof WORKER_PROTOCOL)) {
     return "unknown_major";
   }
-  if ("protocol" in value && value.protocol_minor !== PROTOCOL_MINOR) return "unsupported_minor";
+  if (value.protocol_minor !== PROTOCOL_MINOR) return "unsupported_minor";
   return undefined;
 }
 
@@ -475,18 +487,19 @@ function publicDecision(model: string, value: Record<string, unknown>): StableCo
 }
 
 function sequenceDecision(value: Record<string, unknown>): StableCode {
-  const start = Number(value.start_seq);
+  const start = uint64(value.start_seq);
   const count = Number(value.accepted_count);
-  const records = new Map<number, { messageId: string; digest: string }>();
+  const records = new Map<bigint, { messageId: string; digest: string }>();
   for (let index = 0; index < count; index += 1) {
-    records.set(start + index, {
+    const position = start + BigInt(index);
+    records.set(position, {
       messageId: "00000000-0000-4000-8000-000000000001",
       digest: digest({ index }),
     });
-    if (records.size > 256) records.delete(Math.min(...records.keys()));
+    if (records.size > 256) records.delete(position - 256n);
   }
-  const nextExpected = start + count;
-  const candidate = Number(value.candidate_seq);
+  const nextExpected = start + BigInt(count);
+  const candidate = uint64(value.candidate_seq);
   if (candidate < nextExpected) {
     const record = records.get(candidate);
     if (record === undefined) return "resync_required";
@@ -502,16 +515,16 @@ function revisionDecision(value: Record<string, unknown>): StableCode {
   const capacity = Number(value.fill_count);
   const existing = Boolean(value.existing);
   if (!existing && capacity >= 4096) return "revision_capacity_exceeded";
-  if (!existing) return Number(value.candidate_revision) === 1 ? "accepted" : "revision_gap";
-  const current = Number(value.current_revision);
-  const candidate = Number(value.candidate_revision);
+  if (!existing) return uint64(value.candidate_revision) === 1n ? "accepted" : "revision_gap";
+  const current = uint64(value.current_revision);
+  const candidate = uint64(value.candidate_revision);
   if (candidate < current) return "revision_stale";
   if (candidate === current && value.candidate_projection === value.current_projection) {
     return "revision_duplicate";
   }
   if (Boolean(value.current_final)) return "object_final";
   if (candidate === current) return "revision_conflict";
-  if (candidate > current + 1) return "revision_gap";
+  if (candidate > current + 1n) return "revision_gap";
   if (value.candidate_immutable !== value.current_immutable) return "revision_immutable";
   return "accepted";
 }
@@ -544,19 +557,22 @@ function binaryDecision(value: Record<string, unknown>): StableCode {
     return "binary_header_invalid";
   }
   if (value.lease_id !== value.expected_lease_id) return "binding_mismatch";
-  if (Number(value.epoch) < Number(value.expected_epoch)) return "epoch_stale";
-  if (Number(value.epoch) > Number(value.expected_epoch)) return "epoch_unknown";
-  const sequence = Number(value.seq);
-  const nextExpected = Number(value.next_expected_seq);
-  const oldestReplayable = Math.max(Number(value.input_start_seq), nextExpected - 256);
+  if (uint64(value.epoch) < uint64(value.expected_epoch)) return "epoch_stale";
+  if (uint64(value.epoch) > uint64(value.expected_epoch)) return "epoch_unknown";
+  const sequence = uint64(value.seq);
+  const nextExpected = uint64(value.next_expected_seq);
+  const inputStart = uint64(value.input_start_seq);
+  const windowStart = nextExpected > 256n ? nextExpected - 256n : 0n;
+  const oldestReplayable = inputStart > windowStart ? inputStart : windowStart;
   if (sequence < oldestReplayable) return "resync_required";
   if (sequence < nextExpected) return "seq_duplicate";
   if (sequence > nextExpected) return "seq_gap";
-  if (value.previous_pts !== null && Number(value.pts_ms) < Number(value.previous_pts)) {
+  if (value.previous_pts !== null && uint64(value.pts_ms) < uint64(value.previous_pts)) {
     return "audio_pts_invalid";
   }
   if (
     Number(value.buffered_bytes) + Number(value.payload_length) > 960_000 ||
+    Number(value.session_buffered_bytes) + Number(value.payload_length) > 960_000 ||
     Number(value.process_buffered_bytes) + Number(value.payload_length) > 16_777_216
   ) {
     return "audio_budget_exceeded";
@@ -579,17 +595,19 @@ export function evaluateGoldenCase(testCase: GoldenCaseV1): StableCode {
     return sequenceDecision(value);
   }
   if (testCase.model === "PcmSequenceDecisionV1" && value !== undefined) {
-    const start = Number(value.start_seq);
-    const nextExpected = start + Number(value.accepted_count);
-    const candidate = Number(value.candidate_seq);
-    if (candidate < Math.max(start, nextExpected - 256)) return "resync_required";
+    const start = uint64(value.start_seq);
+    const nextExpected = start + uint64(value.accepted_count);
+    const candidate = uint64(value.candidate_seq);
+    const windowStart = nextExpected > 256n ? nextExpected - 256n : 0n;
+    const oldestReplayable = start > windowStart ? start : windowStart;
+    if (candidate < oldestReplayable) return "resync_required";
     if (candidate < nextExpected) return "seq_duplicate";
     if (candidate > nextExpected) return "seq_gap";
     return "accepted";
   }
   if (testCase.model === "EpochDecisionV1" && value !== undefined) {
-    const current = Number(value.current);
-    const received = Number(value.received);
+    const current = uint64(value.current);
+    const received = uint64(value.received);
     return received < current ? "epoch_stale" : received > current ? "epoch_unknown" : "accepted";
   }
   if (testCase.model === "RevisionDecisionV1" && value !== undefined) {

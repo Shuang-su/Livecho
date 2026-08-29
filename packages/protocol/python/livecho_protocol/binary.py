@@ -135,6 +135,7 @@ class PcmLeaseState:
         self,
         frame: bytes | bytearray | memoryview,
         *,
+        session_buffered_bytes: int = 0,
         process_buffered_bytes: int = 0,
     ) -> Decision:
         if self.closed:
@@ -156,6 +157,7 @@ class PcmLeaseState:
             return Decision(StableCode.AUDIO_PTS_INVALID)
         if (
             self.buffered_bytes + header.payload_length > self.lease_budget
+            or session_buffered_bytes + header.payload_length > LEASE_AUDIO_BUDGET
             or process_buffered_bytes + header.payload_length > PROCESS_AUDIO_BUDGET
         ):
             return Decision(StableCode.AUDIO_BUDGET_EXCEEDED)

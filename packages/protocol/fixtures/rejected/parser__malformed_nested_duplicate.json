@@ -1,0 +1,7 @@
+{
+  "case_id": "parser.malformed_nested_duplicate",
+  "code": "malformed_json",
+  "expect": "rejected",
+  "model": "WorkerHelloV1",
+  "raw_text": "{\"a\":{\"x\":1,\"x\":2},\"b\":}"
+}

@@ -55,6 +55,7 @@ def strict_json_loads(raw: str | bytes) -> dict[str, Any]:
             raise ProtocolValidationError(StableCode.CONTROL_FRAME_TOO_LARGE)
         text = raw
     try:
+        _ = json.loads(text, parse_constant=_reject_constant)
         value = json.loads(
             text,
             object_pairs_hook=_object_without_duplicates,
@@ -82,12 +83,19 @@ def canonical_digest(value: Any) -> bytes:
 
 
 def _precheck_version(value: dict[str, Any], allowed_protocols: frozenset[str] | None) -> None:
-    if allowed_protocols is None and "protocol" not in value:
+    if allowed_protocols is None:
         return
     protocol = value.get("protocol")
-    if allowed_protocols is not None and protocol not in allowed_protocols:
+    protocol_minor = value.get("protocol_minor")
+    if (
+        not isinstance(protocol, str)
+        or not isinstance(protocol_minor, int)
+        or isinstance(protocol_minor, bool)
+    ):
+        return
+    if protocol not in allowed_protocols:
         raise ProtocolValidationError(StableCode.UNKNOWN_MAJOR)
-    if value.get("protocol_minor") != 0:
+    if protocol_minor != 0:
         raise ProtocolValidationError(StableCode.UNSUPPORTED_MINOR)
 
 

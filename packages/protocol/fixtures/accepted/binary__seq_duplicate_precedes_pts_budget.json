@@ -18,6 +18,7 @@
     "pts_ms": 1,
     "sample_count": 1,
     "seq": 0,
+    "session_buffered_bytes": 0,
     "total_length": 58
   },
   "case_id": "binary.seq_duplicate_precedes_pts_budget",

@@ -25,7 +25,6 @@ from .state import (
     CancellationRegistry,
     JsonSequenceWindow,
     LiveWorkerCursor,
-    RevisionDomain,
     decide_worker_resume,
 )
 
@@ -485,6 +484,13 @@ def rejected_cases() -> list[dict[str, Any]]:
                 raw_text='{"a":1,"a":2,}',
             ),
             _case(
+                "parser.malformed_nested_duplicate",
+                "WorkerHelloV1",
+                "rejected",
+                StableCode.MALFORMED_JSON,
+                raw_text='{"a":{"x":1,"x":2},"b":}',
+            ),
+            _case(
                 "parser.too_large",
                 "WorkerHelloV1",
                 "rejected",
@@ -592,6 +598,34 @@ def rejected_cases() -> list[dict[str, Any]]:
                 wire=_changed(hello, protocol="livecho.worker.v2"),
             ),
             _case(
+                "version.nested_protocol_field",
+                "AudioFormatV1",
+                "rejected",
+                StableCode.UNKNOWN_FIELD,
+                wire=_changed(values["AudioFormatV1"], protocol="livecho.worker.v1"),
+            ),
+            _case(
+                "version.protocol_missing",
+                "WorkerHelloV1",
+                "rejected",
+                StableCode.SCHEMA_INVALID,
+                wire={key: value for key, value in hello.items() if key != "protocol"},
+            ),
+            _case(
+                "version.protocol_type",
+                "WorkerHelloV1",
+                "rejected",
+                StableCode.SCHEMA_INVALID,
+                wire=_changed(hello, protocol=1),
+            ),
+            _case(
+                "version.minor_missing",
+                "WorkerHelloV1",
+                "rejected",
+                StableCode.SCHEMA_INVALID,
+                wire={key: value for key, value in hello.items() if key != "protocol_minor"},
+            ),
+            _case(
                 "version.shared_ack_major",
                 "ProtocolAckV1",
                 "rejected",
@@ -687,6 +721,12 @@ def rejected_cases() -> list[dict[str, Any]]:
                 {"current": 1, "received": 2},
             ),
             _semantic_case(
+                "epoch.uint64_unknown",
+                "EpochDecisionV1",
+                StableCode.EPOCH_UNKNOWN,
+                {"current": "9007199254740992", "received": "9007199254740993"},
+            ),
+            _semantic_case(
                 "sequence.conflict",
                 "JsonSequenceDecisionV1",
                 StableCode.SEQ_CONFLICT,
@@ -708,6 +748,18 @@ def rejected_cases() -> list[dict[str, Any]]:
                     "candidate_seq": 2,
                     "candidate_message_id": MESSAGE_ID,
                     "candidate_value_index": 2,
+                },
+            ),
+            _semantic_case(
+                "sequence.uint64_gap",
+                "JsonSequenceDecisionV1",
+                StableCode.SEQ_GAP,
+                {
+                    "start_seq": "9007199254740992",
+                    "accepted_count": 0,
+                    "candidate_seq": "9007199254740993",
+                    "candidate_message_id": MESSAGE_ID,
+                    "candidate_value_index": 0,
                 },
             ),
             _semantic_case(
@@ -744,6 +796,24 @@ def rejected_cases() -> list[dict[str, Any]]:
                     "candidate_revision": 1,
                     "candidate_projection": "new",
                     "candidate_immutable": "new",
+                    "candidate_final": False,
+                },
+            ),
+            _case(
+                "revision.uint64_next",
+                "RevisionDecisionV1",
+                "accepted",
+                StableCode.ACCEPTED,
+                wire={
+                    "existing": True,
+                    "fill_count": 0,
+                    "current_revision": "9007199254740992",
+                    "current_projection": "a",
+                    "current_immutable": "a",
+                    "current_final": False,
+                    "candidate_revision": "9007199254740993",
+                    "candidate_projection": "changed",
+                    "candidate_immutable": "a",
                     "candidate_final": False,
                 },
             ),
@@ -786,12 +856,34 @@ def rejected_cases() -> list[dict[str, Any]]:
                 StableCode.RESYNC_REQUIRED,
                 {"start_seq": 0, "accepted_count": 257, "candidate_seq": 0},
             ),
+            _semantic_case(
+                "pcm_sequence.uint64_gap",
+                "PcmSequenceDecisionV1",
+                StableCode.SEQ_GAP,
+                {
+                    "start_seq": "9007199254740992",
+                    "accepted_count": 0,
+                    "candidate_seq": "9007199254740993",
+                },
+            ),
             _binary_case("binary.header", StableCode.BINARY_HEADER_INVALID, flags=2),
             _binary_case(
                 "binary.frame_large", StableCode.BINARY_FRAME_TOO_LARGE, total_length=32_057
             ),
             _binary_case("audio.pts", StableCode.AUDIO_PTS_INVALID, previous_pts=2, pts_ms=1),
             _binary_case("audio.budget", StableCode.AUDIO_BUDGET_EXCEEDED, buffered_bytes=959_999),
+            _binary_case(
+                "audio.session_budget",
+                StableCode.AUDIO_BUDGET_EXCEEDED,
+                session_buffered_bytes=959_999,
+            ),
+            _binary_case(
+                "binary.uint64_seq_gap",
+                StableCode.SEQ_GAP,
+                seq="9007199254740993",
+                input_start_seq="9007199254740992",
+                next_expected_seq="9007199254740992",
+            ),
             _binary_case(
                 "binary.seq_duplicate_precedes_pts_budget",
                 StableCode.SEQ_DUPLICATE,
@@ -912,6 +1004,7 @@ def _binary_case(case_id: str, code: StableCode, **updates: Any) -> dict[str, An
         "payload_length": 2,
         "total_length": 58,
         "buffered_bytes": 0,
+        "session_buffered_bytes": 0,
         "process_buffered_bytes": 0,
     }
     metadata.update(updates)
@@ -969,34 +1062,25 @@ def _evaluate_sequence(wire: dict[str, Any]) -> StableCode:
 
 
 def _evaluate_revision(wire: dict[str, Any]) -> StableCode:
-    domain = RevisionDomain()
-    for index in range(int(wire["fill_count"])):
-        identity = ("worker.transcript", SESSION_ID, LEASE_ID, 1, f"object-{index}")
-        digest = canonical_digest({"projection": index})
-        preview = domain.preview(identity, 1, digest, digest, False)
-        domain.commit(identity, preview)
-    identity = ("worker.transcript", SESSION_ID, LEASE_ID, 1, "candidate")
-    if bool(wire["existing"]):
-        current_revision = int(wire["current_revision"])
-        immutable = canonical_digest({"immutable": wire["current_immutable"]})
-        for revision in range(1, current_revision + 1):
-            is_current = revision == current_revision
-            projection = wire["current_projection"] if is_current else f"seed-{revision}"
-            current = domain.preview(
-                identity,
-                revision,
-                canonical_digest({"projection": projection}),
-                immutable,
-                bool(wire["current_final"]) if is_current else False,
-            )
-            domain.commit(identity, current)
-    return domain.preview(
-        identity,
-        int(wire["candidate_revision"]),
-        canonical_digest({"projection": wire["candidate_projection"]}),
-        canonical_digest({"immutable": wire["candidate_immutable"]}),
-        bool(wire["candidate_final"]),
-    ).decision.code
+    candidate = int(wire["candidate_revision"])
+    if not bool(wire["existing"]):
+        if int(wire["fill_count"]) >= 4096:
+            return StableCode.REVISION_CAPACITY_EXCEEDED
+        return StableCode.ACCEPTED if candidate == 1 else StableCode.REVISION_GAP
+    current = int(wire["current_revision"])
+    if candidate < current:
+        return StableCode.REVISION_STALE
+    if candidate == current and wire["candidate_projection"] == wire["current_projection"]:
+        return StableCode.REVISION_DUPLICATE
+    if bool(wire["current_final"]):
+        return StableCode.OBJECT_FINAL
+    if candidate == current:
+        return StableCode.REVISION_CONFLICT
+    if candidate > current + 1:
+        return StableCode.REVISION_GAP
+    if wire["candidate_immutable"] != wire["current_immutable"]:
+        return StableCode.REVISION_IMMUTABLE
+    return StableCode.ACCEPTED
 
 
 def _cancel_raw(message_id: str, reason: str, **updates: Any) -> dict[str, Any]:
@@ -1094,6 +1178,7 @@ def _evaluate_binary(metadata: dict[str, Any]) -> StableCode:
         return StableCode.AUDIO_PTS_INVALID
     if (
         int(metadata["buffered_bytes"]) + int(metadata["payload_length"]) > 960_000
+        or int(metadata["session_buffered_bytes"]) + int(metadata["payload_length"]) > 960_000
         or int(metadata["process_buffered_bytes"]) + int(metadata["payload_length"]) > 16_777_216
     ):
         return StableCode.AUDIO_BUDGET_EXCEEDED

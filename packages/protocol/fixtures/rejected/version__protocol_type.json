@@ -1,0 +1,31 @@
+{
+  "case_id": "version.protocol_type",
+  "code": "schema_invalid",
+  "expect": "rejected",
+  "model": "WorkerHelloV1",
+  "wire": {
+    "capabilities": [
+      "asr.transcribe",
+      "protocol.binary-pcm"
+    ],
+    "message_id": "00000000-0000-4000-8000-000000000001",
+    "model_manifests": [
+      {
+        "model_id": "fixture-asr",
+        "provider": "synthetic",
+        "revision": "1",
+        "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      }
+    ],
+    "protocol": 1,
+    "protocol_minor": 0,
+    "resume": null,
+    "sent_at": "2026-01-01T00:00:00.000Z",
+    "supported_minors": [
+      0
+    ],
+    "type": "worker.hello",
+    "worker_id": "00000000-0000-4000-8000-000000000010",
+    "worker_version": "0.1.0"
+  }
+}

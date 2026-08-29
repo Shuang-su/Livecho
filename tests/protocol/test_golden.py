@@ -22,7 +22,7 @@ def _load_cases() -> list[dict[str, Any]]:
 
 def test_all_generated_golden_cases_match_python_decisions() -> None:
     cases = _load_cases()
-    assert len(cases) == 87
+    assert len(cases) == 98
     assert len({case["case_id"] for case in cases}) == len(cases)
     for case in cases:
         validated = GoldenCaseV1.model_validate(case)
