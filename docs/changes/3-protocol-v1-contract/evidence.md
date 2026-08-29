@@ -2,7 +2,7 @@
 
 ## Artifact approval
 
-- Artifact PR: Pending
+- Artifact PR: #23
 - Approved by/date: Pending
 
 ## Automated verification
