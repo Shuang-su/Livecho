@@ -31,21 +31,21 @@
 | Command | Result | Date/commit |
 | --- | --- | --- |
 | `make bootstrap` | Passed; uv verified the frozen Python environment and pnpm 11.21.0 verified the frozen two-workspace install and supply-chain policy. | 2026-08-30 / `4662d41` |
-| `make protocol-generate` | Passed; rewrote the complete generated tree transactionally from the Pydantic source and pinned generator. | 2026-08-30 / `47f4588` |
-| `git diff --exit-code -- packages/protocol/schema packages/protocol/src/generated packages/protocol/fixtures` | Passed after regeneration; generated Schema, TypeScript, compatibility, and fixture bytes match the committed output. | 2026-08-30 / `47f4588` |
-| `make protocol-check` | Passed: `protocol generated artifacts: ok`; the checker compared all expected paths and bytes from a temporary generation. | 2026-08-30 / `47f4588` |
+| `make protocol-generate` | Passed; rewrote the complete generated tree transactionally from the Pydantic source and pinned generator. | 2026-08-30 / `9373d55` |
+| `git diff --exit-code -- packages/protocol/schema packages/protocol/src/generated packages/protocol/fixtures` | Passed after regeneration; generated Schema, TypeScript, compatibility, and fixture bytes match the committed output. | 2026-08-30 / `9373d55` |
+| `make protocol-check` | Passed: `protocol generated artifacts: ok`; the checker compared all expected paths and bytes from a temporary generation. | 2026-08-30 / `9373d55` |
 | `uv run pytest -q tests/protocol/test_binary.py tests/protocol/test_state.py tests/protocol/test_golden.py` | Passed: 34 focused binary, runtime, and golden-corpus tests, including equal/stale creation, sequence exhaustion, end-of-segment release, idle expiry, higher-epoch replacement, and bounded cancellation state. | 2026-08-30 / `3061ef9` |
 | `uv run pytest -q tests/protocol/test_state.py tests/protocol/test_golden.py` | Passed: 30 focused runtime and golden-corpus tests, including transactional invalid replacement with no live-state retirement or active-entry leak. | 2026-08-30 / `a175430` |
 | `uv run pytest -q tests/protocol/test_state.py tests/protocol/test_golden.py` | Passed: 31 focused runtime and golden-corpus tests, including a negotiated-manifest mismatch that preserves the current runtime and active count. | 2026-08-30 / `56158c1` |
 | `uv run pytest -q tests/protocol/test_models.py tests/protocol/test_golden.py` | Passed: 36 focused model/parser and golden-corpus tests, including integral-fraction protocol-minor version precedence. | 2026-08-30 / `47f4588` |
 | `uv run pytest -q tests/protocol/test_binary.py tests/protocol/test_golden.py` | Passed: 10 focused codec and cross-language corpus tests, including all three binary uint64 overflow boundaries. | 2026-08-30 / `8b843fb` |
 | `uv run pytest -q tests/protocol` | Passed: 67 protocol tests. | 2026-08-30 / `56158c1` |
-| `pnpm --filter @livecho/protocol typecheck` | Passed with TypeScript strict mode; also rerun by `make verify`. | 2026-08-30 / `56158c1` |
-| `pnpm --filter @livecho/protocol test` | Passed: one Vitest file and 122 tests, comprising 121 generated parity cases plus the corpus integrity assertion; also rerun by `make verify`. | 2026-08-30 / `47f4588` |
-| `make verify` | Passed; Ruff, workspace lint, mypy, TypeScript checks, 107 pytest tests, 122 Vitest tests, artifact lifecycle, protocol drift, and build all succeeded. | 2026-08-30 / `47f4588` |
-| `git diff --check && git diff --cached --check` | Passed with no whitespace errors. | 2026-08-30 / `47f4588` |
+| `pnpm --filter @livecho/protocol typecheck` | Passed with TypeScript strict mode; also rerun by `make verify`. | 2026-08-30 / `9373d55` |
+| `pnpm --filter @livecho/protocol test` | Passed: one Vitest file and 124 tests, comprising 123 generated parity cases plus the corpus integrity assertion; also rerun by `make verify`. | 2026-08-30 / `9373d55` |
+| `make verify` | Passed; Ruff, workspace lint, mypy, TypeScript checks, 107 pytest tests, 124 Vitest tests, artifact lifecycle, protocol drift, and build all succeeded. | 2026-08-30 / `9373d55` |
+| `git diff --check && git diff --cached --check` | Passed with no whitespace errors. | 2026-08-30 / `9373d55` |
 
-The generated corpus contains 121 unique cases: 40 accepted and 81 rejected. Every
+The generated corpus contains 123 unique cases: 40 accepted and 83 rejected. Every
 `StableCode` value occurs as an expected result. All 18 public Pydantic models have an
 accepted case; the remaining cases cover parser/version/capability/manifest failures,
 JSON and record-free PCM sequence boundaries, revision precedence/capacity/immutability,
@@ -53,7 +53,7 @@ all four final-object outcomes, cancellation CAS/tombstones, reconnect, RFC 8785
 representation variants, and metadata-only binary/PTS/budget boundaries.
 
 Generated output contains 21 Schema/compatibility files, one TypeScript contract, and
-122 fixture files including the manifest. Negative drift tests independently prove that
+124 fixture files including the manifest. Negative drift tests independently prove that
 a changed file, a missing file, and an unexpected extra file each fail comparison.
 
 ## Manual or hardware evidence
@@ -284,6 +284,10 @@ generation, shared golden cases, minimum versions, and the Issue #2 audio ceilin
   where TypeScript returned the negotiated version error. Resolved by normalizing only
   finite integral minor values before the precheck; two raw-text shared cases pin
   `unsupported_minor` and unknown-major precedence in both languages.
+- Final exact-head Codex review P2 found that TypeScript handshake decisions did not
+  require `supported_minors` to contain minor 0, while Python negotiation did. Resolved
+  by applying the same check before version/capability/manifest decisions for worker and
+  viewer handshakes; two shared cases pin `unsupported_minor` in both languages.
 
 ## Deviations
 
