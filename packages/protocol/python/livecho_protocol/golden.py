@@ -405,6 +405,7 @@ def accepted_cases() -> list[dict[str, Any]]:
                     "retained_output_revisions": 0,
                 },
             ),
+            _binary_case("binary.end_of_segment", StableCode.ACCEPTED, flags=1),
             _case(
                 "canonical.equal",
                 "CanonicalDecisionV1",
@@ -812,6 +813,19 @@ def rejected_cases() -> list[dict[str, Any]]:
                 {"current": "9007199254740992", "received": "9007199254740993"},
             ),
             _semantic_case(
+                "epoch.stale_runtime_creation",
+                "LeaseReplacementDecisionV1",
+                StableCode.EPOCH_STALE,
+                {
+                    "current_epoch": "2",
+                    "replacement_epoch": "1",
+                    "resumed": False,
+                    "superseded_active_after": True,
+                    "retained_pcm_bytes": 2,
+                    "retained_output_revisions": 1,
+                },
+            ),
+            _semantic_case(
                 "sequence.conflict",
                 "JsonSequenceDecisionV1",
                 StableCode.SEQ_CONFLICT,
@@ -1204,6 +1218,8 @@ def _evaluate_cancellation(wire: dict[str, Any]) -> StableCode:
     now = datetime(2026, 1, 1, tzinfo=UTC)
     initial = wire["initial"]
     candidate = wire["candidate"]
+    if initial == "closed":
+        return StableCode.LEASE_CLOSED
     current_revision = 2 if candidate == "cas_stale" else 1
     if initial != "missing":
         registry.add_active(ActiveLease(LEASE_ID, SESSION_ID, 1, current_revision))
@@ -1211,9 +1227,6 @@ def _evaluate_cancellation(wire: dict[str, Any]) -> StableCode:
     initial_message = LeaseCancelV1.model_validate(initial_raw)
     if initial == "cancelled":
         registry.cancel(initial_message, initial_raw, now)
-    elif initial == "closed":
-        registry.cancel(initial_message, initial_raw, now)
-        registry.tombstones.clear()
     if candidate == "duplicate":
         raw = initial_raw
     elif candidate == "conflict":
@@ -1316,9 +1329,11 @@ def evaluate_case(value: dict[str, Any]) -> StableCode:
                 return StableCode.EPOCH_UNKNOWN
             return StableCode.ACCEPTED
         if case.model == "LeaseReplacementDecisionV1":
-            is_replacement = not bool(case.wire["resumed"]) and int(
-                case.wire["replacement_epoch"]
-            ) > int(case.wire["current_epoch"])
+            current_epoch = int(case.wire["current_epoch"])
+            replacement_epoch = int(case.wire["replacement_epoch"])
+            if replacement_epoch < current_epoch:
+                return StableCode.EPOCH_STALE
+            is_replacement = not bool(case.wire["resumed"]) and replacement_epoch > current_epoch
             cleared = (
                 not bool(case.wire["superseded_active_after"])
                 and int(case.wire["retained_pcm_bytes"]) == 0

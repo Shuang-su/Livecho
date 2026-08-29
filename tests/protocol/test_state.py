@@ -12,7 +12,7 @@ from livecho_protocol.binary import (
     PcmHeaderV1,
     encode_header,
 )
-from livecho_protocol.errors import StableCode
+from livecho_protocol.errors import ProtocolValidationError, StableCode
 from livecho_protocol.models import LeaseCancelV1, LeaseV1, ViewerCursorV1, WorkerResumeV1
 from livecho_protocol.parser import canonical_digest
 from livecho_protocol.runtime import LeaseRuntimeCoordinator
@@ -247,15 +247,14 @@ def test_cancellation_cas_tombstone_and_expiry() -> None:
     assert registry.cancel(changed, changed_raw, now).code == StableCode.CANCEL_CONFLICT
     registry.session_teardown(SESSION_ID)
     assert registry.active == {}
-    assert registry.closed == {}
     assert registry.tombstones == {}
 
     registry = CancellationRegistry()
     registry.add_active(ActiveLease(LEASE_ID, SESSION_ID, 1, 1))
     assert registry.cancel(message, raw, now).code == StableCode.ACCEPTED
-    assert (
-        registry.cancel(message, raw, now + timedelta(seconds=120)).code == StableCode.LEASE_CLOSED
-    )
+    registry.prune(now + timedelta(seconds=120))
+    assert registry.active == {}
+    assert registry.tombstones == {}
 
 
 def test_cancellation_capacity_evicts_oldest_before_close() -> None:
@@ -271,6 +270,7 @@ def test_cancellation_capacity_evicts_oldest_before_close() -> None:
         assert registry.cancel(LeaseCancelV1.model_validate(raw), raw, now).accepted
         now += timedelta(seconds=1)
     assert tuple(registry.tombstones) == tuple(lease_ids[1:])
+    assert not hasattr(registry, "closed")
 
 
 def test_cancellation_closes_pcm_and_output_atomically(
@@ -411,6 +411,55 @@ def test_higher_epoch_replacement_retires_prior_runtime(
     assert not previous.cancellation_active
     assert previous.accept_pcm(frame, now=now).code == StableCode.LEASE_CLOSED
     assert replacement.cancellation_active
+    assert coordinator.buffered_audio_bytes == 0
+    assert coordinator.session_buffered_audio_bytes(SESSION_ID) == 0
+    coordinator.session_teardown(SESSION_ID)
+
+
+def test_stale_epoch_runtime_creation_is_rejected(
+    valid_messages: dict[str, dict[str, object]],
+) -> None:
+    coordinator = LeaseRuntimeCoordinator()
+    coordinator.session_teardown(SESSION_ID)
+    current_raw = {
+        **deepcopy(valid_messages["LeaseV1"]),
+        "message_id": "00000000-0000-4000-8000-000000000090",
+        "lease_id": "00000000-0000-4000-8000-000000000091",
+        "epoch": "2",
+    }
+    current = coordinator.create(LeaseV1.model_validate(current_raw))
+
+    with pytest.raises(ProtocolValidationError) as stale:
+        coordinator.create(LeaseV1.model_validate(valid_messages["LeaseV1"]))
+
+    assert stale.value.code == StableCode.EPOCH_STALE
+    now = datetime(2026, 1, 1, tzinfo=UTC)
+    frame = bytearray(
+        encode_header(PcmHeaderV1(current.lease_id, current.epoch, 0, 0, 1, 2))
+    ) + bytearray(2)
+    assert current.accept_pcm(frame, now=now).code == StableCode.ACCEPTED
+    coordinator.prune(datetime(2026, 1, 1, 0, 2, tzinfo=UTC))
+    with pytest.raises(ProtocolValidationError) as stale_after_expiry:
+        coordinator.create(LeaseV1.model_validate(valid_messages["LeaseV1"]))
+    assert stale_after_expiry.value.code == StableCode.EPOCH_STALE
+    coordinator.session_teardown(SESSION_ID)
+
+
+def test_end_of_segment_releases_runtime_pcm_ledgers(
+    valid_messages: dict[str, dict[str, object]],
+) -> None:
+    coordinator = LeaseRuntimeCoordinator()
+    coordinator.session_teardown(SESSION_ID)
+    runtime = coordinator.create(LeaseV1.model_validate(valid_messages["LeaseV1"]))
+    now = datetime(2026, 1, 1, tzinfo=UTC)
+    first = bytearray(encode_header(PcmHeaderV1(LEASE_ID, 1, 0, 0, 1, 2))) + bytearray(2)
+    end = bytearray(encode_header(PcmHeaderV1(LEASE_ID, 1, 1, 1, 1, 2, True))) + bytearray(2)
+
+    assert runtime.accept_pcm(first, now=now).code == StableCode.ACCEPTED
+    assert coordinator.buffered_audio_bytes == 2
+    assert coordinator.session_buffered_audio_bytes(SESSION_ID) == 2
+    assert runtime.accept_pcm(end, now=now).code == StableCode.ACCEPTED
+    assert runtime.buffered_audio_bytes == 0
     assert coordinator.buffered_audio_bytes == 0
     assert coordinator.session_buffered_audio_bytes(SESSION_ID) == 0
     coordinator.session_teardown(SESSION_ID)

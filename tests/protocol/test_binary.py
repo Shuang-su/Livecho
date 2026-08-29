@@ -58,3 +58,18 @@ def test_pcm_pts_sequence_and_budget_are_transactional() -> None:
     assert state.buffered_bytes == 0
     assert state.sequence.next_expected_seq == 0
     assert state.accept(first).code == StableCode.LEASE_CLOSED
+
+
+def test_end_of_segment_releases_pcm_without_resetting_ordering() -> None:
+    state = PcmLeaseState(lease_id=LEASE_ID, epoch=1, input_start_seq=0, lease_budget=4)
+    first = _frame(PcmHeaderV1(LEASE_ID, 1, 0, 10, 1, 2))
+    end = _frame(PcmHeaderV1(LEASE_ID, 1, 1, 11, 1, 2, True))
+    next_segment = _frame(PcmHeaderV1(LEASE_ID, 1, 2, 12, 1, 2))
+
+    assert state.accept(first).code == StableCode.ACCEPTED
+    assert state.buffered_bytes == 2
+    assert state.accept(end).code == StableCode.ACCEPTED
+    assert state.buffered_bytes == 0
+    assert state.sequence.next_expected_seq == 2
+    assert state.accept(next_segment).code == StableCode.ACCEPTED
+    assert state.buffered_bytes == 2

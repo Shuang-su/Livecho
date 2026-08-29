@@ -164,6 +164,8 @@ class PcmLeaseState:
         self.sequence.commit(header.seq)
         self.buffered_bytes += header.payload_length
         self.last_pts_ms = header.pts_ms
+        if header.end_of_segment:
+            self.buffered_bytes = 0
         return Decision(StableCode.ACCEPTED)
 
     def consume(self, byte_count: int) -> None:

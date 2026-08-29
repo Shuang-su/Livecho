@@ -387,7 +387,7 @@ class CancellationTombstone:
 
 
 class CancellationRegistry:
-    """Atomic CAS cancellation with bounded terminal replay tombstones."""
+    """Atomic CAS cancellation with bounded replay tombstones; runtimes own terminal state."""
 
     def __init__(
         self,
@@ -399,7 +399,6 @@ class CancellationRegistry:
         self.capacity = capacity
         self.ttl = ttl
         self.active: dict[str, ActiveLease] = {}
-        self.closed: dict[str, ActiveLease] = {}
         self.tombstones: OrderedDict[str, CancellationTombstone] = OrderedDict()
 
     def add_active(self, lease: ActiveLease) -> None:
@@ -437,8 +436,6 @@ class CancellationRegistry:
                 if tombstone.digest == digest:
                     return Decision(StableCode.CANCEL_DUPLICATE)
                 return Decision(StableCode.CANCEL_CONFLICT)
-        if message.lease_id in self.closed:
-            return Decision(StableCode.LEASE_CLOSED)
         lease = self.active.get(message.lease_id)
         if lease is None:
             return Decision(StableCode.LEASE_UNKNOWN)
@@ -457,7 +454,6 @@ class CancellationRegistry:
         if len(self.tombstones) >= self.capacity:
             self.tombstones.popitem(last=False)
         del self.active[lease.lease_id]
-        self.closed[lease.lease_id] = lease
         self.tombstones[lease.lease_id] = CancellationTombstone(
             lease_id=lease.lease_id,
             session_id=lease.session_id,
@@ -473,9 +469,6 @@ class CancellationRegistry:
     def session_teardown(self, session_id: str) -> None:
         self.active = {
             key: value for key, value in self.active.items() if value.session_id != session_id
-        }
-        self.closed = {
-            key: value for key, value in self.closed.items() if value.session_id != session_id
         }
         self.tombstones = OrderedDict(
             (key, value) for key, value in self.tombstones.items() if value.session_id != session_id

@@ -7,7 +7,7 @@ from datetime import datetime
 from typing import Any
 
 from .binary import LEASE_AUDIO_BUDGET, PROCESS_AUDIO_BUDGET, PcmLeaseState
-from .errors import Decision, StableCode
+from .errors import Decision, ProtocolValidationError, StableCode
 from .models import LeaseCancelV1, LeaseV1
 from .scalars import parse_timestamp
 from .state import ActiveLease, CancellationRegistry, LeaseRevisionState, StreamOrderingState
@@ -57,6 +57,7 @@ class LeaseRuntimeCoordinator:
     def __init__(self) -> None:
         self._cancellations = _PROCESS_CANCELLATIONS
         self._runtimes = _PROCESS_RUNTIMES
+        self._session_epochs = _PROCESS_SESSION_EPOCHS
         self._process_pcm = _PROCESS_PCM_BUDGET
 
     @property
@@ -71,8 +72,11 @@ class LeaseRuntimeCoordinator:
         return self._process_pcm.session_bytes(session_id)
 
     def create(self, lease: LeaseV1) -> LeaseRuntimeState:
-        session_runtimes = self._runtimes.setdefault(lease.session_id, set())
         replacement_epoch = int(lease.epoch)
+        current_epoch = self._session_epochs.get(lease.session_id)
+        if current_epoch is not None and replacement_epoch < current_epoch:
+            raise ProtocolValidationError(StableCode.EPOCH_STALE)
+        session_runtimes = self._runtimes.setdefault(lease.session_id, set())
         for previous in tuple(session_runtimes):
             if previous.epoch < replacement_epoch:
                 previous._session_teardown()
@@ -82,6 +86,7 @@ class LeaseRuntimeCoordinator:
             cancellations=self._cancellations,
             process_pcm=self._process_pcm,
         )
+        self._session_epochs[lease.session_id] = replacement_epoch
         session_runtimes.add(runtime)
         return runtime
 
@@ -97,6 +102,7 @@ class LeaseRuntimeCoordinator:
     def session_teardown(self, session_id: str) -> None:
         for runtime in self._runtimes.pop(session_id, set()):
             runtime._session_teardown()
+        self._session_epochs.pop(session_id, None)
         self._cancellations.session_teardown(session_id)
 
 
@@ -206,7 +212,11 @@ class LeaseRuntimeState:
             process_buffered_bytes=self._process_pcm.buffered_bytes,
         )
         if decision.code == StableCode.ACCEPTED:
-            self._process_pcm.add(self.session_id, self._pcm.buffered_bytes - before)
+            buffered_delta = self._pcm.buffered_bytes - before
+            if buffered_delta > 0:
+                self._process_pcm.add(self.session_id, buffered_delta)
+            elif buffered_delta < 0:
+                self._process_pcm.release(self.session_id, -buffered_delta)
         return decision
 
     def consume_pcm(self, byte_count: int) -> None:
@@ -247,6 +257,11 @@ class LeaseRuntimeState:
         if received_epoch > self.epoch:
             return Decision(StableCode.EPOCH_UNKNOWN)
         decision = self._cancellations.cancel(message, raw, now)
+        if (
+            self._terminal_code == StableCode.LEASE_CLOSED
+            and decision.code == StableCode.LEASE_UNKNOWN
+        ):
+            return Decision(StableCode.LEASE_CLOSED)
         if decision.code == StableCode.ACCEPTED:
             self._clear_state()
             self._terminal_code = StableCode.LEASE_CLOSED
@@ -255,3 +270,4 @@ class LeaseRuntimeState:
 
 
 _PROCESS_RUNTIMES: dict[str, set[LeaseRuntimeState]] = {}
+_PROCESS_SESSION_EPOCHS: dict[str, int] = {}
