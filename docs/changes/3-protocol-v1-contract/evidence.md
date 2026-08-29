@@ -30,17 +30,17 @@
 
 | Command | Result | Date/commit |
 | --- | --- | --- |
-| `make bootstrap` | Passed; uv verified the frozen Python environment and pnpm 11.21.0 verified the frozen two-workspace install and supply-chain policy. | 2026-08-30 / `f3a9b57` |
-| `make protocol-generate` | Passed; rewrote the complete generated tree transactionally from the Pydantic source and pinned generator. | 2026-08-30 / `f3a9b57` |
-| `git diff --exit-code -- packages/protocol/schema packages/protocol/src/generated packages/protocol/fixtures` | Passed after regeneration; generated Schema, TypeScript, compatibility, and fixture bytes match the committed output. | 2026-08-30 / `f3a9b57` |
-| `make protocol-check` | Passed: `protocol generated artifacts: ok`; the checker compared all expected paths and bytes from a temporary generation. | 2026-08-30 / `f3a9b57` |
-| `uv run pytest -q tests/protocol` | Passed: 54 protocol tests. | 2026-08-30 / `f3a9b57` |
-| `pnpm --filter @livecho/protocol typecheck` | Passed with TypeScript strict mode; also rerun by `make verify`. | 2026-08-30 / `f3a9b57` |
-| `pnpm --filter @livecho/protocol test` | Passed: one Vitest file and 85 tests, comprising 84 generated parity cases plus the corpus integrity assertion; also rerun by `make verify`. | 2026-08-30 / `f3a9b57` |
-| `make verify` | Passed; Ruff, workspace lint, mypy, TypeScript checks, 94 pytest tests, 85 Vitest tests, artifact lifecycle, protocol drift, and build all succeeded. | 2026-08-30 / `f3a9b57` |
-| `git diff --check && git diff --cached --check` | Passed with no whitespace errors. | 2026-08-30 / `f3a9b57` |
+| `make bootstrap` | Passed; uv verified the frozen Python environment and pnpm 11.21.0 verified the frozen two-workspace install and supply-chain policy. | 2026-08-30 / `82f1f96` |
+| `make protocol-generate` | Passed; rewrote the complete generated tree transactionally from the Pydantic source and pinned generator. | 2026-08-30 / `82f1f96` |
+| `git diff --exit-code -- packages/protocol/schema packages/protocol/src/generated packages/protocol/fixtures` | Passed after regeneration; generated Schema, TypeScript, compatibility, and fixture bytes match the committed output. | 2026-08-30 / `82f1f96` |
+| `make protocol-check` | Passed: `protocol generated artifacts: ok`; the checker compared all expected paths and bytes from a temporary generation. | 2026-08-30 / `82f1f96` |
+| `uv run pytest -q tests/protocol` | Passed: 55 protocol tests. | 2026-08-30 / `82f1f96` |
+| `pnpm --filter @livecho/protocol typecheck` | Passed with TypeScript strict mode; also rerun by `make verify`. | 2026-08-30 / `82f1f96` |
+| `pnpm --filter @livecho/protocol test` | Passed: one Vitest file and 86 tests, comprising 85 generated parity cases plus the corpus integrity assertion; also rerun by `make verify`. | 2026-08-30 / `82f1f96` |
+| `make verify` | Passed; Ruff, workspace lint, mypy, TypeScript checks, 95 pytest tests, 86 Vitest tests, artifact lifecycle, protocol drift, and build all succeeded. | 2026-08-30 / `82f1f96` |
+| `git diff --check && git diff --cached --check` | Passed with no whitespace errors. | 2026-08-30 / `82f1f96` |
 
-The generated corpus contains 84 unique cases: 35 accepted and 49 rejected. Every
+The generated corpus contains 85 unique cases: 36 accepted and 49 rejected. Every
 `StableCode` value occurs as an expected result. All 18 public Pydantic models have an
 accepted case; the remaining cases cover parser/version/capability/manifest failures,
 JSON and record-free PCM sequence boundaries, revision precedence/capacity/immutability,
@@ -48,7 +48,7 @@ all four final-object outcomes, cancellation CAS/tombstones, reconnect, RFC 8785
 representation variants, and metadata-only binary/PTS/budget boundaries.
 
 Generated output contains 21 Schema/compatibility files, one TypeScript contract, and
-85 fixture files including the manifest. Negative drift tests independently prove that
+86 fixture files including the manifest. Negative drift tests independently prove that
 a changed file, a missing file, and an unexpected extra file each fail comparison.
 
 ## Manual or hardware evidence
@@ -173,6 +173,13 @@ generation, shared golden cases, minimum versions, and the Issue #2 audio ceilin
   lower-sequence replay decisions. Resolved with the full input-start/next-expected
   256-position arithmetic window in both evaluators and a shared case where
   `seq_duplicate` takes precedence over simultaneous invalid PTS and budget state.
+- Follow-up Codex review P2 found that Python 3.12 timestamp formatting omitted leading
+  zeros for years 0001 through 0999. Resolved with explicit fixed-width component
+  formatting and an accepted shared year-0001 case; year 0000 remains rejected.
+- Follow-up Codex review P2 found that coordinator-created runtimes defaulted the process
+  PCM usage to zero. Resolved with one process-scoped logical byte budget updated on
+  accept, consume, cancellation, expiry, and session teardown, plus an 18-runtime exact
+  boundary test that reuses one synthetic in-memory frame and proves final cleanup.
 
 ## Deviations
 
