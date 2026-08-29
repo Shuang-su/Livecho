@@ -5,7 +5,7 @@ from datetime import UTC, datetime, timedelta
 
 from livecho_protocol.binary import PcmHeaderV1, encode_header
 from livecho_protocol.errors import StableCode
-from livecho_protocol.models import LeaseCancelV1, ViewerCursorV1, WorkerResumeV1
+from livecho_protocol.models import LeaseCancelV1, LeaseV1, ViewerCursorV1, WorkerResumeV1
 from livecho_protocol.parser import canonical_digest
 from livecho_protocol.runtime import LeaseRuntimeState
 from livecho_protocol.state import (
@@ -264,33 +264,85 @@ def test_cancellation_capacity_evicts_oldest_before_close() -> None:
 def test_cancellation_closes_pcm_and_output_atomically(
     valid_messages: dict[str, dict[str, object]],
 ) -> None:
-    runtime = LeaseRuntimeState(
-        lease_id=LEASE_ID,
-        session_id=SESSION_ID,
-        epoch=1,
-        revision=1,
-        input_start_seq=0,
-        output_start_seq=0,
-    )
+    lease = LeaseV1.model_validate(valid_messages["LeaseV1"])
+    runtime = LeaseRuntimeState(lease=lease)
+    now = datetime(2026, 1, 1, tzinfo=UTC)
     output = deepcopy(valid_messages["TranscriptSegmentV1"])
-    assert runtime.output.accept(output).code == StableCode.ACCEPTED
+    assert runtime.accept_output(output, now=now).code == StableCode.ACCEPTED
 
     header = PcmHeaderV1(LEASE_ID, 1, 0, 0, 1, 2)
     frame = bytearray(encode_header(header)) + bytearray(header.payload_length)
-    assert runtime.pcm.accept(frame).code == StableCode.ACCEPTED
-    assert runtime.pcm.buffered_bytes == 2
+    assert runtime.accept_pcm(frame, now=now).code == StableCode.ACCEPTED
+    assert runtime.buffered_audio_bytes == 2
 
     raw = _cancel()
     cancellation = LeaseCancelV1.model_validate(raw)
-    assert (
-        runtime.cancel(cancellation, raw, datetime(2026, 1, 1, tzinfo=UTC)).code
-        == StableCode.ACCEPTED
-    )
-    assert runtime.pcm.buffered_bytes == 0
-    assert runtime.output.sequence.retained_sequences == ()
-    assert runtime.output.revisions.size == 0
-    assert runtime.pcm.accept(frame).code == StableCode.LEASE_CLOSED
-    assert runtime.output.accept(output).code == StableCode.LEASE_CLOSED
+    assert runtime.cancel(cancellation, raw, now).code == StableCode.ACCEPTED
+    assert runtime.buffered_audio_bytes == 0
+    assert runtime.output_revision_count == 0
+    assert runtime.accept_pcm(frame, now=now).code == StableCode.LEASE_CLOSED
+    assert runtime.accept_output(output, now=now).code == StableCode.LEASE_CLOSED
+    assert runtime.cancel(cancellation, raw, now).code == StableCode.CANCEL_DUPLICATE
+
+
+def test_non_sequenced_lease_revision_updates_cancellation_cas(
+    valid_messages: dict[str, dict[str, object]],
+) -> None:
+    initial_raw = deepcopy(valid_messages["LeaseV1"])
+    initial = LeaseV1.model_validate(initial_raw)
+    runtime = LeaseRuntimeState(lease=initial)
+    now = datetime(2026, 1, 1, tzinfo=UTC)
+
+    replay_raw = {**initial_raw, "message_id": MESSAGE_ID_2}
+    replay = LeaseV1.model_validate(replay_raw)
+    assert runtime.accept_lease_update(replay, now=now).code == StableCode.REVISION_DUPLICATE
+
+    update_raw = {
+        **initial_raw,
+        "message_id": "00000000-0000-4000-8000-000000000003",
+        "revision": "2",
+    }
+    update = LeaseV1.model_validate(update_raw)
+    assert runtime.accept_lease_update(update, now=now).code == StableCode.ACCEPTED
+    assert runtime.lease_revision == 2
+
+    immutable_raw = {
+        **update_raw,
+        "message_id": "00000000-0000-4000-8000-000000000004",
+        "revision": "3",
+        "room_id": "changed-room",
+    }
+    immutable = LeaseV1.model_validate(immutable_raw)
+    assert runtime.accept_lease_update(immutable, now=now).code == StableCode.REVISION_IMMUTABLE
+    assert runtime.lease_revision == 2
+
+    cancel_raw = {**_cancel(), "expected_revision": "2"}
+    cancellation = LeaseCancelV1.model_validate(cancel_raw)
+    assert runtime.cancel(cancellation, cancel_raw, now).code == StableCode.ACCEPTED
+
+
+def test_runtime_expires_before_pcm_output_lease_update_or_cancellation(
+    valid_messages: dict[str, dict[str, object]],
+) -> None:
+    lease_raw = deepcopy(valid_messages["LeaseV1"])
+    lease = LeaseV1.model_validate(lease_raw)
+    runtime = LeaseRuntimeState(lease=lease)
+    before = datetime(2026, 1, 1, 0, 1, 59, 999000, tzinfo=UTC)
+    deadline = datetime(2026, 1, 1, 0, 2, tzinfo=UTC)
+    output = deepcopy(valid_messages["TranscriptSegmentV1"])
+    frame = bytearray(encode_header(PcmHeaderV1(LEASE_ID, 1, 0, 0, 1, 2))) + bytearray(2)
+
+    assert runtime.accept_pcm(frame, now=before).code == StableCode.ACCEPTED
+    assert runtime.accept_output(output, now=deadline).code == StableCode.LEASE_EXPIRED
+    assert runtime.buffered_audio_bytes == 0
+    assert runtime.output_revision_count == 0
+    assert runtime.accept_pcm(frame, now=deadline).code == StableCode.LEASE_EXPIRED
+    assert runtime.accept_lease_update(lease, now=deadline).code == StableCode.LEASE_EXPIRED
+
+    cancel_raw = _cancel()
+    cancellation = LeaseCancelV1.model_validate(cancel_raw)
+    assert runtime.cancel(cancellation, cancel_raw, deadline).code == StableCode.LEASE_EXPIRED
+    assert LEASE_ID not in runtime.cancellations.active
 
 
 def test_resume_requires_exact_live_cursor() -> None:

@@ -263,6 +263,43 @@ def message_is_final(message: Mapping[str, Any]) -> bool:
     return False
 
 
+class LeaseRevisionState:
+    """Non-sequenced revision state for backend-issued lease messages."""
+
+    def __init__(self, *, session_id: str, lease_id: str, epoch: int) -> None:
+        self.session_id = session_id
+        self.lease_id = lease_id
+        self.epoch = epoch
+        self.revisions = RevisionDomain(capacity=1)
+        self.closed = False
+
+    def accept(self, message: Mapping[str, Any]) -> Decision:
+        if self.closed:
+            return Decision(StableCode.LEASE_CLOSED)
+        if message.get("session_id") != self.session_id or message.get("lease_id") != self.lease_id:
+            return Decision(StableCode.BINDING_MISMATCH)
+        received_epoch = int(str(message["epoch"]))
+        if received_epoch < self.epoch:
+            return Decision(StableCode.EPOCH_STALE)
+        if received_epoch > self.epoch:
+            return Decision(StableCode.EPOCH_UNKNOWN)
+        identity = revision_identity(message)
+        preview = self.revisions.preview(
+            identity,
+            int(str(message["revision"])),
+            canonical_digest(revision_projection(message)),
+            canonical_digest(immutable_projection(message)),
+            False,
+        )
+        if preview.decision.code == StableCode.ACCEPTED:
+            self.revisions.commit(identity, preview)
+        return preview.decision
+
+    def clear(self) -> None:
+        self.revisions.clear()
+        self.closed = True
+
+
 class StreamOrderingState:
     """Sequence-before-revision precedence for one admitted stream domain."""
 
@@ -367,6 +404,20 @@ class CancellationRegistry:
 
     def add_active(self, lease: ActiveLease) -> None:
         self.active[lease.lease_id] = lease
+
+    def update_active_revision(self, lease_id: str, revision: int) -> None:
+        lease = self.active.get(lease_id)
+        if lease is None:
+            raise ValueError("lease is not active")
+        self.active[lease_id] = ActiveLease(
+            lease_id=lease.lease_id,
+            session_id=lease.session_id,
+            epoch=lease.epoch,
+            revision=revision,
+        )
+
+    def expire_active(self, lease_id: str) -> None:
+        self.active.pop(lease_id, None)
 
     def _expire(self, now: datetime) -> None:
         expired = [
