@@ -31,17 +31,17 @@
 | Command | Result | Date/commit |
 | --- | --- | --- |
 | `make bootstrap` | Passed; uv verified the frozen Python environment and pnpm 11.21.0 verified the frozen two-workspace install and supply-chain policy. | 2026-08-30 / `4662d41` |
-| `make protocol-generate` | Passed; rewrote the complete generated tree transactionally from the Pydantic source and pinned generator. | 2026-08-30 / `0c6102f` |
-| `git diff --exit-code -- packages/protocol/schema packages/protocol/src/generated packages/protocol/fixtures` | Passed after regeneration; generated Schema, TypeScript, compatibility, and fixture bytes match the committed output. | 2026-08-30 / `0c6102f` |
-| `make protocol-check` | Passed: `protocol generated artifacts: ok`; the checker compared all expected paths and bytes from a temporary generation. | 2026-08-30 / `0c6102f` |
+| `make protocol-generate` | Passed; rewrote the complete generated tree transactionally from the Pydantic source and pinned generator. | 2026-08-30 / `eb945dd` |
+| `git diff --exit-code -- packages/protocol/schema packages/protocol/src/generated packages/protocol/fixtures` | Passed after regeneration; generated Schema, TypeScript, compatibility, and fixture bytes match the committed output. | 2026-08-30 / `eb945dd` |
+| `make protocol-check` | Passed: `protocol generated artifacts: ok`; the checker compared all expected paths and bytes from a temporary generation. | 2026-08-30 / `eb945dd` |
 | `uv run pytest -q tests/protocol/test_state.py tests/protocol/test_golden.py` | Passed: 25 focused runtime and golden-corpus tests, including idle expiry and higher-epoch replacement cleanup. | 2026-08-30 / `0c6102f` |
-| `uv run pytest -q tests/protocol` | Passed: 59 protocol tests. | 2026-08-30 / `0c6102f` |
-| `pnpm --filter @livecho/protocol typecheck` | Passed with TypeScript strict mode; also rerun by `make verify`. | 2026-08-30 / `0c6102f` |
-| `pnpm --filter @livecho/protocol test` | Passed: one Vitest file and 105 tests, comprising 104 generated parity cases plus the corpus integrity assertion; also rerun by `make verify`. | 2026-08-30 / `0c6102f` |
-| `make verify` | Passed; Ruff, workspace lint, mypy, TypeScript checks, 99 pytest tests, 105 Vitest tests, artifact lifecycle, protocol drift, and build all succeeded. | 2026-08-30 / `0c6102f` |
-| `git diff --check && git diff --cached --check` | Passed with no whitespace errors. | 2026-08-30 / `0c6102f` |
+| `uv run pytest -q tests/protocol` | Passed: 59 protocol tests. | 2026-08-30 / `eb945dd` |
+| `pnpm --filter @livecho/protocol typecheck` | Passed with TypeScript strict mode; also rerun by `make verify`. | 2026-08-30 / `eb945dd` |
+| `pnpm --filter @livecho/protocol test` | Passed: one Vitest file and 109 tests, comprising 108 generated parity cases plus the corpus integrity assertion; also rerun by `make verify`. | 2026-08-30 / `eb945dd` |
+| `make verify` | Passed; Ruff, workspace lint, mypy, TypeScript checks, 99 pytest tests, 109 Vitest tests, artifact lifecycle, protocol drift, and build all succeeded. | 2026-08-30 / `eb945dd` |
+| `git diff --check && git diff --cached --check` | Passed with no whitespace errors. | 2026-08-30 / `eb945dd` |
 
-The generated corpus contains 104 unique cases: 39 accepted and 65 rejected. Every
+The generated corpus contains 108 unique cases: 39 accepted and 69 rejected. Every
 `StableCode` value occurs as an expected result. All 18 public Pydantic models have an
 accepted case; the remaining cases cover parser/version/capability/manifest failures,
 JSON and record-free PCM sequence boundaries, revision precedence/capacity/immutability,
@@ -49,7 +49,7 @@ all four final-object outcomes, cancellation CAS/tombstones, reconnect, RFC 8785
 representation variants, and metadata-only binary/PTS/budget boundaries.
 
 Generated output contains 21 Schema/compatibility files, one TypeScript contract, and
-105 fixture files including the manifest. Negative drift tests independently prove that
+109 fixture files including the manifest. Negative drift tests independently prove that
 a changed file, a missing file, and an unexpected extra file each fail comparison.
 
 ## Manual or hardware evidence
@@ -229,6 +229,11 @@ generation, shared golden cases, minimum versions, and the Issue #2 audio ceilin
   every superseded runtime before registering the replacement, clearing PCM, output,
   lease-revision, cancellation, and budget state; a runtime regression and shared
   `epoch.non_resumed_replacement_clears_state` golden transition pin the behavior.
+- Final exact-head Codex review P2 found that Pydantic numeric literals treated booleans
+  as equal integers while JSON Schema and Ajv rejected them. Resolved by applying the
+  boolean-rejecting JSON-integer normalizer to protocol/selected minor, sample-rate, and
+  channel literals; four shared raw-text cases pin each boolean rejection in Python and
+  TypeScript.
 
 ## Deviations
 
