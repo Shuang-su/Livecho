@@ -392,6 +392,20 @@ def accepted_cases() -> list[dict[str, Any]]:
                 wire={"initial": "cancelled", "candidate": "duplicate"},
             ),
             _case(
+                "epoch.non_resumed_replacement_clears_state",
+                "LeaseReplacementDecisionV1",
+                "accepted",
+                StableCode.ACCEPTED,
+                wire={
+                    "current_epoch": "1",
+                    "replacement_epoch": "2",
+                    "resumed": False,
+                    "superseded_active_after": False,
+                    "retained_pcm_bytes": 0,
+                    "retained_output_revisions": 0,
+                },
+            ),
+            _case(
                 "canonical.equal",
                 "CanonicalDecisionV1",
                 "accepted",
@@ -1261,6 +1275,16 @@ def evaluate_case(value: dict[str, Any]) -> StableCode:
             if received > current:
                 return StableCode.EPOCH_UNKNOWN
             return StableCode.ACCEPTED
+        if case.model == "LeaseReplacementDecisionV1":
+            is_replacement = not bool(case.wire["resumed"]) and int(
+                case.wire["replacement_epoch"]
+            ) > int(case.wire["current_epoch"])
+            cleared = (
+                not bool(case.wire["superseded_active_after"])
+                and int(case.wire["retained_pcm_bytes"]) == 0
+                and int(case.wire["retained_output_revisions"]) == 0
+            )
+            return StableCode.ACCEPTED if is_replacement and cleared else StableCode.SCHEMA_INVALID
         if case.model == "RevisionDecisionV1":
             return _evaluate_revision(case.wire)
         if case.model == "CancellationDecisionV1":

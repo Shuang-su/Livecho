@@ -611,6 +611,15 @@ export function evaluateGoldenCase(testCase: GoldenCaseV1): StableCode {
     const received = uint64(value.received);
     return received < current ? "epoch_stale" : received > current ? "epoch_unknown" : "accepted";
   }
+  if (testCase.model === "LeaseReplacementDecisionV1" && value !== undefined) {
+    const isReplacement =
+      !Boolean(value.resumed) && uint64(value.replacement_epoch) > uint64(value.current_epoch);
+    const cleared =
+      !Boolean(value.superseded_active_after) &&
+      Number(value.retained_pcm_bytes) === 0 &&
+      Number(value.retained_output_revisions) === 0;
+    return isReplacement && cleared ? "accepted" : "schema_invalid";
+  }
   if (testCase.model === "RevisionDecisionV1" && value !== undefined) {
     return revisionDecision(value);
   }

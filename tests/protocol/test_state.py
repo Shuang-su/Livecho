@@ -363,6 +363,59 @@ def test_runtime_expires_before_pcm_output_lease_update_or_cancellation(
     assert not runtime.cancellation_active
 
 
+def test_runtime_coordinator_prunes_idle_expired_runtime(
+    valid_messages: dict[str, dict[str, object]],
+) -> None:
+    coordinator = LeaseRuntimeCoordinator()
+    coordinator.session_teardown(SESSION_ID)
+    runtime = coordinator.create(LeaseV1.model_validate(valid_messages["LeaseV1"]))
+    now = datetime(2026, 1, 1, tzinfo=UTC)
+    deadline = datetime(2026, 1, 1, 0, 2, tzinfo=UTC)
+    frame = bytearray(encode_header(PcmHeaderV1(LEASE_ID, 1, 0, 0, 1, 2))) + bytearray(2)
+
+    assert runtime.accept_pcm(frame, now=now).code == StableCode.ACCEPTED
+    assert coordinator.buffered_audio_bytes == 2
+
+    LeaseRuntimeCoordinator().prune(deadline)
+
+    assert runtime.buffered_audio_bytes == 0
+    assert coordinator.buffered_audio_bytes == 0
+    assert coordinator.session_buffered_audio_bytes(SESSION_ID) == 0
+    assert not runtime.cancellation_active
+    assert runtime.accept_pcm(frame, now=deadline).code == StableCode.LEASE_EXPIRED
+
+
+def test_higher_epoch_replacement_retires_prior_runtime(
+    valid_messages: dict[str, dict[str, object]],
+) -> None:
+    coordinator = LeaseRuntimeCoordinator()
+    coordinator.session_teardown(SESSION_ID)
+    previous = coordinator.create(LeaseV1.model_validate(valid_messages["LeaseV1"]))
+    now = datetime(2026, 1, 1, tzinfo=UTC)
+    frame = bytearray(encode_header(PcmHeaderV1(LEASE_ID, 1, 0, 0, 1, 2))) + bytearray(2)
+    output = deepcopy(valid_messages["TranscriptSegmentV1"])
+
+    assert previous.accept_pcm(frame, now=now).code == StableCode.ACCEPTED
+    assert previous.accept_output(output, now=now).code == StableCode.ACCEPTED
+
+    replacement_raw = {
+        **deepcopy(valid_messages["LeaseV1"]),
+        "message_id": "00000000-0000-4000-8000-000000000090",
+        "lease_id": "00000000-0000-4000-8000-000000000091",
+        "epoch": "2",
+    }
+    replacement = coordinator.create(LeaseV1.model_validate(replacement_raw))
+
+    assert previous.buffered_audio_bytes == 0
+    assert previous.output_revision_count == 0
+    assert not previous.cancellation_active
+    assert previous.accept_pcm(frame, now=now).code == StableCode.LEASE_CLOSED
+    assert replacement.cancellation_active
+    assert coordinator.buffered_audio_bytes == 0
+    assert coordinator.session_buffered_audio_bytes(SESSION_ID) == 0
+    coordinator.session_teardown(SESSION_ID)
+
+
 def test_session_teardown_closes_all_runtime_state_domains(
     valid_messages: dict[str, dict[str, object]],
 ) -> None:

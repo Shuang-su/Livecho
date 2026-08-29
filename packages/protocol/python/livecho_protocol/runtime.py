@@ -71,16 +71,28 @@ class LeaseRuntimeCoordinator:
         return self._process_pcm.session_bytes(session_id)
 
     def create(self, lease: LeaseV1) -> LeaseRuntimeState:
+        session_runtimes = self._runtimes.setdefault(lease.session_id, set())
+        replacement_epoch = int(lease.epoch)
+        for previous in tuple(session_runtimes):
+            if previous.epoch < replacement_epoch:
+                previous._session_teardown()
+                session_runtimes.remove(previous)
         runtime = LeaseRuntimeState(
             lease=lease,
             cancellations=self._cancellations,
             process_pcm=self._process_pcm,
         )
-        self._runtimes.setdefault(runtime.session_id, set()).add(runtime)
+        session_runtimes.add(runtime)
         return runtime
 
     def prune(self, now: datetime) -> None:
         self._cancellations.prune(now)
+        for session_id, runtimes in tuple(self._runtimes.items()):
+            for runtime in tuple(runtimes):
+                if runtime._expire_if_due(now) is not None:
+                    runtimes.remove(runtime)
+            if not runtimes:
+                del self._runtimes[session_id]
 
     def session_teardown(self, session_id: str) -> None:
         for runtime in self._runtimes.pop(session_id, set()):
@@ -163,6 +175,7 @@ class LeaseRuntimeState:
 
     def _session_teardown(self) -> None:
         self._clear_state()
+        self._cancellations.expire_active(self.lease_id)
         self._allow_cancel_replay = False
         if self._terminal_code is None:
             self._terminal_code = StableCode.LEASE_CLOSED

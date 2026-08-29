@@ -13,6 +13,7 @@
     "accepted/canonical__key_order.json",
     "accepted/canonical__missing_null.json",
     "accepted/canonical__number_spelling.json",
+    "accepted/epoch__non_resumed_replacement_clears_state.json",
     "accepted/final__duplicate.json",
     "accepted/model__audioformatv1.json",
     "accepted/model__heartbeatv1.json",
