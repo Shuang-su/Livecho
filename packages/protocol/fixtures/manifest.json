@@ -42,6 +42,8 @@
     "accepted/sequence__duplicate.json"
   ],
   "rejected": [
+    "rejected/ack__accepted_revision_rejects_cas.json",
+    "rejected/ack__accepted_seq_rejects_cas.json",
     "rejected/ack__cancel_position_required.json",
     "rejected/ack__revision_position_required.json",
     "rejected/ack__seq_position_required.json",

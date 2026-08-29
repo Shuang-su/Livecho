@@ -388,8 +388,9 @@ function semanticModelCode(model: string, value: Record<string, unknown>): Stabl
     const hasSeq = value.seq != null;
     const hasRevision = value.revision != null;
     const hasExpectedRevision = value.expected_revision != null;
-    if (outcome === "accepted" && !hasSeq && !hasRevision && !hasExpectedRevision) {
-      return "schema_invalid";
+    if (outcome === "accepted") {
+      const hasStreamPosition = hasSeq || hasRevision;
+      if (hasStreamPosition === hasExpectedRevision) return "schema_invalid";
     }
     if (outcome === "seq_duplicate" && (!hasSeq || hasRevision || hasExpectedRevision)) {
       return "schema_invalid";

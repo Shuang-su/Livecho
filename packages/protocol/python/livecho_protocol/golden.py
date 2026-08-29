@@ -651,6 +651,25 @@ def rejected_cases() -> list[dict[str, Any]]:
                 ),
             ),
             _case(
+                "ack.accepted_seq_rejects_cas",
+                "ProtocolAckV1",
+                "rejected",
+                StableCode.SCHEMA_INVALID,
+                wire=_changed(ack, expected_revision="1"),
+            ),
+            _case(
+                "ack.accepted_revision_rejects_cas",
+                "ProtocolAckV1",
+                "rejected",
+                StableCode.SCHEMA_INVALID,
+                wire=_changed(
+                    ack,
+                    seq=None,
+                    revision="1",
+                    expected_revision="1",
+                ),
+            ),
+            _case(
                 "ack.revision_position_required",
                 "ProtocolAckV1",
                 "rejected",

@@ -397,8 +397,10 @@ class ProtocolAckV1(EitherEnvelopeV1):
     @model_validator(mode="after")
     def applicable_position(self) -> ProtocolAckV1:
         if self.outcome == "accepted":
-            if self.seq is None and self.revision is None and self.expected_revision is None:
-                raise ValueError("accepted ack requires a sequence, revision, or CAS value")
+            has_stream_position = self.seq is not None or self.revision is not None
+            has_cas_position = self.expected_revision is not None
+            if has_stream_position == has_cas_position:
+                raise ValueError("accepted ack requires exactly one position domain")
         elif self.outcome == "seq_duplicate":
             if self.seq is None or self.revision is not None or self.expected_revision is not None:
                 raise ValueError("sequence duplicate ack requires only seq")
