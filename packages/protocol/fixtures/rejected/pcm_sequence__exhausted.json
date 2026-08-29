@@ -1,0 +1,11 @@
+{
+  "case_id": "pcm_sequence.exhausted",
+  "code": "resync_required",
+  "expect": "rejected",
+  "model": "PcmSequenceDecisionV1",
+  "wire": {
+    "accepted_count": 0,
+    "candidate_seq": "18446744073709551615",
+    "start_seq": "18446744073709551615"
+  }
+}

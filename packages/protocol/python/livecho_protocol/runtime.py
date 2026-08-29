@@ -76,6 +76,8 @@ class LeaseRuntimeCoordinator:
         current_epoch = self._session_epochs.get(lease.session_id)
         if current_epoch is not None and replacement_epoch < current_epoch:
             raise ProtocolValidationError(StableCode.EPOCH_STALE)
+        if current_epoch == replacement_epoch:
+            raise ProtocolValidationError(StableCode.RESYNC_REQUIRED)
         session_runtimes = self._runtimes.setdefault(lease.session_id, set())
         for previous in tuple(session_runtimes):
             if previous.epoch < replacement_epoch:

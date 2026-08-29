@@ -16,6 +16,7 @@ from livecho_protocol.errors import ProtocolValidationError, StableCode
 from livecho_protocol.models import LeaseCancelV1, LeaseV1, ViewerCursorV1, WorkerResumeV1
 from livecho_protocol.parser import canonical_digest
 from livecho_protocol.runtime import LeaseRuntimeCoordinator
+from livecho_protocol.scalars import UINT64_MAX
 from livecho_protocol.state import (
     ActiveLease,
     CancellationRegistry,
@@ -82,6 +83,21 @@ def test_pcm_sequence_boundary_retains_no_records() -> None:
     assert vars(window) == {"start_seq": 0, "next_expected_seq": 257}
     assert window.preview(0).code == StableCode.RESYNC_REQUIRED
     assert window.preview(1).code == StableCode.SEQ_DUPLICATE
+
+
+def test_sequence_exhaustion_rejects_before_cursor_overflow() -> None:
+    digest = canonical_digest({"seq": str(UINT64_MAX)})
+    json_window = JsonSequenceWindow(UINT64_MAX)
+    assert json_window.preview(UINT64_MAX, MESSAGE_ID, digest).code == StableCode.RESYNC_REQUIRED
+    with pytest.raises(ValueError, match="sequence space is exhausted"):
+        json_window.commit(UINT64_MAX, MESSAGE_ID, digest)
+    assert json_window.next_expected_seq == UINT64_MAX
+
+    pcm_window = PcmSequenceWindow(UINT64_MAX)
+    assert pcm_window.preview(UINT64_MAX).code == StableCode.RESYNC_REQUIRED
+    with pytest.raises(ValueError, match="PCM sequence space is exhausted"):
+        pcm_window.commit(UINT64_MAX)
+    assert pcm_window.next_expected_seq == UINT64_MAX
 
 
 def _revision_values(message: dict[str, object]) -> tuple[bytes, bytes]:
@@ -445,6 +461,28 @@ def test_stale_epoch_runtime_creation_is_rejected(
     coordinator.session_teardown(SESSION_ID)
 
 
+def test_equal_epoch_runtime_creation_requires_existing_state_reuse(
+    valid_messages: dict[str, dict[str, object]],
+) -> None:
+    coordinator = LeaseRuntimeCoordinator()
+    coordinator.session_teardown(SESSION_ID)
+    current = coordinator.create(LeaseV1.model_validate(valid_messages["LeaseV1"]))
+    duplicate_raw = {
+        **deepcopy(valid_messages["LeaseV1"]),
+        "message_id": "00000000-0000-4000-8000-000000000090",
+        "lease_id": "00000000-0000-4000-8000-000000000091",
+    }
+
+    with pytest.raises(ProtocolValidationError) as duplicate:
+        coordinator.create(LeaseV1.model_validate(duplicate_raw))
+
+    assert duplicate.value.code == StableCode.RESYNC_REQUIRED
+    now = datetime(2026, 1, 1, tzinfo=UTC)
+    frame = bytearray(encode_header(PcmHeaderV1(current.lease_id, 1, 0, 0, 1, 2))) + bytearray(2)
+    assert current.accept_pcm(frame, now=now).code == StableCode.ACCEPTED
+    coordinator.session_teardown(SESSION_ID)
+
+
 def test_end_of_segment_releases_runtime_pcm_ledgers(
     valid_messages: dict[str, dict[str, object]],
 ) -> None:
@@ -541,36 +579,36 @@ def test_runtime_coordinator_enforces_process_pcm_budget_and_releases_bytes(
     assert coordinator.buffered_audio_bytes == 0
 
 
-def test_runtime_coordinator_enforces_session_pcm_budget(
+def test_runtime_coordinator_enforces_lease_and_session_pcm_budget(
     valid_messages: dict[str, dict[str, object]],
 ) -> None:
     coordinator = LeaseRuntimeCoordinator()
     coordinator.session_teardown(SESSION_ID)
-    runtimes = []
-    for index in range(2):
-        lease_raw = {
-            **deepcopy(valid_messages["LeaseV1"]),
-            "message_id": f"{index + 800:08x}-0000-4000-8000-{index + 800:012x}",
-            "lease_id": f"{index + 900:08x}-0000-4000-8000-{index + 900:012x}",
-        }
-        runtimes.append(coordinator.create(LeaseV1.model_validate(lease_raw)))
+    runtime = coordinator.create(LeaseV1.model_validate(valid_messages["LeaseV1"]))
 
     frame = bytearray(HEADER_LENGTH + MAX_PAYLOAD_LENGTH)
     now = datetime(2026, 1, 1, tzinfo=UTC)
     frames_per_session = LEASE_AUDIO_BUDGET // MAX_PAYLOAD_LENGTH
     for sequence in range(frames_per_session):
         frame[:HEADER_LENGTH] = encode_header(
-            PcmHeaderV1(runtimes[0].lease_id, 1, sequence, sequence, 16_000, MAX_PAYLOAD_LENGTH)
+            PcmHeaderV1(runtime.lease_id, 1, sequence, sequence, 16_000, MAX_PAYLOAD_LENGTH)
         )
-        assert runtimes[0].accept_pcm(frame, now=now).code == StableCode.ACCEPTED
+        assert runtime.accept_pcm(frame, now=now).code == StableCode.ACCEPTED
 
     frame[:HEADER_LENGTH] = encode_header(
-        PcmHeaderV1(runtimes[1].lease_id, 1, 0, 0, 16_000, MAX_PAYLOAD_LENGTH)
+        PcmHeaderV1(
+            runtime.lease_id,
+            1,
+            frames_per_session,
+            frames_per_session,
+            16_000,
+            MAX_PAYLOAD_LENGTH,
+        )
     )
     assert coordinator.session_buffered_audio_bytes(SESSION_ID) == LEASE_AUDIO_BUDGET
-    assert runtimes[1].accept_pcm(frame, now=now).code == StableCode.AUDIO_BUDGET_EXCEEDED
-    runtimes[0].consume_pcm(MAX_PAYLOAD_LENGTH)
-    assert runtimes[1].accept_pcm(frame, now=now).code == StableCode.ACCEPTED
+    assert runtime.accept_pcm(frame, now=now).code == StableCode.AUDIO_BUDGET_EXCEEDED
+    runtime.consume_pcm(MAX_PAYLOAD_LENGTH)
+    assert runtime.accept_pcm(frame, now=now).code == StableCode.ACCEPTED
     coordinator.session_teardown(SESSION_ID)
     assert coordinator.session_buffered_audio_bytes(SESSION_ID) == 0
     assert coordinator.buffered_audio_bytes == 0
@@ -586,11 +624,16 @@ def test_cancellation_cannot_close_a_different_runtime(
         **deepcopy(valid_messages["LeaseV1"]),
         "message_id": "00000000-0000-4000-8000-000000000090",
         "lease_id": "00000000-0000-4000-8000-000000000091",
+        "session_id": "00000000-0000-4000-8000-000000000092",
     }
     lease_b = LeaseV1.model_validate(lease_b_raw)
     runtime_a = coordinator.create(lease_a)
     runtime_b = coordinator.create(lease_b)
-    cancel_b_raw = {**_cancel(), "lease_id": lease_b.lease_id}
+    cancel_b_raw = {
+        **_cancel(),
+        "lease_id": lease_b.lease_id,
+        "session_id": lease_b.session_id,
+    }
     cancel_b = LeaseCancelV1.model_validate(cancel_b_raw)
     now = datetime(2026, 1, 1, tzinfo=UTC)
 
@@ -607,6 +650,7 @@ def test_cancellation_cannot_close_a_different_runtime(
     assert runtime_b.accept_pcm(frame_b, now=now).code == StableCode.LEASE_CLOSED
     assert runtime_a.accept_pcm(frame_a, now=now).code == StableCode.SEQ_DUPLICATE
     coordinator.session_teardown(SESSION_ID)
+    coordinator.session_teardown(lease_b.session_id)
 
 
 def test_runtime_coordinator_enforces_process_wide_tombstone_capacity(
@@ -624,11 +668,13 @@ def test_runtime_coordinator_enforces_process_wide_tombstone_capacity(
             **deepcopy(valid_messages["LeaseV1"]),
             "message_id": f"{index + 200:08x}-0000-4000-8000-{index + 200:012x}",
             "lease_id": lease_id,
+            "epoch": str(index + 1),
         }
         runtime = coordinator.create(LeaseV1.model_validate(lease_raw))
         cancel_raw = {
             **_cancel(f"{index + 300:08x}-0000-4000-8000-{index + 300:012x}"),
             "lease_id": lease_id,
+            "epoch": str(index + 1),
         }
         cancellation = LeaseCancelV1.model_validate(cancel_raw)
         assert runtime.cancel(

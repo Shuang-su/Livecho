@@ -11,7 +11,7 @@ from typing import Any
 from .errors import Decision, StableCode
 from .models import LeaseCancelV1, ViewerCursorV1, WorkerResumeV1
 from .parser import canonical_digest
-from .scalars import parse_timestamp
+from .scalars import UINT64_MAX, parse_timestamp
 
 SEQUENCE_WINDOW_CAPACITY = 256
 REVISION_DOMAIN_CAPACITY = 4_096
@@ -48,11 +48,15 @@ class JsonSequenceWindow:
             return Decision(StableCode.SEQ_CONFLICT)
         if seq > self.next_expected_seq:
             return Decision(StableCode.SEQ_GAP)
+        if seq == UINT64_MAX:
+            return Decision(StableCode.RESYNC_REQUIRED)
         return Decision(StableCode.ACCEPTED)
 
     def commit(self, seq: int, message_id: str, digest: bytes) -> None:
         if seq != self.next_expected_seq:
             raise ValueError("only the exact next sequence can be committed")
+        if seq == UINT64_MAX:
+            raise ValueError("sequence space is exhausted")
         self._records[seq] = SequenceRecord(message_id=message_id, digest=digest)
         self.next_expected_seq += 1
         while len(self._records) > SEQUENCE_WINDOW_CAPACITY:
@@ -80,11 +84,15 @@ class PcmSequenceWindow:
             return Decision(StableCode.SEQ_DUPLICATE)
         if seq > self.next_expected_seq:
             return Decision(StableCode.SEQ_GAP)
+        if seq == UINT64_MAX:
+            return Decision(StableCode.RESYNC_REQUIRED)
         return Decision(StableCode.ACCEPTED)
 
     def commit(self, seq: int) -> None:
         if seq != self.next_expected_seq:
             raise ValueError("only the exact next PCM sequence can be committed")
+        if seq == UINT64_MAX:
+            raise ValueError("PCM sequence space is exhausted")
         self.next_expected_seq += 1
 
     def clear(self) -> None:

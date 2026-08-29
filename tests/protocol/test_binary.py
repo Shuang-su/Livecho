@@ -3,13 +3,13 @@ from __future__ import annotations
 import pytest
 from livecho_protocol.binary import (
     HEADER_LENGTH,
-    MAX_UINT64,
     PcmHeaderV1,
     PcmLeaseState,
     decode_header,
     encode_header,
 )
 from livecho_protocol.errors import ProtocolValidationError, StableCode
+from livecho_protocol.scalars import UINT64_MAX
 
 from tests.protocol.conftest import LEASE_ID
 
@@ -27,7 +27,7 @@ def test_header_is_exactly_56_bytes_and_round_trips_metadata() -> None:
 
 
 def test_header_uint64_overflow_is_a_stable_structural_rejection() -> None:
-    overflowing = MAX_UINT64 + 1
+    overflowing = UINT64_MAX + 1
     headers = (
         PcmHeaderV1(LEASE_ID, overflowing, 0, 0, 1, 2),
         PcmHeaderV1(LEASE_ID, 1, overflowing, 0, 1, 2),

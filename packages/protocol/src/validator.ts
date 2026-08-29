@@ -490,6 +490,8 @@ function publicDecision(model: string, value: Record<string, unknown>): StableCo
 function sequenceDecision(value: Record<string, unknown>): StableCode {
   const start = uint64(value.start_seq);
   const count = Number(value.accepted_count);
+  const nextExpected = start + BigInt(count);
+  if (nextExpected > MAX_UINT64) return "resync_required";
   const records = new Map<bigint, { messageId: string; digest: string }>();
   for (let index = 0; index < count; index += 1) {
     const position = start + BigInt(index);
@@ -499,7 +501,6 @@ function sequenceDecision(value: Record<string, unknown>): StableCode {
     });
     if (records.size > 256) records.delete(position - 256n);
   }
-  const nextExpected = start + BigInt(count);
   const candidate = uint64(value.candidate_seq);
   if (candidate < nextExpected) {
     const record = records.get(candidate);
@@ -509,7 +510,8 @@ function sequenceDecision(value: Record<string, unknown>): StableCode {
       ? "seq_duplicate"
       : "seq_conflict";
   }
-  return candidate > nextExpected ? "seq_gap" : "accepted";
+  if (candidate > nextExpected) return "seq_gap";
+  return candidate === MAX_UINT64 ? "resync_required" : "accepted";
 }
 
 function revisionDecision(value: Record<string, unknown>): StableCode {
@@ -576,6 +578,7 @@ function binaryDecision(value: Record<string, unknown>): StableCode {
   if (sequence < oldestReplayable) return "resync_required";
   if (sequence < nextExpected) return "seq_duplicate";
   if (sequence > nextExpected) return "seq_gap";
+  if (sequence === MAX_UINT64) return "resync_required";
   if (value.previous_pts !== null && pts < uint64(value.previous_pts)) {
     return "audio_pts_invalid";
   }
@@ -606,13 +609,14 @@ export function evaluateGoldenCase(testCase: GoldenCaseV1): StableCode {
   if (testCase.model === "PcmSequenceDecisionV1" && value !== undefined) {
     const start = uint64(value.start_seq);
     const nextExpected = start + uint64(value.accepted_count);
+    if (nextExpected > MAX_UINT64) return "resync_required";
     const candidate = uint64(value.candidate_seq);
     const windowStart = nextExpected > 256n ? nextExpected - 256n : 0n;
     const oldestReplayable = start > windowStart ? start : windowStart;
     if (candidate < oldestReplayable) return "resync_required";
     if (candidate < nextExpected) return "seq_duplicate";
     if (candidate > nextExpected) return "seq_gap";
-    return "accepted";
+    return candidate === MAX_UINT64 ? "resync_required" : "accepted";
   }
   if (testCase.model === "EpochDecisionV1" && value !== undefined) {
     const current = uint64(value.current);
@@ -623,6 +627,7 @@ export function evaluateGoldenCase(testCase: GoldenCaseV1): StableCode {
     const currentEpoch = uint64(value.current_epoch);
     const replacementEpoch = uint64(value.replacement_epoch);
     if (replacementEpoch < currentEpoch) return "epoch_stale";
+    if (replacementEpoch === currentEpoch) return "resync_required";
     const isReplacement =
       !Boolean(value.resumed) && replacementEpoch > currentEpoch;
     const cleared =

@@ -9,7 +9,6 @@ from typing import Any, Literal
 
 from pydantic import Field, model_validator
 
-from .binary import MAX_UINT64
 from .compatibility import manifest_key, negotiate_viewer, negotiate_worker
 from .errors import SUCCESS_CODES, ProtocolValidationError, StableCode
 from .models import (
@@ -21,6 +20,7 @@ from .models import (
     WorkerResumeV1,
 )
 from .parser import canonical_digest, parse_control, strict_json_loads, validate_object
+from .scalars import UINT64_MAX
 from .state import (
     ActiveLease,
     CancellationRegistry,
@@ -827,6 +827,31 @@ def rejected_cases() -> list[dict[str, Any]]:
                 },
             ),
             _semantic_case(
+                "epoch.equal_runtime_creation",
+                "LeaseReplacementDecisionV1",
+                StableCode.RESYNC_REQUIRED,
+                {
+                    "current_epoch": "2",
+                    "replacement_epoch": "2",
+                    "resumed": False,
+                    "superseded_active_after": True,
+                    "retained_pcm_bytes": 2,
+                    "retained_output_revisions": 1,
+                },
+            ),
+            _semantic_case(
+                "sequence.exhausted",
+                "JsonSequenceDecisionV1",
+                StableCode.RESYNC_REQUIRED,
+                {
+                    "start_seq": str(UINT64_MAX),
+                    "accepted_count": 0,
+                    "candidate_seq": str(UINT64_MAX),
+                    "candidate_message_id": MESSAGE_ID,
+                    "candidate_value_index": 0,
+                },
+            ),
+            _semantic_case(
                 "sequence.conflict",
                 "JsonSequenceDecisionV1",
                 StableCode.SEQ_CONFLICT,
@@ -983,22 +1008,32 @@ def rejected_cases() -> list[dict[str, Any]]:
                     "candidate_seq": "9007199254740993",
                 },
             ),
+            _semantic_case(
+                "pcm_sequence.exhausted",
+                "PcmSequenceDecisionV1",
+                StableCode.RESYNC_REQUIRED,
+                {
+                    "start_seq": str(UINT64_MAX),
+                    "accepted_count": 0,
+                    "candidate_seq": str(UINT64_MAX),
+                },
+            ),
             _binary_case("binary.header", StableCode.BINARY_HEADER_INVALID, flags=2),
             _binary_case("binary.epoch_zero", StableCode.BINARY_HEADER_INVALID, epoch="0"),
             _binary_case(
                 "binary.epoch_overflow",
                 StableCode.BINARY_HEADER_INVALID,
-                epoch=str(MAX_UINT64 + 1),
+                epoch=str(UINT64_MAX + 1),
             ),
             _binary_case(
                 "binary.seq_overflow",
                 StableCode.BINARY_HEADER_INVALID,
-                seq=str(MAX_UINT64 + 1),
+                seq=str(UINT64_MAX + 1),
             ),
             _binary_case(
                 "binary.pts_overflow",
                 StableCode.BINARY_HEADER_INVALID,
-                pts_ms=str(MAX_UINT64 + 1),
+                pts_ms=str(UINT64_MAX + 1),
             ),
             _binary_case(
                 "binary.frame_large", StableCode.BINARY_FRAME_TOO_LARGE, total_length=32_057
@@ -1016,6 +1051,13 @@ def rejected_cases() -> list[dict[str, Any]]:
                 seq="9007199254740993",
                 input_start_seq="9007199254740992",
                 next_expected_seq="9007199254740992",
+            ),
+            _binary_case(
+                "binary.sequence_exhausted",
+                StableCode.RESYNC_REQUIRED,
+                seq=str(UINT64_MAX),
+                input_start_seq=str(UINT64_MAX),
+                next_expected_seq=str(UINT64_MAX),
             ),
             _binary_case(
                 "binary.seq_duplicate_precedes_pts_budget",
@@ -1183,10 +1225,14 @@ def _evaluate_public(case: GoldenCaseV1) -> StableCode:
 
 
 def _evaluate_sequence(wire: dict[str, Any]) -> StableCode:
-    window = JsonSequenceWindow(int(wire["start_seq"]))
-    for index in range(int(wire["accepted_count"])):
+    start = int(wire["start_seq"])
+    accepted_count = int(wire["accepted_count"])
+    if start + accepted_count > UINT64_MAX:
+        return StableCode.RESYNC_REQUIRED
+    window = JsonSequenceWindow(start)
+    for index in range(accepted_count):
         digest = canonical_digest({"index": index})
-        window.commit(index + int(wire["start_seq"]), MESSAGE_ID, digest)
+        window.commit(index + start, MESSAGE_ID, digest)
     return window.preview(
         int(wire["candidate_seq"]),
         str(wire["candidate_message_id"]),
@@ -1285,9 +1331,9 @@ def _evaluate_binary(metadata: dict[str, Any]) -> StableCode:
         or metadata["minor"] != 0
         or int(metadata["flags"]) & ~1
         or metadata["header_length"] != 56
-        or not 1 <= int(metadata["epoch"]) <= MAX_UINT64
-        or not 0 <= int(metadata["seq"]) <= MAX_UINT64
-        or not 0 <= int(metadata["pts_ms"]) <= MAX_UINT64
+        or not 1 <= int(metadata["epoch"]) <= UINT64_MAX
+        or not 0 <= int(metadata["seq"]) <= UINT64_MAX
+        or not 0 <= int(metadata["pts_ms"]) <= UINT64_MAX
         or int(metadata["total_length"]) != 56 + int(metadata["payload_length"])
         or not 1 <= int(metadata["sample_count"]) <= 16_000
         or int(metadata["payload_length"]) != int(metadata["sample_count"]) * 2
@@ -1308,6 +1354,8 @@ def _evaluate_binary(metadata: dict[str, Any]) -> StableCode:
         return StableCode.SEQ_DUPLICATE
     if sequence > next_expected:
         return StableCode.SEQ_GAP
+    if sequence == UINT64_MAX:
+        return StableCode.RESYNC_REQUIRED
     previous = metadata["previous_pts"]
     if previous is not None and int(metadata["pts_ms"]) < int(previous):
         return StableCode.AUDIO_PTS_INVALID
@@ -1330,6 +1378,8 @@ def evaluate_case(value: dict[str, Any]) -> StableCode:
         if case.model == "PcmSequenceDecisionV1":
             start = int(case.wire["start_seq"])
             next_expected = start + int(case.wire["accepted_count"])
+            if next_expected > UINT64_MAX:
+                return StableCode.RESYNC_REQUIRED
             candidate = int(case.wire["candidate_seq"])
             if candidate < max(start, next_expected - 256):
                 return StableCode.RESYNC_REQUIRED
@@ -1337,7 +1387,7 @@ def evaluate_case(value: dict[str, Any]) -> StableCode:
                 return StableCode.SEQ_DUPLICATE
             if candidate > next_expected:
                 return StableCode.SEQ_GAP
-            return StableCode.ACCEPTED
+            return StableCode.RESYNC_REQUIRED if candidate == UINT64_MAX else StableCode.ACCEPTED
         if case.model == "EpochDecisionV1":
             current = int(case.wire["current"])
             received = int(case.wire["received"])
@@ -1351,6 +1401,8 @@ def evaluate_case(value: dict[str, Any]) -> StableCode:
             replacement_epoch = int(case.wire["replacement_epoch"])
             if replacement_epoch < current_epoch:
                 return StableCode.EPOCH_STALE
+            if replacement_epoch == current_epoch:
+                return StableCode.RESYNC_REQUIRED
             is_replacement = not bool(case.wire["resumed"]) and replacement_epoch > current_epoch
             cleared = (
                 not bool(case.wire["superseded_active_after"])
