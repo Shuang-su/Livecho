@@ -322,9 +322,13 @@ class TimelineEventV1(ViewerEnvelopeV1):
     @classmethod
     def select_payload_branch(cls, value: object) -> object:
         if isinstance(value, dict):
-            if "segment_id" in value:
+            transcript_fields = set(TranscriptTimelinePayloadV1.model_fields)
+            status_fields = set(SessionStatusTimelinePayloadV1.model_fields)
+            has_transcript_field = not transcript_fields.isdisjoint(value)
+            has_status_field = not status_fields.isdisjoint(value)
+            if has_transcript_field and not has_status_field:
                 return TranscriptTimelinePayloadV1.model_validate(value)
-            if "status" in value:
+            if has_status_field and not has_transcript_field:
                 return SessionStatusTimelinePayloadV1.model_validate(value)
         return value
 

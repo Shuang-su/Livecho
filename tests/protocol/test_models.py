@@ -62,6 +62,16 @@ def test_timeline_known_value_error_is_schema_invalid(
         parse_control(json.dumps(changed), TimelineEventV1)
     assert invalid.value.code == StableCode.SCHEMA_INVALID
 
+    del changed["payload"]["segment_id"]
+    with pytest.raises(ProtocolValidationError) as partial:
+        parse_control(json.dumps(changed), TimelineEventV1)
+    assert partial.value.code == StableCode.SCHEMA_INVALID
+
+    changed["payload"]["raw"] = "forbidden"
+    with pytest.raises(ProtocolValidationError) as unknown:
+        parse_control(json.dumps(changed), TimelineEventV1)
+    assert unknown.value.code == StableCode.UNKNOWN_FIELD
+
 
 def test_unknown_fields_and_non_nfc_fail_closed(
     valid_messages: dict[str, dict[str, object]],

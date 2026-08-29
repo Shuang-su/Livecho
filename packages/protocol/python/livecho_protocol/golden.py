@@ -450,6 +450,11 @@ def rejected_cases() -> list[dict[str, Any]]:
     ack = values["ProtocolAckV1"]
     error = values["ProtocolErrorV1"]
     timeline = values["TimelineEventV1"]
+    partial_timeline = deepcopy(timeline)
+    partial_payload = partial_timeline["payload"]
+    if not isinstance(partial_payload, dict):
+        raise TypeError("timeline payload fixture must be an object")
+    del partial_payload["segment_id"]
     transcript = values["TranscriptSegmentV1"]
     non_nfc = deepcopy(transcript)
     non_nfc["text"] = "e\u0301"
@@ -471,6 +476,13 @@ def rejected_cases() -> list[dict[str, Any]]:
                 "rejected",
                 StableCode.DUPLICATE_KEY,
                 raw_text=duplicate,
+            ),
+            _case(
+                "parser.malformed_duplicate",
+                "WorkerHelloV1",
+                "rejected",
+                StableCode.MALFORMED_JSON,
+                raw_text='{"a":1,"a":2,}',
             ),
             _case(
                 "parser.too_large",
@@ -499,6 +511,13 @@ def rejected_cases() -> list[dict[str, Any]]:
                 "rejected",
                 StableCode.SCHEMA_INVALID,
                 wire=_changed(timeline, payload=_changed(timeline["payload"], text="")),
+            ),
+            _case(
+                "schema.timeline_partial_payload",
+                "TimelineEventV1",
+                "rejected",
+                StableCode.SCHEMA_INVALID,
+                wire=partial_timeline,
             ),
             _case(
                 "schema.timestamp_invalid",

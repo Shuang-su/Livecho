@@ -1,0 +1,7 @@
+{
+  "case_id": "parser.malformed_duplicate",
+  "code": "malformed_json",
+  "expect": "rejected",
+  "model": "WorkerHelloV1",
+  "raw_text": "{\"a\":1,\"a\":2,}"
+}

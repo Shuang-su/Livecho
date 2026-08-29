@@ -11,7 +11,15 @@ import rfc8785
 from pydantic import ValidationError
 
 from .errors import ProtocolValidationError, StableCode
-from .models import MODEL_BY_NAME, VIEWER_PROTOCOL, WORKER_PROTOCOL, StrictModel
+from .models import (
+    MODEL_BY_NAME,
+    VIEWER_PROTOCOL,
+    WORKER_PROTOCOL,
+    SessionStatusTimelinePayloadV1,
+    StrictModel,
+    TimelineEventV1,
+    TranscriptTimelinePayloadV1,
+)
 
 MAX_CONTROL_BYTES = 65_536
 
@@ -83,8 +91,31 @@ def _precheck_version(value: dict[str, Any], allowed_protocols: frozenset[str] |
         raise ProtocolValidationError(StableCode.UNSUPPORTED_MINOR)
 
 
-def _validation_code(error: ValidationError) -> StableCode:
+def _timeline_has_unknown_field(value: dict[str, Any]) -> bool:
+    if not set(value).issubset(TimelineEventV1.model_fields):
+        return True
+    payload = value.get("payload")
+    if not isinstance(payload, dict):
+        return False
+    allowed_payload_fields = {
+        *TranscriptTimelinePayloadV1.model_fields,
+        *SessionStatusTimelinePayloadV1.model_fields,
+    }
+    return not set(payload).issubset(allowed_payload_fields)
+
+
+def _validation_code(
+    error: ValidationError,
+    model: type[StrictModel],
+    value: dict[str, Any],
+) -> StableCode:
     errors = error.errors(include_url=False, include_context=False, include_input=False)
+    if model is TimelineEventV1:
+        return (
+            StableCode.UNKNOWN_FIELD
+            if _timeline_has_unknown_field(value)
+            else StableCode.SCHEMA_INVALID
+        )
     if any(item["type"] == "extra_forbidden" for item in errors):
         return StableCode.UNKNOWN_FIELD
     if any(item.get("loc", ())[:1] == ("capabilities",) for item in errors):
@@ -105,7 +136,7 @@ def validate_object[ModelT: StrictModel](value: dict[str, Any], model: type[Mode
     try:
         return model.model_validate(value)
     except ValidationError as error:
-        raise ProtocolValidationError(_validation_code(error)) from error
+        raise ProtocolValidationError(_validation_code(error, model, value)) from error
 
 
 def parse_control[ModelT: StrictModel](

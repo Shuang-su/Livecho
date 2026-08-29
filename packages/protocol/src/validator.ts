@@ -96,6 +96,32 @@ const VIEWER_MODELS = new Set([
   "ViewerSubscribeV1",
 ]);
 const SHARED_ENVELOPE_MODELS = new Set(["ProtocolAckV1", "ProtocolErrorV1"]);
+const TIMELINE_EVENT_FIELDS = new Set([
+  "protocol",
+  "protocol_minor",
+  "message_id",
+  "type",
+  "sent_at",
+  "event_id",
+  "session_id",
+  "room_id",
+  "epoch",
+  "seq",
+  "revision",
+  "occurred_at",
+  "payload",
+]);
+const TIMELINE_PAYLOAD_FIELDS = new Set([
+  "segment_id",
+  "start_ms",
+  "end_ms",
+  "text",
+  "language",
+  "confidence",
+  "is_final",
+  "status",
+  "reason_code",
+]);
 const publicModelSet = new Set<string>(PUBLIC_MODELS);
 const ajv = new Ajv2020({
   allErrors: true,
@@ -234,8 +260,8 @@ export function strictJsonParse(raw: string):
     return { code: "control_frame_too_large" };
   }
   try {
-    scanJson(raw);
     const value: unknown = JSON.parse(raw);
+    scanJson(raw);
     if (value === null || Array.isArray(value) || typeof value !== "object") {
       return { code: "schema_invalid" };
     }
@@ -267,6 +293,17 @@ function classifySchemaErrors(errors: ErrorObject[] | null | undefined): StableC
     return "capability_required";
   }
   return "schema_invalid";
+}
+
+function timelineHasUnknownField(value: Record<string, unknown>): boolean {
+  if (Object.keys(value).some((field) => !TIMELINE_EVENT_FIELDS.has(field))) return true;
+  const payload = value.payload;
+  return (
+    payload !== null &&
+    typeof payload === "object" &&
+    !Array.isArray(payload) &&
+    Object.keys(payload).some((field) => !TIMELINE_PAYLOAD_FIELDS.has(field))
+  );
 }
 
 function precheckVersion(model: string, value: Record<string, unknown>): StableCode | undefined {
@@ -398,25 +435,13 @@ function semverAtLeast(value: string, minimum: string): boolean {
 function publicDecision(model: string, value: Record<string, unknown>): StableCode {
   const version = precheckVersion(model, value);
   if (version !== undefined) return version;
-  if (
-    model === "TimelineEventV1" &&
-    value.payload !== null &&
-    typeof value.payload === "object" &&
-    !Array.isArray(value.payload)
-  ) {
-    const payload = value.payload as Record<string, unknown>;
-    const payloadModel = "segment_id" in payload
-      ? "TranscriptTimelinePayloadV1"
-      : "status" in payload
-        ? "SessionStatusTimelinePayloadV1"
-        : undefined;
-    const payloadValidator = payloadModel === undefined ? undefined : validators.get(payloadModel);
-    if (payloadValidator !== undefined && !payloadValidator(payload)) {
-      return classifySchemaErrors(payloadValidator.errors);
-    }
-  }
   const validator = validators.get(model);
-  if (validator === undefined || !validator(value)) return classifySchemaErrors(validator?.errors);
+  if (validator === undefined || !validator(value)) {
+    if (model === "TimelineEventV1") {
+      return timelineHasUnknownField(value) ? "unknown_field" : "schema_invalid";
+    }
+    return classifySchemaErrors(validator?.errors);
+  }
   const semantic = semanticModelCode(model, value);
   if (semantic !== "accepted") return semantic;
   if (model === "WorkerHelloV1") {
