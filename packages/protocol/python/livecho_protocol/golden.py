@@ -735,6 +735,26 @@ def rejected_cases() -> list[dict[str, Any]]:
                 wire=_changed(hello, protocol_minor=1),
             ),
             _case(
+                "version.integral_fraction_minor",
+                "WorkerHelloV1",
+                "rejected",
+                StableCode.UNSUPPORTED_MINOR,
+                raw_text=json.dumps(
+                    _changed(hello, protocol_minor=1.0),
+                    separators=(",", ":"),
+                ),
+            ),
+            _case(
+                "version.integral_fraction_minor_with_unknown_major",
+                "WorkerHelloV1",
+                "rejected",
+                StableCode.UNKNOWN_MAJOR,
+                raw_text=json.dumps(
+                    _changed(hello, protocol="livecho.worker.v2", protocol_minor=0.0),
+                    separators=(",", ":"),
+                ),
+            ),
+            _case(
                 "version.worker_old",
                 "WorkerHelloV1",
                 "rejected",

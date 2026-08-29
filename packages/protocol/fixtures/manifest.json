@@ -112,6 +112,8 @@
     "rejected/sequence__gap.json",
     "rejected/sequence__resync.json",
     "rejected/sequence__uint64_gap.json",
+    "rejected/version__integral_fraction_minor.json",
+    "rejected/version__integral_fraction_minor_with_unknown_major.json",
     "rejected/version__major.json",
     "rejected/version__minor.json",
     "rejected/version__minor_missing.json",

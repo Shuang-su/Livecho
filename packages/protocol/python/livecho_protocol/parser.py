@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 from collections.abc import Callable
 from typing import Any
 
@@ -87,6 +88,12 @@ def _precheck_version(value: dict[str, Any], allowed_protocols: frozenset[str] |
         return
     protocol = value.get("protocol")
     protocol_minor = value.get("protocol_minor")
+    if (
+        isinstance(protocol_minor, float)
+        and math.isfinite(protocol_minor)
+        and protocol_minor.is_integer()
+    ):
+        protocol_minor = int(protocol_minor)
     if (
         not isinstance(protocol, str)
         or not isinstance(protocol_minor, int)

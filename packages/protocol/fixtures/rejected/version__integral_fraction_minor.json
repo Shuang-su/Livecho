@@ -1,0 +1,7 @@
+{
+  "case_id": "version.integral_fraction_minor",
+  "code": "unsupported_minor",
+  "expect": "rejected",
+  "model": "WorkerHelloV1",
+  "raw_text": "{\"protocol\":\"livecho.worker.v1\",\"protocol_minor\":1.0,\"message_id\":\"00000000-0000-4000-8000-000000000001\",\"type\":\"worker.hello\",\"sent_at\":\"2026-01-01T00:00:00.000Z\",\"worker_id\":\"00000000-0000-4000-8000-000000000010\",\"worker_version\":\"0.1.0\",\"supported_minors\":[0],\"capabilities\":[\"asr.transcribe\",\"protocol.binary-pcm\"],\"model_manifests\":[{\"provider\":\"synthetic\",\"model_id\":\"fixture-asr\",\"revision\":\"1\",\"sha256\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"}],\"resume\":null}"
+}
