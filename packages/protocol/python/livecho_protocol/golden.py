@@ -557,6 +557,46 @@ def rejected_cases() -> list[dict[str, Any]]:
                 ),
             ),
             _case(
+                "schema.boolean_protocol_minor",
+                "LeaseV1",
+                "rejected",
+                StableCode.SCHEMA_INVALID,
+                raw_text=json.dumps(
+                    _changed(values["LeaseV1"], protocol_minor=False),
+                    separators=(",", ":"),
+                ),
+            ),
+            _case(
+                "schema.boolean_selected_minor",
+                "WorkerWelcomeV1",
+                "rejected",
+                StableCode.SCHEMA_INVALID,
+                raw_text=json.dumps(
+                    _changed(values["WorkerWelcomeV1"], selected_minor=False),
+                    separators=(",", ":"),
+                ),
+            ),
+            _case(
+                "schema.boolean_channels",
+                "AudioFormatV1",
+                "rejected",
+                StableCode.SCHEMA_INVALID,
+                raw_text=json.dumps(
+                    _changed(values["AudioFormatV1"], channels=True),
+                    separators=(",", ":"),
+                ),
+            ),
+            _case(
+                "schema.boolean_sample_rate",
+                "AudioFormatV1",
+                "rejected",
+                StableCode.SCHEMA_INVALID,
+                raw_text=json.dumps(
+                    _changed(values["AudioFormatV1"], sample_rate_hz=True),
+                    separators=(",", ":"),
+                ),
+            ),
+            _case(
                 "schema.timeline_payload_value",
                 "TimelineEventV1",
                 "rejected",

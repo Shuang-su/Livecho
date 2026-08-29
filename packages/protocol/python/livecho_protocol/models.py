@@ -58,6 +58,9 @@ Milliseconds = Annotated[
 ]
 Confidence = Annotated[float, Field(strict=True, ge=0, le=1)]
 RealtimeFactor = Annotated[float, Field(strict=True, ge=0, le=100)]
+ProtocolMinorLiteral = Annotated[Literal[0], BeforeValidator(_json_integer)]
+SampleRateLiteral = Annotated[Literal[16000], BeforeValidator(_json_integer)]
+ChannelCountLiteral = Annotated[Literal[1], BeforeValidator(_json_integer)]
 RejectCode = Literal[
     "malformed_json",
     "duplicate_key",
@@ -107,8 +110,8 @@ class ModelManifestRefV1(StrictModel):
 
 class AudioFormatV1(StrictModel):
     encoding: Literal["pcm_s16le"]
-    sample_rate_hz: Literal[16000]
-    channels: Literal[1]
+    sample_rate_hz: SampleRateLiteral
+    channels: ChannelCountLiteral
 
 
 class WorkerResumeV1(StrictModel):
@@ -128,7 +131,7 @@ class ViewerCursorV1(StrictModel):
 
 class WorkerEnvelopeV1(StrictModel):
     protocol: Literal["livecho.worker.v1"]
-    protocol_minor: Literal[0]
+    protocol_minor: ProtocolMinorLiteral
     message_id: UUID4String
     type: str
     sent_at: TimestampString
@@ -136,7 +139,7 @@ class WorkerEnvelopeV1(StrictModel):
 
 class ViewerEnvelopeV1(StrictModel):
     protocol: Literal["livecho.viewer.v1"]
-    protocol_minor: Literal[0]
+    protocol_minor: ProtocolMinorLiteral
     message_id: UUID4String
     type: str
     sent_at: TimestampString
@@ -144,7 +147,7 @@ class ViewerEnvelopeV1(StrictModel):
 
 class EitherEnvelopeV1(StrictModel):
     protocol: Literal["livecho.worker.v1", "livecho.viewer.v1"]
-    protocol_minor: Literal[0]
+    protocol_minor: ProtocolMinorLiteral
     message_id: UUID4String
     type: str
     sent_at: TimestampString
@@ -184,7 +187,7 @@ class WorkerHelloV1(WorkerEnvelopeV1):
 class WorkerWelcomeV1(WorkerEnvelopeV1):
     type: Literal["worker.welcome"]
     connection_id: UUID4String
-    selected_minor: Literal[0]
+    selected_minor: ProtocolMinorLiteral
     minimum_worker_version: Literal["0.1.0"]
     resume_succeeded: bool
     accepted_capabilities: Annotated[
@@ -375,7 +378,7 @@ class ViewerSubscribeV1(ViewerEnvelopeV1):
 
 class ViewerReadyV1(ViewerEnvelopeV1):
     type: Literal["viewer.ready"]
-    selected_minor: Literal[0]
+    selected_minor: ProtocolMinorLiteral
     minimum_client_version: Literal["0.1.0"]
     session_id: UUID4String
     epoch: PositiveUint64Decimal
