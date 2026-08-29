@@ -30,17 +30,17 @@
 
 | Command | Result | Date/commit |
 | --- | --- | --- |
-| `make bootstrap` | Passed; uv verified the frozen Python environment and pnpm 11.21.0 verified the frozen two-workspace install and supply-chain policy. | 2026-08-30 / `e1fee54` |
-| `make protocol-generate` | Passed; rewrote the complete generated tree transactionally from the Pydantic source and pinned generator. | 2026-08-30 / `e1fee54` |
-| `git diff --exit-code -- packages/protocol/schema packages/protocol/src/generated packages/protocol/fixtures` | Passed after regeneration; generated Schema, TypeScript, compatibility, and fixture bytes match the committed output. | 2026-08-30 / `e1fee54` |
-| `make protocol-check` | Passed: `protocol generated artifacts: ok`; the checker compared all expected paths and bytes from a temporary generation. | 2026-08-30 / `e1fee54` |
-| `uv run pytest -q tests/protocol` | Passed: 55 protocol tests. | 2026-08-30 / `e1fee54` |
-| `pnpm --filter @livecho/protocol typecheck` | Passed with TypeScript strict mode; also rerun by `make verify`. | 2026-08-30 / `e1fee54` |
-| `pnpm --filter @livecho/protocol test` | Passed: one Vitest file and 88 tests, comprising 87 generated parity cases plus the corpus integrity assertion; also rerun by `make verify`. | 2026-08-30 / `e1fee54` |
-| `make verify` | Passed; Ruff, workspace lint, mypy, TypeScript checks, 95 pytest tests, 88 Vitest tests, artifact lifecycle, protocol drift, and build all succeeded. | 2026-08-30 / `e1fee54` |
-| `git diff --check && git diff --cached --check` | Passed with no whitespace errors. | 2026-08-30 / `e1fee54` |
+| `make bootstrap` | Passed; uv verified the frozen Python environment and pnpm 11.21.0 verified the frozen two-workspace install and supply-chain policy. | 2026-08-30 / `a287ea4` |
+| `make protocol-generate` | Passed; rewrote the complete generated tree transactionally from the Pydantic source and pinned generator. | 2026-08-30 / `a287ea4` |
+| `git diff --exit-code -- packages/protocol/schema packages/protocol/src/generated packages/protocol/fixtures` | Passed after regeneration; generated Schema, TypeScript, compatibility, and fixture bytes match the committed output. | 2026-08-30 / `a287ea4` |
+| `make protocol-check` | Passed: `protocol generated artifacts: ok`; the checker compared all expected paths and bytes from a temporary generation. | 2026-08-30 / `a287ea4` |
+| `uv run pytest -q tests/protocol` | Passed: 57 protocol tests. | 2026-08-30 / `a287ea4` |
+| `pnpm --filter @livecho/protocol typecheck` | Passed with TypeScript strict mode; also rerun by `make verify`. | 2026-08-30 / `a287ea4` |
+| `pnpm --filter @livecho/protocol test` | Passed: one Vitest file and 99 tests, comprising 98 generated parity cases plus the corpus integrity assertion; also rerun by `make verify`. | 2026-08-30 / `a287ea4` |
+| `make verify` | Passed; Ruff, workspace lint, mypy, TypeScript checks, 97 pytest tests, 99 Vitest tests, artifact lifecycle, protocol drift, and build all succeeded. | 2026-08-30 / `a287ea4` |
+| `git diff --check && git diff --cached --check` | Passed with no whitespace errors. | 2026-08-30 / `a287ea4` |
 
-The generated corpus contains 87 unique cases: 36 accepted and 51 rejected. Every
+The generated corpus contains 98 unique cases: 37 accepted and 61 rejected. Every
 `StableCode` value occurs as an expected result. All 18 public Pydantic models have an
 accepted case; the remaining cases cover parser/version/capability/manifest failures,
 JSON and record-free PCM sequence boundaries, revision precedence/capacity/immutability,
@@ -48,7 +48,7 @@ all four final-object outcomes, cancellation CAS/tombstones, reconnect, RFC 8785
 representation variants, and metadata-only binary/PTS/budget boundaries.
 
 Generated output contains 21 Schema/compatibility files, one TypeScript contract, and
-88 fixture files including the manifest. Negative drift tests independently prove that
+99 fixture files including the manifest. Negative drift tests independently prove that
 a changed file, a missing file, and an unexpected extra file each fail comparison.
 
 ## Manual or hardware evidence
@@ -189,6 +189,25 @@ generation, shared golden cases, minimum versions, and the Issue #2 audio ceilin
   later JSON syntax error while Python reported malformed JSON. Resolved by completing
   native JSON syntax parsing before the duplicate-key scan and pinning the combined
   malformed-plus-duplicate input as `malformed_json` in the shared corpus.
+- Later Codex review P2 found that multiple leases in one session could exceed the
+  session PCM ceiling. Resolved with a process-scoped ledger that tracks both session and
+  process logical bytes and releases them on consume, cancellation, expiry, and teardown;
+  separate session and process boundary regressions use one reusable synthetic frame.
+- Later Codex review P2 found that version prechecks ran on closed nested models and on
+  malformed or missing envelope fields. Resolved by limiting negotiation decisions to
+  envelope models with present, correctly typed protocol and minor fields; four shared
+  cases pin nested extra-field and malformed-envelope results.
+- Later Codex review P2 found JavaScript safe-integer collapse in semantic ordering
+  evaluators. Resolved by using `bigint` for sequence, epoch, revision, PCM position, and
+  binary uint64 comparisons, with five shared cases above `2^53` including an accepted
+  next revision.
+- Later Codex review P1 found that a cancellation for lease B passed to runtime A could
+  close B in the shared registry while clearing A. Resolved by validating lease, session,
+  and epoch against the addressed runtime before touching the registry; a two-runtime
+  regression proves neither runtime is incorrectly closed.
+- Later Codex review P2 found Python could surface a nested duplicate before a later outer
+  syntax error. Resolved by completing a bounded syntax parse before the duplicate-aware
+  parse and pinning a nested-duplicate-plus-malformed document as `malformed_json`.
 
 ## Deviations
 
