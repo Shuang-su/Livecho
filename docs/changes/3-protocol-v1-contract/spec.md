@@ -52,7 +52,7 @@ bounds, not advisory limits.
 | `WorkerHelloV1` | Worker to backend before any lease: envelope; `worker_id` UUIDv4; SemVer `worker_version` up to 64 characters; unique `supported_minors` containing 1-16 integers from 0-255; unique `capabilities` containing 1-16 known capability literals; 0-16 `ModelManifestRefV1` values; and optional `WorkerResumeV1`. Outside that closed resume object it contains no session, locator, path, arbitrary metadata, or secret. |
 | `LeaseV1` | Backend to worker: envelope; `lease_id`, `session_id`, `room_id`; `epoch` starting at `"1"`; lease `revision` starting at `"1"`; canonical `issued_at`/`expires_at`; `input_start_seq` and `output_start_seq`; exactly one allowlisted model manifest; fixed `AudioFormatV1`; and `audio_origin: "synthetic"`. Expiry is after issue time and no more than 120 seconds later. |
 | `HeartbeatV1` | Worker to backend for an active lease: envelope; lease/session binding; `epoch`; stream `seq`; worker state `ready`, `busy`, `draining`, or `error`; optional last accepted input/output sequences; `audio_buffer_bytes` from 0-960,000; and `observed_at`. It has no free-form metrics map or diagnostic body. |
-| `WorkerStatsV1` | Worker to backend for an active lease: envelope; lease/session binding; `epoch`; stream `seq`; stats object `revision`; bounded cumulative `processed_audio_ms`, `segments_accepted`, and `segments_rejected`; `realtime_factor` from 0 through 100 with at most six decimal places; and `window_started_at`/`window_ended_at`. It has no host inventory, command output, transcript body, or extensible map. |
+| `WorkerStatsV1` | Worker to backend for an active lease: envelope; lease/session binding; `stats_id` UUIDv4; `epoch`; stream `seq`; stats object `revision`; bounded cumulative `processed_audio_ms`, `segments_accepted`, and `segments_rejected`; `realtime_factor` from 0 through 100 with at most six decimal places; and `window_started_at`/`window_ended_at`. It has no host inventory, command output, transcript body, or extensible map. |
 | `TranscriptSegmentV1` | Worker to backend: envelope; lease/session binding; `segment_id`; `epoch`; stream `seq`; segment `revision`; `start_ms` and `end_ms` with `0 <= start_ms < end_ms` and a maximum 30,000 ms span; normalized UTF-8 `text` of 1-4,096 Unicode scalar values; optional BCP-47 `language`; optional confidence from 0 through 1 with at most six decimal places; and `is_final`. It contains no audio representation or raw platform identity. |
 | `TimelineEventV1` | Backend to viewer: envelope; `event_id`, `session_id`, `room_id`; `epoch`; viewer-stream `seq`; event `revision`; `occurred_at`; and a closed discriminated payload. V1.0 payloads are `TranscriptTimelinePayloadV1`, containing exactly `segment_id`, `start_ms`, `end_ms`, `text`, optional `language`, optional `confidence`, and `is_final`, or `SessionStatusTimelinePayloadV1`, containing only `status` (`starting`, `live`, `stopping`, `stopped`, or `failed`) and an optional 1-64-character conservative-ASCII stable `reason_code`. No raw platform payload or arbitrary object is permitted. |
 
@@ -187,6 +187,45 @@ the current revision is a no-op; a changed value at the current revision is
 An `is_final: true` transcript cannot be revised. A revision cannot move an object to a
 different session, lease, epoch, time range, or identity.
 
+Revision identity is `(message type, session_id, lease_id or zero UUID, epoch, object
+ID)`, where object ID is `lease_id`, `segment_id`, `stats_id`, or `event_id` as
+applicable. Its content digest is RFC 8785 JCS/SHA-256 over the validated message after
+removing only the transmission envelope fields `message_id`, `sent_at`, and `seq`;
+protocol/type, bindings, object ID, revision, and every domain payload field remain in
+the projection. Validation precedence for stream messages is fixed:
+
+1. Validate transport, size/parser/schema, negotiated version, binding, and epoch.
+2. If `seq` is below expected, resolve only the sequence window to `seq_duplicate`,
+   `seq_conflict`, or `resync_required`; do not evaluate revision.
+3. If `seq` is above expected, return `seq_gap`; do not evaluate revision.
+4. For the exact expected `seq`, evaluate revision. A matching current revision and
+   projection digest consumes that sequence, has no object side effect, and returns
+   `revision_duplicate`. Different content at current revision is `revision_conflict` and
+   does not consume the sequence. An accepted new/current-plus-one revision consumes the
+   sequence and updates state. Every revision rejection leaves sequence and object state
+   unchanged.
+
+Thus replaying the original whole message at its old sequence produces
+`seq_duplicate`; retransmitting the same object revision/content under the next expected
+sequence (with any valid new transmission message ID/time) produces
+`revision_duplicate`; and changed domain content at that current revision produces
+`revision_conflict`. An identical replay of an already-final object may be a
+`revision_duplicate`, but a changed or higher revision is `object_final`.
+
+Each worker `(session, lease, epoch, direction)` or viewer `(session, epoch)` revision
+state domain retains at most 4,096 identities until termination, with no eviction or
+access-based refresh during that active domain. Each
+logical 104-byte record contains an 8-byte type/flag/reserved prefix, three 16-byte UUID
+slots for session/lease/object (zero lease for viewer state), 8-byte epoch, 8-byte current
+revision, and 32-byte projection digest: at most 425,984 logical bytes per domain and no
+message body. When 4,096 identities exist, an exact update/duplicate of an existing
+identity is still evaluated, but a new identity returns
+`revision_capacity_exceeded` without consuming sequence or changing state. The state is
+cleared only on cancellation, expiry, session teardown, epoch replacement, or a
+non-resumed connection. Boundary tests must accept identities 1-4,096, reject identity
+4,097, still accept a valid update to an existing identity at capacity, and prove
+cleanup permits a new domain.
+
 `LeaseCancelV1` closes the named active lease atomically only when `expected_revision`
 equals the current lease revision; it neither increments that revision nor consumes the
 PCM input sequence. The initial matching cancellation returns `accepted`. Repeating the
@@ -232,7 +271,8 @@ text. Minor 0 defines at least:
 `worker_version_too_old`, `capability_required`, `manifest_not_allowed`,
 `lease_unknown`, `lease_expired`, `lease_closed`, `binding_mismatch`, `epoch_stale`, `epoch_unknown`,
 `seq_duplicate`, `seq_conflict`, `seq_gap`, `revision_duplicate`, `cancel_duplicate`,
-`revision_conflict`, `revision_stale`, `revision_gap`, `cancel_conflict`, `object_final`,
+`revision_conflict`, `revision_stale`, `revision_gap`, `revision_capacity_exceeded`,
+`cancel_conflict`, `object_final`,
 `resync_required`, `binary_header_invalid`, `binary_frame_too_large`,
 `audio_pts_invalid`, and `audio_budget_exceeded`.
 
@@ -295,6 +335,11 @@ reordered keys, insignificant string escaping, and equivalent accepted number sp
 produce the same JCS digest/outcome in Python and TypeScript; changed values, explicit
 null versus missing, and non-NFC text must produce the specified different or rejected
 outcomes.
+
+The revision subset must cover the two replay forms and precedence above, projection
+variants in transmission-only versus domain fields, the 4,096/4,097 identity boundary,
+an existing update at capacity, final-object replay/mutation, and cleanup into a new
+domain.
 
 The cancellation subset must contain an accepted exact-CAS initial close, its identical
 `cancel_duplicate` replay, a same-ID changed-reason `cancel_conflict`, lower and higher
@@ -385,8 +430,8 @@ fixture retains its result. There is no silent downgrade.
 - [ ] Focused executable tests cover epoch authority, exact-next sequencing, idempotent
   duplicate versus conflict, out-of-order rejection without buffering, revision rules,
   the exact 256-record JSON and 256-position PCM boundaries, RFC 8785 representation
-  variants, final-object behavior, reconnect resume/refusal, and unchanged state on
-  rejection.
+  variants, revision replay precedence and 4,096-identity capacity, final-object
+  behavior, reconnect resume/refusal, and unchanged state on rejection.
 - [ ] `make protocol-generate` is deterministic, `make protocol-check` detects changed,
   missing, and extra generated output, and `make verify` enforces drift.
 - [ ] Python and TypeScript run the identical accepted/rejected golden corpus and agree

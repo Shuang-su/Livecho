@@ -55,6 +55,13 @@ generation, shared golden cases, minimum versions, and the Issue #2 audio ceilin
 - Follow-up Codex review P2 found that “canonical JSON” was unspecified. Resolved by
   requiring RFC 8785 JCS plus SHA-256 in both languages, strict pre-canonicalization
   validation, NFC text, and raw representation-variant parity cases.
+- Follow-up Codex review P2 found that whole-message replay identity made
+  `revision_duplicate` ambiguous or unreachable. Resolved with a transmission-field-free
+  JCS revision projection and fixed sequence-before-revision precedence, including both
+  replay forms and changed-content outcomes.
+- Follow-up Codex review P2 found unbounded retained per-object revision state. Resolved
+  with a no-eviction 4,096-identity/425,984-logical-byte ceiling per active domain,
+  `revision_capacity_exceeded`, and capacity/update/cleanup boundary requirements.
 - Security/data review found no permitted field for a credential, playback/download URL,
   arbitrary path/command/code/container, raw platform payload, or extensible metadata.
   The documents expressly prohibit audio fixtures, encodings, digests, persistence, and
