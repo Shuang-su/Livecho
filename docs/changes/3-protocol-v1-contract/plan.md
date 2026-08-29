@@ -5,9 +5,10 @@
 1. Merge this artifact-only change with no runtime, dependency, schema, fixture, or
    generated-code changes. Start implementation from the resulting `main` commit on a
    separate Issue #3 branch.
-2. Add pinned Pydantic v2 and protocol workspace dependencies, create the Python and
-   TypeScript package layout specified above, and add root `protocol-generate` and
-   `protocol-check` Make targets. Keep every existing workspace script contract green.
+2. Add pinned Pydantic v2 and RFC 8785 dependencies plus the protocol workspace
+   dependencies, create the Python and TypeScript package layout specified above, and
+   add root `protocol-generate` and `protocol-check` Make targets. Keep every existing
+   workspace script contract green.
 3. Implement the strict Pydantic scalar/envelope/supporting models, six required public
    models, closed CAS-based `LeaseCancelV1`, compatibility matrix, stable codes, and
    semantic invariants. Unit-test model boundaries before generating downstream files.
@@ -17,9 +18,9 @@
 5. Implement pure bounded in-memory ordering state machines for epoch authority,
    directional sequences, revisions, terminal objects, cancellation tombstones, and
    reconnect decisions. Test every transition, duplicate/conflict distinction, gap,
-   the exact 256-record per-domain FIFO boundary, tombstone expiry/capacity,
-   cross-binding rejection, and no-state-change failure path without implementing
-   scheduling or persistence.
+   the exact 256-record JSON FIFO and 256-position record-free PCM boundaries, tombstone
+   expiry/capacity, cross-binding rejection, and no-state-change failure path without
+   implementing scheduling or persistence.
 6. Implement deterministic draft-2020-12 JSON Schema, compatibility JSON, and TypeScript
    generation. Normalize ordering/line endings/IDs, reject nondeterministic metadata,
    generate atomically, and add a temporary-directory drift comparison that detects
@@ -29,14 +30,17 @@
    compare decision and stable code, not dependency-specific diagnostic strings. Keep
    binary cases metadata-only and add a repository scan proving that no audio fixture or
    obvious encoded-audio form was added.
-8. Export the generated TypeScript contract from the protocol workspace, implement all
+8. Add cross-language RFC 8785 replay cases for key order, escaping, accepted number
+   spellings, missing versus null, NFC rejection, and changed content. Compare the JCS
+   bytes/digest and protocol outcome without logging message bodies or digests.
+9. Export the generated TypeScript contract from the protocol workspace, implement all
    required `lint`, `typecheck`, `test`, and `build` scripts, and wire protocol drift and
    parity into `make verify`/CI. Do not mount endpoints or enable any production path.
-9. Update only this Issue's `evidence.md` with exact commands, commit, generation/parity
+10. Update only this Issue's `evidence.md` with exact commands, commit, generation/parity
    case counts, diff review, and deviations. Review the complete diff for secrets,
    locators, arbitrary execution/download surfaces, real platform data, audio artifacts,
    and scope belonging to later Issues before opening the implementation PR.
-10. Open one implementation PR that closes Issue #3. Resolve every deterministic check
+11. Open one implementation PR that closes Issue #3. Resolve every deterministic check
     and review finding, obtain the required owner/risk decision, and merge only when the
     accepted artifacts, implementation, generated output, and evidence agree.
 

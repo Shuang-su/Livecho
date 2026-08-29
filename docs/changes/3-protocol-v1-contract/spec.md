@@ -22,6 +22,17 @@ also repeated in the top-level `protocol` literal and every control message carr
 discriminator, and a canonical UTC timestamp with exactly millisecond precision and a
 `Z` suffix.
 
+Every human-readable text value must already be Unicode NFC; validation rejects rather
+than rewrites a non-NFC value. For accepted JSON replay identity, both languages apply
+RFC 8785 JSON Canonicalization Scheme (JCS) to the strictly parsed original JSON value
+and compute SHA-256 over the resulting UTF-8 bytes. Canonicalization happens only after
+duplicate-key, size, UTF-8, and schema validation and before any default insertion or
+model transformation; strict models do not coerce values. JCS makes object-key order,
+insignificant escaping, and equivalent accepted JSON number spellings identical, while
+a missing optional member and an explicit null remain different. Non-finite values are
+already rejected. Message ID is also compared directly even though it is included in
+the canonical digest.
+
 Wire fields with schema format `uint64-decimal`, including `epoch`, `seq`, `revision`,
 cursors, and cumulative counters, are canonical decimal strings in the inclusive range
 0 through 18,446,744,073,709,551,615. Only `"0"` may start with zero. This avoids loss
@@ -130,12 +141,11 @@ Worker input PCM starts at `LeaseV1.input_start_seq`; `HeartbeatV1`, `WorkerStat
 sequence. In each domain:
 
 1. The receiver accepts only the exact next expected `seq` and then increments it.
-2. A lower JSON `seq` is an idempotent no-op only when its message identity and canonical
-   content digest match the previously accepted value in the exact in-memory
+2. A lower JSON `seq` is an idempotent no-op only when its message identity and RFC 8785
+   JCS/SHA-256 digest match the previously accepted value in the exact in-memory
    deduplication window defined below. It yields `seq_duplicate` without reapplying side
-   effects. A
-   lower binary PCM `seq` in the current window is always discarded unread as the same
-   no-op; audio bytes are neither compared nor hashed.
+   effects. A lower binary PCM `seq` in the current window is always discarded unread as
+   the same no-op; audio bytes are neither compared nor hashed.
 3. Reusing a sequence with different identity or content is `seq_conflict`.
 4. A higher sequence is `seq_gap`; the receiver does not buffer, skip, or advance.
 5. JSON deduplication digests remain in memory only, are never logged or persisted, and
@@ -155,6 +165,19 @@ Lease cancellation, expiry, session teardown, or non-resumed replacement clears 
 domain. Later gateway Issues bound concurrent connections/domains; they may impose a
 lower concurrent-domain limit but cannot change this minor-0 per-domain window or replay
 result for an admitted domain.
+
+Binary PCM uses the same 256-position replay boundary without retaining a record or any
+payload-derived value. The receiver stores only `next_expected_seq` and derives
+`oldest_replayable_seq = max(input_start_seq, next_expected_seq - 256)`. After structural
+header and lease/epoch validation, any lower sequence at or above that boundary is
+discarded without reading, comparing, or hashing its payload and returns
+`seq_duplicate`; a lower sequence below it returns `resync_required`. After accepting
+input sequences 0-255, all are replayable no-ops; accepting 256 moves the boundary to 1,
+making replay 0 `resync_required` and replay 1 `seq_duplicate`. Cancellation, expiry,
+teardown, or a new non-resumed lease erases the arithmetic window. Binary payload/header
+content conflicts for an already accepted lower sequence are intentionally not compared
+or reprocessed; only current/future structural, binding, epoch, PTS, size, and budget
+checks can reject a new frame.
 
 Revision domains are per stable lease, transcript segment, stats window, or timeline
 event identity within one session/epoch. A new object starts at revision `"1"`. The
@@ -237,9 +260,10 @@ The implementation uses this layout:
 - `tests/protocol/`: Python model, ordering, binary boundary, and generation tests; and
 - `tools/protocol_codegen.py`: the only generation entry point.
 
-The root Python environment adds pinned Pydantic v2. The protocol workspace adds pinned
-TypeScript, Ajv 2020, and JSON-Schema-to-TypeScript dependencies and implements the
-required `lint`, `typecheck`, `test`, and `build` scripts. Python creates draft 2020-12
+The root Python environment adds pinned Pydantic v2 and an RFC 8785 implementation. The
+protocol workspace adds pinned TypeScript, Ajv 2020, JSON-Schema-to-TypeScript, and RFC
+8785 canonicalization dependencies and implements the required `lint`, `typecheck`,
+`test`, and `build` scripts. Python creates draft 2020-12
 JSON Schema. TypeScript validates the `wire` member of each fixture with the matching
 generated schema plus explicit semantic checks. Both runners load the same manifest and
 compare the expected accept/reject result and stable code.
@@ -265,7 +289,12 @@ ordered.
 
 The sequence subset must cover an empty window, exact duplicate and conflict, all 256
 retained positions, deterministic insertion/eviction at sequence 256, replay immediately
-inside and outside the lower boundary, and cleanup on lease/session termination.
+inside and outside the lower boundary, the PCM arithmetic boundary without retained
+payload data, and cleanup on lease/session termination. Raw-text cases must prove that
+reordered keys, insignificant string escaping, and equivalent accepted number spellings
+produce the same JCS digest/outcome in Python and TypeScript; changed values, explicit
+null versus missing, and non-NFC text must produce the specified different or rejected
+outcomes.
 
 The cancellation subset must contain an accepted exact-CAS initial close, its identical
 `cancel_duplicate` replay, a same-ID changed-reason `cancel_conflict`, lower and higher
@@ -355,8 +384,9 @@ fixture retains its result. There is no silent downgrade.
   fixture or persistence.
 - [ ] Focused executable tests cover epoch authority, exact-next sequencing, idempotent
   duplicate versus conflict, out-of-order rejection without buffering, revision rules,
-  the exact 256-record deduplication boundary/eviction, final-object behavior, reconnect
-  resume/refusal, and unchanged state on rejection.
+  the exact 256-record JSON and 256-position PCM boundaries, RFC 8785 representation
+  variants, final-object behavior, reconnect resume/refusal, and unchanged state on
+  rejection.
 - [ ] `make protocol-generate` is deterministic, `make protocol-check` detects changed,
   missing, and extra generated output, and `make verify` enforces drift.
 - [ ] Python and TypeScript run the identical accepted/rejected golden corpus and agree
