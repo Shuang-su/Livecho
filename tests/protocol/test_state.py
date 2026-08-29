@@ -4,7 +4,14 @@ from copy import deepcopy
 from datetime import UTC, datetime, timedelta
 
 import pytest
-from livecho_protocol.binary import PcmHeaderV1, encode_header
+from livecho_protocol.binary import (
+    HEADER_LENGTH,
+    LEASE_AUDIO_BUDGET,
+    MAX_PAYLOAD_LENGTH,
+    PROCESS_AUDIO_BUDGET,
+    PcmHeaderV1,
+    encode_header,
+)
 from livecho_protocol.errors import StableCode
 from livecho_protocol.models import LeaseCancelV1, LeaseV1, ViewerCursorV1, WorkerResumeV1
 from livecho_protocol.parser import canonical_digest
@@ -380,6 +387,47 @@ def test_session_teardown_closes_all_runtime_state_domains(
     cancel_raw = _cancel()
     cancellation = LeaseCancelV1.model_validate(cancel_raw)
     assert runtime.cancel(cancellation, cancel_raw, now).code == StableCode.LEASE_CLOSED
+
+
+def test_runtime_coordinator_enforces_process_pcm_budget_and_releases_bytes(
+    valid_messages: dict[str, dict[str, object]],
+) -> None:
+    coordinator = LeaseRuntimeCoordinator()
+    coordinator.session_teardown(SESSION_ID)
+    runtimes = []
+    for index in range(18):
+        lease_raw = {
+            **deepcopy(valid_messages["LeaseV1"]),
+            "message_id": f"{index + 500:08x}-0000-4000-8000-{index + 500:012x}",
+            "lease_id": f"{index + 600:08x}-0000-4000-8000-{index + 600:012x}",
+        }
+        runtimes.append(coordinator.create(LeaseV1.model_validate(lease_raw)))
+
+    frame = bytearray(HEADER_LENGTH + MAX_PAYLOAD_LENGTH)
+    now = datetime(2026, 1, 1, tzinfo=UTC)
+    frames_per_lease = LEASE_AUDIO_BUDGET // MAX_PAYLOAD_LENGTH
+    accepted_frames = PROCESS_AUDIO_BUDGET // MAX_PAYLOAD_LENGTH
+    for index in range(accepted_frames):
+        runtime = runtimes[index // frames_per_lease]
+        sequence = index % frames_per_lease
+        frame[:HEADER_LENGTH] = encode_header(
+            PcmHeaderV1(runtime.lease_id, 1, sequence, sequence, 16_000, MAX_PAYLOAD_LENGTH)
+        )
+        assert runtime.accept_pcm(frame, now=now).code == StableCode.ACCEPTED
+
+    next_runtime = runtimes[accepted_frames // frames_per_lease]
+    next_sequence = accepted_frames % frames_per_lease
+    frame[:HEADER_LENGTH] = encode_header(
+        PcmHeaderV1(next_runtime.lease_id, 1, next_sequence, next_sequence, 16_000, 32_000)
+    )
+    assert coordinator.buffered_audio_bytes == accepted_frames * MAX_PAYLOAD_LENGTH
+    assert next_runtime.accept_pcm(frame, now=now).code == StableCode.AUDIO_BUDGET_EXCEEDED
+
+    runtimes[0].consume_pcm(MAX_PAYLOAD_LENGTH)
+    assert next_runtime.accept_pcm(frame, now=now).code == StableCode.ACCEPTED
+    assert coordinator.buffered_audio_bytes == accepted_frames * MAX_PAYLOAD_LENGTH
+    coordinator.session_teardown(SESSION_ID)
+    assert coordinator.buffered_audio_bytes == 0
 
 
 def test_runtime_coordinator_enforces_process_wide_tombstone_capacity(

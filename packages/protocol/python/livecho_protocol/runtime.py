@@ -6,7 +6,7 @@ from collections.abc import Mapping
 from datetime import datetime
 from typing import Any
 
-from .binary import PcmLeaseState
+from .binary import PROCESS_AUDIO_BUDGET, PcmLeaseState
 from .errors import Decision, StableCode
 from .models import LeaseCancelV1, LeaseV1
 from .scalars import parse_timestamp
@@ -15,19 +15,48 @@ from .state import ActiveLease, CancellationRegistry, LeaseRevisionState, Stream
 _PROCESS_CANCELLATIONS = CancellationRegistry()
 
 
+class _ProcessPcmBudget:
+    """Process-wide logical count for ephemeral PCM bytes currently awaiting consumption."""
+
+    def __init__(self) -> None:
+        self.buffered_bytes = 0
+
+    def add(self, byte_count: int) -> None:
+        if byte_count < 0 or self.buffered_bytes + byte_count > PROCESS_AUDIO_BUDGET:
+            raise RuntimeError("invalid process PCM budget increase")
+        self.buffered_bytes += byte_count
+
+    def release(self, byte_count: int) -> None:
+        if byte_count < 0 or byte_count > self.buffered_bytes:
+            raise RuntimeError("invalid process PCM budget release")
+        self.buffered_bytes -= byte_count
+
+
+_PROCESS_PCM_BUDGET = _ProcessPcmBudget()
+
+
 class LeaseRuntimeCoordinator:
     """Process-scoped owner for lease runtimes and bounded cancellation tombstones."""
 
     def __init__(self) -> None:
         self._cancellations = _PROCESS_CANCELLATIONS
         self._runtimes = _PROCESS_RUNTIMES
+        self._process_pcm = _PROCESS_PCM_BUDGET
 
     @property
     def tombstone_count(self) -> int:
         return len(self._cancellations.tombstones)
 
+    @property
+    def buffered_audio_bytes(self) -> int:
+        return self._process_pcm.buffered_bytes
+
     def create(self, lease: LeaseV1) -> LeaseRuntimeState:
-        runtime = LeaseRuntimeState(lease=lease, cancellations=self._cancellations)
+        runtime = LeaseRuntimeState(
+            lease=lease,
+            cancellations=self._cancellations,
+            process_pcm=self._process_pcm,
+        )
         self._runtimes.setdefault(runtime.session_id, set()).add(runtime)
         return runtime
 
@@ -48,6 +77,7 @@ class LeaseRuntimeState:
         *,
         lease: LeaseV1,
         cancellations: CancellationRegistry,
+        process_pcm: _ProcessPcmBudget,
     ) -> None:
         self.lease_id = lease.lease_id
         self.session_id = lease.session_id
@@ -56,6 +86,7 @@ class LeaseRuntimeState:
         self._terminal_code: StableCode | None = None
         self._allow_cancel_replay = False
         self._cancellations = cancellations
+        self._process_pcm = process_pcm
         self._cancellations.add_active(
             ActiveLease(self.lease_id, self.session_id, self.epoch, int(lease.revision))
         )
@@ -105,7 +136,9 @@ class LeaseRuntimeState:
         return self.lease_id in self._cancellations.active
 
     def _clear_state(self) -> None:
+        buffered_bytes = self._pcm.buffered_bytes
         self._pcm.clear()
+        self._process_pcm.release(buffered_bytes)
         self._output.clear()
         self._lease.clear()
 
@@ -130,12 +163,22 @@ class LeaseRuntimeState:
         frame: bytes | bytearray | memoryview,
         *,
         now: datetime,
-        process_buffered_bytes: int = 0,
     ) -> Decision:
         terminal = self._expire_if_due(now)
         if terminal is not None:
             return terminal
-        return self._pcm.accept(frame, process_buffered_bytes=process_buffered_bytes)
+        before = self._pcm.buffered_bytes
+        decision = self._pcm.accept(
+            frame,
+            process_buffered_bytes=self._process_pcm.buffered_bytes,
+        )
+        if decision.code == StableCode.ACCEPTED:
+            self._process_pcm.add(self._pcm.buffered_bytes - before)
+        return decision
+
+    def consume_pcm(self, byte_count: int) -> None:
+        self._pcm.consume(byte_count)
+        self._process_pcm.release(byte_count)
 
     def accept_output(self, message: Mapping[str, Any], *, now: datetime) -> Decision:
         terminal = self._expire_if_due(now)

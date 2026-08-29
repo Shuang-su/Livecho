@@ -324,6 +324,16 @@ def accepted_cases() -> list[dict[str, Any]]:
                 ),
             ),
             _case(
+                "schema.timestamp_year_one",
+                "TranscriptSegmentV1",
+                "accepted",
+                StableCode.ACCEPTED,
+                wire=_changed(
+                    values["TranscriptSegmentV1"],
+                    sent_at="0001-01-01T00:00:00.000Z",
+                ),
+            ),
+            _case(
                 "sequence.duplicate",
                 "JsonSequenceDecisionV1",
                 "accepted",

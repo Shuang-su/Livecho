@@ -34,6 +34,7 @@
     "accepted/model__workerwelcomev1.json",
     "accepted/pcm_sequence__duplicate.json",
     "accepted/revision__duplicate.json",
+    "accepted/schema__timestamp_year_one.json",
     "accepted/sequence__duplicate.json"
   ],
   "rejected": [
