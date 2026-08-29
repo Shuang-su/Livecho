@@ -1,13 +1,15 @@
 from __future__ import annotations
 
+import pytest
 from livecho_protocol.binary import (
     HEADER_LENGTH,
+    MAX_UINT64,
     PcmHeaderV1,
     PcmLeaseState,
     decode_header,
     encode_header,
 )
-from livecho_protocol.errors import StableCode
+from livecho_protocol.errors import ProtocolValidationError, StableCode
 
 from tests.protocol.conftest import LEASE_ID
 
@@ -22,6 +24,19 @@ def test_header_is_exactly_56_bytes_and_round_trips_metadata() -> None:
     encoded = encode_header(header)
     assert len(encoded) == HEADER_LENGTH == 56
     assert decode_header(_frame(header)) == header
+
+
+def test_header_uint64_overflow_is_a_stable_structural_rejection() -> None:
+    overflowing = MAX_UINT64 + 1
+    headers = (
+        PcmHeaderV1(LEASE_ID, overflowing, 0, 0, 1, 2),
+        PcmHeaderV1(LEASE_ID, 1, overflowing, 0, 1, 2),
+        PcmHeaderV1(LEASE_ID, 1, 0, overflowing, 1, 2),
+    )
+    for header in headers:
+        with pytest.raises(ProtocolValidationError) as invalid:
+            encode_header(header)
+        assert invalid.value.code == StableCode.BINARY_HEADER_INVALID
 
 
 def test_invalid_flags_and_sizes_reject_without_budget_change() -> None:

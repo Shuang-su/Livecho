@@ -9,6 +9,7 @@ from typing import Any, Literal
 
 from pydantic import Field, model_validator
 
+from .binary import MAX_UINT64
 from .compatibility import manifest_key, negotiate_viewer, negotiate_worker
 from .errors import SUCCESS_CODES, ProtocolValidationError, StableCode
 from .models import (
@@ -985,6 +986,21 @@ def rejected_cases() -> list[dict[str, Any]]:
             _binary_case("binary.header", StableCode.BINARY_HEADER_INVALID, flags=2),
             _binary_case("binary.epoch_zero", StableCode.BINARY_HEADER_INVALID, epoch="0"),
             _binary_case(
+                "binary.epoch_overflow",
+                StableCode.BINARY_HEADER_INVALID,
+                epoch=str(MAX_UINT64 + 1),
+            ),
+            _binary_case(
+                "binary.seq_overflow",
+                StableCode.BINARY_HEADER_INVALID,
+                seq=str(MAX_UINT64 + 1),
+            ),
+            _binary_case(
+                "binary.pts_overflow",
+                StableCode.BINARY_HEADER_INVALID,
+                pts_ms=str(MAX_UINT64 + 1),
+            ),
+            _binary_case(
                 "binary.frame_large", StableCode.BINARY_FRAME_TOO_LARGE, total_length=32_057
             ),
             _binary_case("audio.pts", StableCode.AUDIO_PTS_INVALID, previous_pts=2, pts_ms=1),
@@ -1269,7 +1285,9 @@ def _evaluate_binary(metadata: dict[str, Any]) -> StableCode:
         or metadata["minor"] != 0
         or int(metadata["flags"]) & ~1
         or metadata["header_length"] != 56
-        or int(metadata["epoch"]) < 1
+        or not 1 <= int(metadata["epoch"]) <= MAX_UINT64
+        or not 0 <= int(metadata["seq"]) <= MAX_UINT64
+        or not 0 <= int(metadata["pts_ms"]) <= MAX_UINT64
         or int(metadata["total_length"]) != 56 + int(metadata["payload_length"])
         or not 1 <= int(metadata["sample_count"]) <= 16_000
         or int(metadata["payload_length"]) != int(metadata["sample_count"]) * 2

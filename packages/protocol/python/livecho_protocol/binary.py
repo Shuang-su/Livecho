@@ -19,6 +19,7 @@ MAX_PAYLOAD_LENGTH = 32_000
 MAX_FRAME_LENGTH = HEADER_LENGTH + MAX_PAYLOAD_LENGTH
 LEASE_AUDIO_BUDGET = 960_000
 PROCESS_AUDIO_BUDGET = 16_777_216
+MAX_UINT64 = 18_446_744_073_709_551_615
 _HEADER = struct.Struct("!4sBBBB16sQQQII")
 
 
@@ -40,9 +41,9 @@ def _valid_header(header: PcmHeaderV1) -> bool:
         return False
     return (
         str(lease) == header.lease_id
-        and header.epoch >= 1
-        and 0 <= header.seq <= 18_446_744_073_709_551_615
-        and 0 <= header.pts_ms <= 18_446_744_073_709_551_615
+        and 1 <= header.epoch <= MAX_UINT64
+        and 0 <= header.seq <= MAX_UINT64
+        and 0 <= header.pts_ms <= MAX_UINT64
         and 1 <= header.sample_count <= MAX_SAMPLE_COUNT
         and 2 <= header.payload_length <= MAX_PAYLOAD_LENGTH
         and header.payload_length == header.sample_count * 2

@@ -13,6 +13,7 @@ export const WORKER_PROTOCOL = "livecho.worker.v1" as const;
 export const VIEWER_PROTOCOL = "livecho.viewer.v1" as const;
 export const PROTOCOL_MINOR = 0 as const;
 export const MAX_CONTROL_BYTES = 65_536;
+const MAX_UINT64 = 18_446_744_073_709_551_615n;
 
 export type StableCode =
   | "accepted"
@@ -542,6 +543,9 @@ function cancellationDecision(value: Record<string, unknown>): StableCode {
 }
 
 function binaryDecision(value: Record<string, unknown>): StableCode {
+  const epoch = uint64(value.epoch);
+  const sequence = uint64(value.seq);
+  const pts = uint64(value.pts_ms);
   if (Number(value.total_length) > 32_056) return "binary_frame_too_large";
   if (
     value.magic !== "LPCM" ||
@@ -549,7 +553,12 @@ function binaryDecision(value: Record<string, unknown>): StableCode {
     value.minor !== 0 ||
     (Number(value.flags) & ~1) !== 0 ||
     value.header_length !== 56 ||
-    uint64(value.epoch) < 1n ||
+    epoch < 1n ||
+    epoch > MAX_UINT64 ||
+    sequence < 0n ||
+    sequence > MAX_UINT64 ||
+    pts < 0n ||
+    pts > MAX_UINT64 ||
     Number(value.total_length) !== 56 + Number(value.payload_length) ||
     Number(value.sample_count) < 1 ||
     Number(value.sample_count) > 16_000 ||
@@ -558,9 +567,8 @@ function binaryDecision(value: Record<string, unknown>): StableCode {
     return "binary_header_invalid";
   }
   if (value.lease_id !== value.expected_lease_id) return "binding_mismatch";
-  if (uint64(value.epoch) < uint64(value.expected_epoch)) return "epoch_stale";
-  if (uint64(value.epoch) > uint64(value.expected_epoch)) return "epoch_unknown";
-  const sequence = uint64(value.seq);
+  if (epoch < uint64(value.expected_epoch)) return "epoch_stale";
+  if (epoch > uint64(value.expected_epoch)) return "epoch_unknown";
   const nextExpected = uint64(value.next_expected_seq);
   const inputStart = uint64(value.input_start_seq);
   const windowStart = nextExpected > 256n ? nextExpected - 256n : 0n;
@@ -568,7 +576,7 @@ function binaryDecision(value: Record<string, unknown>): StableCode {
   if (sequence < oldestReplayable) return "resync_required";
   if (sequence < nextExpected) return "seq_duplicate";
   if (sequence > nextExpected) return "seq_gap";
-  if (value.previous_pts !== null && uint64(value.pts_ms) < uint64(value.previous_pts)) {
+  if (value.previous_pts !== null && pts < uint64(value.previous_pts)) {
     return "audio_pts_invalid";
   }
   if (
