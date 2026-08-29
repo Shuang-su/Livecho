@@ -564,12 +564,19 @@ function binaryDecision(value: Record<string, unknown>): StableCode {
   const epoch = uint64(value.epoch);
   const sequence = uint64(value.seq);
   const pts = uint64(value.pts_ms);
+  const flags = value.flags;
+  const validFlags =
+    typeof flags === "number" &&
+    Number.isInteger(flags) &&
+    flags >= 0 &&
+    flags <= 0xff &&
+    (flags === 0 || flags === 1);
   if (Number(value.total_length) > 32_056) return "binary_frame_too_large";
   if (
     value.magic !== "LPCM" ||
     value.major !== 1 ||
     value.minor !== 0 ||
-    (Number(value.flags) & ~1) !== 0 ||
+    !validFlags ||
     value.header_length !== 56 ||
     epoch < 1n ||
     epoch > MAX_UINT64 ||

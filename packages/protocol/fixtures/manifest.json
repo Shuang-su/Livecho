@@ -53,6 +53,7 @@
     "rejected/audio__session_budget.json",
     "rejected/binary__epoch_overflow.json",
     "rejected/binary__epoch_zero.json",
+    "rejected/binary__flags_overflow.json",
     "rejected/binary__frame_large.json",
     "rejected/binary__header.json",
     "rejected/binary__pts_overflow.json",

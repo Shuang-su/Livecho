@@ -1097,6 +1097,11 @@ def rejected_cases() -> list[dict[str, Any]]:
                 },
             ),
             _binary_case("binary.header", StableCode.BINARY_HEADER_INVALID, flags=2),
+            _binary_case(
+                "binary.flags_overflow",
+                StableCode.BINARY_HEADER_INVALID,
+                flags=4_294_967_296,
+            ),
             _binary_case("binary.epoch_zero", StableCode.BINARY_HEADER_INVALID, epoch="0"),
             _binary_case(
                 "binary.epoch_overflow",
@@ -1410,13 +1415,25 @@ def _evaluate_resume(wire: dict[str, Any]) -> StableCode:
 
 
 def _evaluate_binary(metadata: dict[str, Any]) -> StableCode:
+    raw_flags = metadata["flags"]
+    flags: int | None
+    if isinstance(raw_flags, bool):
+        flags = None
+    elif isinstance(raw_flags, int):
+        flags = raw_flags
+    elif isinstance(raw_flags, float) and raw_flags.is_integer():
+        flags = int(raw_flags)
+    else:
+        flags = None
     if int(metadata["total_length"]) > 32_056:
         return StableCode.BINARY_FRAME_TOO_LARGE
     if (
         metadata["magic"] != "LPCM"
         or metadata["major"] != 1
         or metadata["minor"] != 0
-        or int(metadata["flags"]) & ~1
+        or flags is None
+        or not 0 <= flags <= 0xFF
+        or flags not in (0, 1)
         or metadata["header_length"] != 56
         or not 1 <= int(metadata["epoch"]) <= UINT64_MAX
         or not 0 <= int(metadata["seq"]) <= UINT64_MAX
