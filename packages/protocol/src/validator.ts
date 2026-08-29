@@ -398,6 +398,23 @@ function semverAtLeast(value: string, minimum: string): boolean {
 function publicDecision(model: string, value: Record<string, unknown>): StableCode {
   const version = precheckVersion(model, value);
   if (version !== undefined) return version;
+  if (
+    model === "TimelineEventV1" &&
+    value.payload !== null &&
+    typeof value.payload === "object" &&
+    !Array.isArray(value.payload)
+  ) {
+    const payload = value.payload as Record<string, unknown>;
+    const payloadModel = "segment_id" in payload
+      ? "TranscriptTimelinePayloadV1"
+      : "status" in payload
+        ? "SessionStatusTimelinePayloadV1"
+        : undefined;
+    const payloadValidator = payloadModel === undefined ? undefined : validators.get(payloadModel);
+    if (payloadValidator !== undefined && !payloadValidator(payload)) {
+      return classifySchemaErrors(payloadValidator.errors);
+    }
+  }
   const validator = validators.get(model);
   if (validator === undefined || !validator(value)) return classifySchemaErrors(validator?.errors);
   const semantic = semanticModelCode(model, value);
@@ -504,7 +521,12 @@ function binaryDecision(value: Record<string, unknown>): StableCode {
   if (value.lease_id !== value.expected_lease_id) return "binding_mismatch";
   if (Number(value.epoch) < Number(value.expected_epoch)) return "epoch_stale";
   if (Number(value.epoch) > Number(value.expected_epoch)) return "epoch_unknown";
-  if (Number(value.seq) > Number(value.next_expected_seq)) return "seq_gap";
+  const sequence = Number(value.seq);
+  const nextExpected = Number(value.next_expected_seq);
+  const oldestReplayable = Math.max(Number(value.input_start_seq), nextExpected - 256);
+  if (sequence < oldestReplayable) return "resync_required";
+  if (sequence < nextExpected) return "seq_duplicate";
+  if (sequence > nextExpected) return "seq_gap";
   if (value.previous_pts !== null && Number(value.pts_ms) < Number(value.previous_pts)) {
     return "audio_pts_invalid";
   }

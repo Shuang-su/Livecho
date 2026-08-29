@@ -52,6 +52,17 @@ def test_both_timeline_payloads_are_closed(
         TimelineEventV1.model_validate(changed)
 
 
+def test_timeline_known_value_error_is_schema_invalid(
+    valid_messages: dict[str, dict[str, object]],
+) -> None:
+    changed = deepcopy(valid_messages["TimelineEventV1"])
+    assert isinstance(changed["payload"], dict)
+    changed["payload"]["text"] = ""
+    with pytest.raises(ProtocolValidationError) as invalid:
+        parse_control(json.dumps(changed), TimelineEventV1)
+    assert invalid.value.code == StableCode.SCHEMA_INVALID
+
+
 def test_unknown_fields_and_non_nfc_fail_closed(
     valid_messages: dict[str, dict[str, object]],
 ) -> None:

@@ -1,6 +1,6 @@
 {
   "binary_header": {
-    "buffered_bytes": 0,
+    "buffered_bytes": 959999,
     "epoch": 1,
     "expected_epoch": 1,
     "expected_lease_id": "00000000-0000-4000-8000-000000000020",
@@ -11,17 +11,17 @@
     "magic": "LPCM",
     "major": 1,
     "minor": 0,
-    "next_expected_seq": 0,
+    "next_expected_seq": 1,
     "payload_length": 2,
-    "previous_pts": null,
+    "previous_pts": 2,
     "process_buffered_bytes": 0,
-    "pts_ms": 0,
+    "pts_ms": 1,
     "sample_count": 1,
     "seq": 0,
-    "total_length": 32057
+    "total_length": 58
   },
-  "case_id": "binary.frame_large",
-  "code": "binary_frame_too_large",
-  "expect": "rejected",
+  "case_id": "binary.seq_duplicate_precedes_pts_budget",
+  "code": "seq_duplicate",
+  "expect": "accepted",
   "model": "PcmHeaderV1"
 }

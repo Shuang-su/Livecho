@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from .scalars import (
     LanguageTag,
@@ -317,6 +317,16 @@ class TimelineEventV1(ViewerEnvelopeV1):
     revision: PositiveUint64Decimal
     occurred_at: TimestampString
     payload: TranscriptTimelinePayloadV1 | SessionStatusTimelinePayloadV1
+
+    @field_validator("payload", mode="before")
+    @classmethod
+    def select_payload_branch(cls, value: object) -> object:
+        if isinstance(value, dict):
+            if "segment_id" in value:
+                return TranscriptTimelinePayloadV1.model_validate(value)
+            if "status" in value:
+                return SessionStatusTimelinePayloadV1.model_validate(value)
+        return value
 
 
 class ViewerSubscribeV1(ViewerEnvelopeV1):

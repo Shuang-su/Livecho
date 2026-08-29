@@ -10,7 +10,7 @@ from typing import Any, Literal
 from pydantic import Field, model_validator
 
 from .compatibility import manifest_key, negotiate_viewer, negotiate_worker
-from .errors import ProtocolValidationError, StableCode
+from .errors import SUCCESS_CODES, ProtocolValidationError, StableCode
 from .models import (
     MODEL_BY_NAME,
     LeaseCancelV1,
@@ -439,6 +439,7 @@ def rejected_cases() -> list[dict[str, Any]]:
     hello = values["WorkerHelloV1"]
     ack = values["ProtocolAckV1"]
     error = values["ProtocolErrorV1"]
+    timeline = values["TimelineEventV1"]
     transcript = values["TranscriptSegmentV1"]
     non_nfc = deepcopy(transcript)
     non_nfc["text"] = "e\u0301"
@@ -481,6 +482,13 @@ def rejected_cases() -> list[dict[str, Any]]:
                 "rejected",
                 StableCode.SCHEMA_INVALID,
                 wire=_changed(transcript, end_ms=0),
+            ),
+            _case(
+                "schema.timeline_payload_value",
+                "TimelineEventV1",
+                "rejected",
+                StableCode.SCHEMA_INVALID,
+                wire=_changed(timeline, payload=_changed(timeline["payload"], text="")),
             ),
             _case(
                 "schema.timestamp_invalid",
@@ -755,6 +763,15 @@ def rejected_cases() -> list[dict[str, Any]]:
             ),
             _binary_case("audio.pts", StableCode.AUDIO_PTS_INVALID, previous_pts=2, pts_ms=1),
             _binary_case("audio.budget", StableCode.AUDIO_BUDGET_EXCEEDED, buffered_bytes=959_999),
+            _binary_case(
+                "binary.seq_duplicate_precedes_pts_budget",
+                StableCode.SEQ_DUPLICATE,
+                seq=0,
+                next_expected_seq=1,
+                previous_pts=2,
+                pts_ms=1,
+                buffered_bytes=959_999,
+            ),
             _case(
                 "canonical.changed",
                 "CanonicalDecisionV1",
@@ -858,6 +875,7 @@ def _binary_case(case_id: str, code: StableCode, **updates: Any) -> dict[str, An
         "epoch": 1,
         "expected_epoch": 1,
         "seq": 0,
+        "input_start_seq": 0,
         "next_expected_seq": 0,
         "pts_ms": 0,
         "previous_pts": None,
@@ -868,7 +886,8 @@ def _binary_case(case_id: str, code: StableCode, **updates: Any) -> dict[str, An
         "process_buffered_bytes": 0,
     }
     metadata.update(updates)
-    return _case(case_id, "PcmHeaderV1", "rejected", code, binary_header=metadata)
+    expect: Literal["accepted", "rejected"] = "accepted" if code in SUCCESS_CODES else "rejected"
+    return _case(case_id, "PcmHeaderV1", expect, code, binary_header=metadata)
 
 
 def all_cases() -> list[dict[str, Any]]:
@@ -1032,7 +1051,14 @@ def _evaluate_binary(metadata: dict[str, Any]) -> StableCode:
         return StableCode.EPOCH_STALE
     if int(metadata["epoch"]) > int(metadata["expected_epoch"]):
         return StableCode.EPOCH_UNKNOWN
-    if int(metadata["seq"]) > int(metadata["next_expected_seq"]):
+    sequence = int(metadata["seq"])
+    next_expected = int(metadata["next_expected_seq"])
+    oldest_replayable = max(int(metadata["input_start_seq"]), next_expected - 256)
+    if sequence < oldest_replayable:
+        return StableCode.RESYNC_REQUIRED
+    if sequence < next_expected:
+        return StableCode.SEQ_DUPLICATE
+    if sequence > next_expected:
         return StableCode.SEQ_GAP
     previous = metadata["previous_pts"]
     if previous is not None and int(metadata["pts_ms"]) < int(previous):
