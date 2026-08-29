@@ -31,17 +31,18 @@
 | Command | Result | Date/commit |
 | --- | --- | --- |
 | `make bootstrap` | Passed; uv verified the frozen Python environment and pnpm 11.21.0 verified the frozen two-workspace install and supply-chain policy. | 2026-08-30 / `4662d41` |
-| `make protocol-generate` | Passed; rewrote the complete generated tree transactionally from the Pydantic source and pinned generator. | 2026-08-30 / `9d36c2e` |
-| `git diff --exit-code -- packages/protocol/schema packages/protocol/src/generated packages/protocol/fixtures` | Passed after regeneration; generated Schema, TypeScript, compatibility, and fixture bytes match the committed output. | 2026-08-30 / `9d36c2e` |
-| `make protocol-check` | Passed: `protocol generated artifacts: ok`; the checker compared all expected paths and bytes from a temporary generation. | 2026-08-30 / `9d36c2e` |
+| `make protocol-generate` | Passed; rewrote the complete generated tree transactionally from the Pydantic source and pinned generator. | 2026-08-30 / `8b843fb` |
+| `git diff --exit-code -- packages/protocol/schema packages/protocol/src/generated packages/protocol/fixtures` | Passed after regeneration; generated Schema, TypeScript, compatibility, and fixture bytes match the committed output. | 2026-08-30 / `8b843fb` |
+| `make protocol-check` | Passed: `protocol generated artifacts: ok`; the checker compared all expected paths and bytes from a temporary generation. | 2026-08-30 / `8b843fb` |
 | `uv run pytest -q tests/protocol/test_binary.py tests/protocol/test_state.py tests/protocol/test_golden.py` | Passed: 31 focused binary, runtime, and golden-corpus tests, including stale creation, end-of-segment release, idle expiry, higher-epoch replacement, and bounded cancellation state. | 2026-08-30 / `9d36c2e` |
-| `uv run pytest -q tests/protocol` | Passed: 62 protocol tests. | 2026-08-30 / `9d36c2e` |
-| `pnpm --filter @livecho/protocol typecheck` | Passed with TypeScript strict mode; also rerun by `make verify`. | 2026-08-30 / `9d36c2e` |
-| `pnpm --filter @livecho/protocol test` | Passed: one Vitest file and 111 tests, comprising 110 generated parity cases plus the corpus integrity assertion; also rerun by `make verify`. | 2026-08-30 / `9d36c2e` |
-| `make verify` | Passed; Ruff, workspace lint, mypy, TypeScript checks, 102 pytest tests, 111 Vitest tests, artifact lifecycle, protocol drift, and build all succeeded. | 2026-08-30 / `9d36c2e` |
-| `git diff --check && git diff --cached --check` | Passed with no whitespace errors. | 2026-08-30 / `9d36c2e` |
+| `uv run pytest -q tests/protocol/test_binary.py tests/protocol/test_golden.py` | Passed: 10 focused codec and cross-language corpus tests, including all three binary uint64 overflow boundaries. | 2026-08-30 / `8b843fb` |
+| `uv run pytest -q tests/protocol` | Passed: 63 protocol tests. | 2026-08-30 / `8b843fb` |
+| `pnpm --filter @livecho/protocol typecheck` | Passed with TypeScript strict mode; also rerun by `make verify`. | 2026-08-30 / `8b843fb` |
+| `pnpm --filter @livecho/protocol test` | Passed: one Vitest file and 114 tests, comprising 113 generated parity cases plus the corpus integrity assertion; also rerun by `make verify`. | 2026-08-30 / `8b843fb` |
+| `make verify` | Passed; Ruff, workspace lint, mypy, TypeScript checks, 103 pytest tests, 114 Vitest tests, artifact lifecycle, protocol drift, and build all succeeded. | 2026-08-30 / `8b843fb` |
+| `git diff --check && git diff --cached --check` | Passed with no whitespace errors. | 2026-08-30 / `8b843fb` |
 
-The generated corpus contains 110 unique cases: 40 accepted and 70 rejected. Every
+The generated corpus contains 113 unique cases: 40 accepted and 73 rejected. Every
 `StableCode` value occurs as an expected result. All 18 public Pydantic models have an
 accepted case; the remaining cases cover parser/version/capability/manifest failures,
 JSON and record-free PCM sequence boundaries, revision precedence/capacity/immutability,
@@ -49,7 +50,7 @@ all four final-object outcomes, cancellation CAS/tombstones, reconnect, RFC 8785
 representation variants, and metadata-only binary/PTS/budget boundaries.
 
 Generated output contains 21 Schema/compatibility files, one TypeScript contract, and
-111 fixture files including the manifest. Negative drift tests independently prove that
+114 fixture files including the manifest. Negative drift tests independently prove that
 a changed file, a missing file, and an unexpected extra file each fail comparison.
 
 ## Manual or hardware evidence
@@ -249,6 +250,11 @@ generation, shared golden cases, minimum versions, and the Issue #2 audio ceilin
   the bounded tombstone owns replay classification, while the addressed runtime owns
   durable terminal `lease_closed` authority after tombstone expiry or eviction. Capacity,
   expiry, and session teardown tests pin the split.
+- Final exact-head Codex review P2 found that an epoch above uint64 passed the encoder's
+  lower-bound-only predicate and escaped as `struct.error`. Resolved with one shared
+  uint64 maximum in the executable codec and explicit epoch/sequence/PTS lower/upper
+  structural checks in both metadata evaluators; three shared overflow cases require
+  `binary_header_invalid` before ordering or epoch comparison.
 
 ## Deviations
 
