@@ -458,6 +458,8 @@ function publicDecision(model: string, value: Record<string, unknown>): StableCo
   const semantic = semanticModelCode(model, value);
   if (semantic !== "accepted") return semantic;
   if (model === "WorkerHelloV1") {
+    const supportedMinors = value.supported_minors as number[];
+    if (!supportedMinors.includes(PROTOCOL_MINOR)) return "unsupported_minor";
     if (!semverAtLeast(String(value.worker_version), "0.1.0")) return "worker_version_too_old";
     const capabilities = value.capabilities as string[];
     if (
@@ -493,6 +495,8 @@ function publicDecision(model: string, value: Record<string, unknown>): StableCo
     }
   }
   if (model === "ViewerSubscribeV1") {
+    const supportedMinors = value.supported_minors as number[];
+    if (!supportedMinors.includes(PROTOCOL_MINOR)) return "unsupported_minor";
     if (!semverAtLeast(String(value.client_version), "0.1.0")) return "worker_version_too_old";
   }
   return "accepted";

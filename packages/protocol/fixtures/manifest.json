@@ -122,7 +122,9 @@
     "rejected/version__protocol_type.json",
     "rejected/version__shared_ack_major.json",
     "rejected/version__shared_error_major.json",
-    "rejected/version__worker_old.json"
+    "rejected/version__viewer_supported_minor_missing.json",
+    "rejected/version__worker_old.json",
+    "rejected/version__worker_supported_minor_missing.json"
   ],
   "version": 1
 }

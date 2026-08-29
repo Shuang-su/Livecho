@@ -755,6 +755,20 @@ def rejected_cases() -> list[dict[str, Any]]:
                 ),
             ),
             _case(
+                "version.worker_supported_minor_missing",
+                "WorkerHelloV1",
+                "rejected",
+                StableCode.UNSUPPORTED_MINOR,
+                wire=_changed(hello, supported_minors=[1]),
+            ),
+            _case(
+                "version.viewer_supported_minor_missing",
+                "ViewerSubscribeV1",
+                "rejected",
+                StableCode.UNSUPPORTED_MINOR,
+                wire=_changed(values["ViewerSubscribeV1"], supported_minors=[1]),
+            ),
+            _case(
                 "version.worker_old",
                 "WorkerHelloV1",
                 "rejected",
