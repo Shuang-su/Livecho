@@ -40,6 +40,11 @@ generation, shared golden cases, minimum versions, and the Issue #2 audio ceilin
   while ordinary updates require current plus one. Resolved by defining
   `expected_revision` as a non-advancing CAS guard and pinning initial close, identical
   replay, changed replay, stale/gapped CAS, and already-closed outcomes.
+- Final-head Codex review P1 found that clearing all deduplication state on close made
+  cancellation replay outcomes indistinguishable. Resolved by retaining one bounded,
+  120-second, in-memory terminal cancellation tombstone containing only bindings,
+  message/reason/CAS metadata, and a canonical JSON digest while immediately clearing
+  PCM and ordinary deduplication state.
 - Security/data review found no permitted field for a credential, playback/download URL,
   arbitrary path/command/code/container, raw platform payload, or extensible metadata.
   The documents expressly prohibit audio fixtures, encodings, digests, persistence, and

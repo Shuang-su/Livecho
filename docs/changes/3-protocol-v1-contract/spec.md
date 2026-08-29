@@ -56,7 +56,8 @@ version, current session/epoch, next viewer sequence, and whether the cursor res
 
 `ProtocolAckV1` is available on both subprotocols and contains only the envelope,
 `outcome` (`accepted`, `seq_duplicate`, `revision_duplicate`, or `cancel_duplicate`),
-and the applicable message identity/sequence/revision. `ProtocolErrorV1` contains only the envelope, stable
+and the applicable message identity/sequence/revision/CAS value. `ProtocolErrorV1`
+contains only the envelope and stable
 rejection `code`, bounded public `message`, `retryable`, and optional
 `expected`/`received` uint64 decimal values. Neither response may echo an invalid
 payload, transcript, secret, locator, or audio.
@@ -157,8 +158,23 @@ ID with changed binding, expected revision, or reason is `cancel_conflict`. Whil
 is still active, a lower CAS value is `revision_stale` and a higher value is
 `revision_gap`. A new cancellation after terminal closure is `lease_closed`. All are
 pinned by golden cases. Cancellation is checked before later input/output, clears
-bounded PCM/deduplication state, and cannot be undone or converted to a different reason
-by replay. Expiry independently returns `lease_expired`.
+bounded PCM and ordinary deduplication state while retaining only the terminal tombstone
+defined next, and cannot be undone or converted to a different reason by replay. Expiry
+independently returns `lease_expired`.
+
+On successful cancellation, the state machine immediately clears every PCM buffer and
+ordinary sequence/revision deduplication entry but retains one terminal in-memory
+cancellation tombstone for that lease. The closed tombstone contains only lease/session
+bindings, epoch, `expected_revision`, accepted message ID, reason literal, close time,
+and a canonical JSON content digest; it contains no transcript, event body, raw payload,
+or audio-derived value. It is limited to one tombstone per closed lease and 64
+tombstones process-wide, and is erased at session teardown, 120 seconds after close, or
+as the oldest tombstone when capacity is needed for a new cancellation. While present it
+produces `cancel_duplicate`/`cancel_conflict` as defined above. After expiry or bounded
+eviction, authoritative closed-lease state yields `lease_closed`; no historical replay
+claim is made. Tombstone capacity must be reserved, evicting the oldest closed entry if
+necessary, before atomically accepting the new close so resource pressure can never
+prevent an active lease from being cancelled.
 
 `WorkerHelloV1` and `ViewerSubscribeV1` may include a reconnect cursor. Resume succeeds
 only when the named connection/session, exact lease where applicable, epoch, and next
@@ -303,6 +319,9 @@ fixture retains its result. There is no silent downgrade.
   only protocol/minor, message type when safely decoded, stable code, bounded identifiers,
   and timing; never transcript/event bodies, invalid input, low-entropy content digests,
   credentials, raw payloads, or audio.
+- A terminal cancellation tombstone is bounded, in-memory-only protocol metadata kept
+  for at most 120 seconds solely to distinguish idempotent from conflicting replays. It
+  is never persisted or logged and is erased on session teardown.
 - PCM exists only in bounded process memory for an active synthetic lease or an in-memory
   codec test. It is evicted on consumption, end-of-segment, expiry, cancellation,
   disconnect, disablement, and teardown. The protocol creates no persistence, queue,

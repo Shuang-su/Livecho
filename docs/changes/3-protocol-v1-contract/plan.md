@@ -15,9 +15,10 @@
    construct only minimal synthetic sample bytes in memory, must not print/snapshot/write
    them, and must assert cleanup and unchanged budget on rejection.
 5. Implement pure bounded in-memory ordering state machines for epoch authority,
-   directional sequences, revisions, terminal objects, and reconnect decisions. Test
-   every transition, duplicate/conflict distinction, gap, cross-binding rejection, and
-   no-state-change failure path without implementing scheduling or persistence.
+   directional sequences, revisions, terminal objects, cancellation tombstones, and
+   reconnect decisions. Test every transition, duplicate/conflict distinction, gap,
+   tombstone expiry/capacity, cross-binding rejection, and no-state-change failure path
+   without implementing scheduling or persistence.
 6. Implement deterministic draft-2020-12 JSON Schema, compatibility JSON, and TypeScript
    generation. Normalize ordering/line endings/IDs, reject nondeterministic metadata,
    generate atomically, and add a temporary-directory drift comparison that detects
