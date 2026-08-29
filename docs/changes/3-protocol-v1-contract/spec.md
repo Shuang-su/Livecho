@@ -192,38 +192,69 @@ ID)`, where object ID is `lease_id`, `segment_id`, `stats_id`, or `event_id` as
 applicable. Its content digest is RFC 8785 JCS/SHA-256 over the validated message after
 removing only the transmission envelope fields `message_id`, `sent_at`, and `seq`;
 protocol/type, bindings, object ID, revision, and every domain payload field remain in
-the projection. Validation precedence for stream messages is fixed:
+the projection.
+
+The receiver also computes an immutable-field digest as RFC 8785 JCS/SHA-256 over one
+closed per-type projection. These projections contain no transmission or mutable
+payload fields and contain exactly:
+
+- `LeaseV1`: `type`, `session_id`, `lease_id`, `room_id`, `epoch`, `issued_at`,
+  `expires_at`, `input_start_seq`, `output_start_seq`, `model_manifest`,
+  `audio_format`, and `audio_origin`;
+- `WorkerStatsV1`: `type`, `session_id`, `lease_id`, `stats_id`, `epoch`,
+  `window_started_at`, and `window_ended_at`;
+- `TranscriptSegmentV1`: `type`, `session_id`, `lease_id`, `segment_id`, `epoch`,
+  `start_ms`, and `end_ms`;
+- a transcript `TimelineEventV1`: `type`, `session_id`, `room_id`, `event_id`, `epoch`,
+  `occurred_at`, the payload discriminator, `segment_id`, `start_ms`, and `end_ms`;
+- a session-status `TimelineEventV1`: `type`, `session_id`, `room_id`, `event_id`,
+  `epoch`, `occurred_at`, and the payload discriminator.
+
+The already-stored identity fields are intentionally repeated in the digest so the
+projection is independently testable. A current-plus-one revision whose immutable
+digest differs from the stored digest returns `revision_immutable` without consuming
+the sequence or changing object state. Validation precedence for stream messages is
+fixed:
 
 1. Validate transport, size/parser/schema, negotiated version, binding, and epoch.
 2. If `seq` is below expected, resolve only the sequence window to `seq_duplicate`,
    `seq_conflict`, or `resync_required`; do not evaluate revision.
 3. If `seq` is above expected, return `seq_gap`; do not evaluate revision.
-4. For the exact expected `seq`, evaluate revision. A matching current revision and
+4. For the exact expected `seq`, evaluate revision in this order: a revision below the
+   current value returns `revision_stale`; the current revision with a matching
    projection digest consumes that sequence, has no object side effect, and returns
-   `revision_duplicate`. Different content at current revision is `revision_conflict` and
-   does not consume the sequence. An accepted new/current-plus-one revision consumes the
-   sequence and updates state. Every revision rejection leaves sequence and object state
-   unchanged.
+   `revision_duplicate`; if the stored object is final, every other current or higher
+   revision returns `object_final`; otherwise different content at the current revision
+   returns `revision_conflict`, a revision above current plus one returns `revision_gap`,
+   and current plus one with a changed immutable-field digest returns
+   `revision_immutable`. An accepted new object at revision one or accepted
+   current-plus-one revision consumes the sequence and updates both digests and object
+   state. Every revision rejection leaves sequence and object state unchanged.
 
 Thus replaying the original whole message at its old sequence produces
 `seq_duplicate`; retransmitting the same object revision/content under the next expected
 sequence (with any valid new transmission message ID/time) produces
 `revision_duplicate`; and changed domain content at that current revision produces
-`revision_conflict`. An identical replay of an already-final object may be a
-`revision_duplicate`, but a changed or higher revision is `object_final`.
+`revision_conflict` for a non-final object. For an already-final object, an identical
+current-revision replay is `revision_duplicate`, a lower revision is `revision_stale`,
+and changed content at the current revision or any higher revision is `object_final`.
+The golden corpus pins all four final-object cases, including changed content at the
+exact current revision and expected sequence.
 
 Each worker `(session, lease, epoch, direction)` or viewer `(session, epoch)` revision
 state domain retains at most 4,096 identities until termination, with no eviction or
 access-based refresh during that active domain. Each
-logical 104-byte record contains an 8-byte type/flag/reserved prefix, three 16-byte UUID
+logical 136-byte record contains an 8-byte type/flag/reserved prefix, three 16-byte UUID
 slots for session/lease/object (zero lease for viewer state), 8-byte epoch, 8-byte current
-revision, and 32-byte projection digest: at most 425,984 logical bytes per domain and no
-message body. When 4,096 identities exist, an exact update/duplicate of an existing
-identity is still evaluated, but a new identity returns
+revision, a 32-byte complete projection digest, and a 32-byte immutable-field projection
+digest: at most 557,056 logical bytes per domain and no message body. When 4,096
+identities exist, an exact update/duplicate of an existing identity is still evaluated,
+but a new identity returns
 `revision_capacity_exceeded` without consuming sequence or changing state. The state is
 cleared only on cancellation, expiry, session teardown, epoch replacement, or a
 non-resumed connection. Boundary tests must accept identities 1-4,096, reject identity
-4,097, still accept a valid update to an existing identity at capacity, and prove
+4,097, still accept a valid immutable-preserving update to an existing identity at
+capacity, reject an immutable-field change without altering either digest, and prove
 cleanup permits a new domain.
 
 `LeaseCancelV1` closes the named active lease atomically only when `expected_revision`
@@ -271,7 +302,8 @@ text. Minor 0 defines at least:
 `worker_version_too_old`, `capability_required`, `manifest_not_allowed`,
 `lease_unknown`, `lease_expired`, `lease_closed`, `binding_mismatch`, `epoch_stale`, `epoch_unknown`,
 `seq_duplicate`, `seq_conflict`, `seq_gap`, `revision_duplicate`, `cancel_duplicate`,
-`revision_conflict`, `revision_stale`, `revision_gap`, `revision_capacity_exceeded`,
+`revision_conflict`, `revision_stale`, `revision_gap`, `revision_immutable`,
+`revision_capacity_exceeded`,
 `cancel_conflict`, `object_final`,
 `resync_required`, `binary_header_invalid`, `binary_frame_too_large`,
 `audio_pts_invalid`, and `audio_budget_exceeded`.

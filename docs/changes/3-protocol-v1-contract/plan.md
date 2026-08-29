@@ -20,8 +20,8 @@
    reconnect decisions. Test every transition, duplicate/conflict distinction, gap,
    the exact 256-record JSON FIFO and 256-position record-free PCM boundaries, tombstone
    expiry/capacity, revision projection/precedence and the 4,096-identity ceiling,
-   cross-binding rejection, and no-state-change failure path without implementing
-   scheduling or persistence.
+   immutable-field projection, exact final-object precedence, cross-binding rejection,
+   and no-state-change failure paths without implementing scheduling or persistence.
 6. Implement deterministic draft-2020-12 JSON Schema, compatibility JSON, and TypeScript
    generation. Normalize ordering/line endings/IDs, reject nondeterministic metadata,
    generate atomically, and add a temporary-directory drift comparison that detects

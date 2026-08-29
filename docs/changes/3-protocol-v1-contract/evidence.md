@@ -11,7 +11,7 @@
 | Command | Result | Date/commit |
 | --- | --- | --- |
 | `make bootstrap` | Passed; uv checked the frozen environment and pnpm 11.21.0 reported the frozen workspace already up to date. | 2026-08-30 / staged artifact tree |
-| `make verify` | Passed; Ruff check/format, workspace lint, mypy, typecheck, 40 pytest tests, pnpm tests, artifact gate, and build all succeeded. | 2026-08-30 / staged artifact tree |
+| `make verify` | Passed after the two exact-head P2 corrections; Ruff check/format, workspace lint, mypy, typecheck, 40 pytest tests, pnpm tests, artifact gate, and build all succeeded. | 2026-08-30 / corrected artifact tree |
 | `make artifacts` | Passed: `change artifacts: ok`. | 2026-08-30 / staged artifact tree |
 | `git diff --check && git diff --cached --check` | Passed with no whitespace errors. | 2026-08-30 / staged artifact tree |
 | `git diff --cached --name-only` | Passed; exactly the four required files under `docs/changes/3-protocol-v1-contract/` were listed. | 2026-08-30 / staged artifact tree |
@@ -60,8 +60,18 @@ generation, shared golden cases, minimum versions, and the Issue #2 audio ceilin
   JCS revision projection and fixed sequence-before-revision precedence, including both
   replay forms and changed-content outcomes.
 - Follow-up Codex review P2 found unbounded retained per-object revision state. Resolved
-  with a no-eviction 4,096-identity/425,984-logical-byte ceiling per active domain,
+  with a no-eviction 4,096-identity/557,056-logical-byte ceiling per active domain,
   `revision_capacity_exceeded`, and capacity/update/cleanup boundary requirements.
+- Exact-head Codex review P2 found that the bounded revision record could not enforce
+  immutable time ranges from its complete projection digest alone. Resolved by adding a
+  closed per-type immutable-field projection and second 32-byte digest to each bounded
+  record, plus immutable-preserving/update-at-capacity and unchanged-state rejection
+  requirements.
+- Exact-head Codex review P2 found conflicting outcomes for changed content at the
+  current revision of an already-final object. Resolved with an explicit internal
+  precedence: identical current content is `revision_duplicate`, lower is
+  `revision_stale`, and changed current content or any higher revision is
+  `object_final`; all four cases are required golden cases.
 - Security/data review found no permitted field for a credential, playback/download URL,
   arbitrary path/command/code/container, raw platform payload, or extensible metadata.
   The documents expressly prohibit audio fixtures, encodings, digests, persistence, and
