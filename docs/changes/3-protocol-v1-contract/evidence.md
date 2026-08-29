@@ -31,21 +31,22 @@
 | Command | Result | Date/commit |
 | --- | --- | --- |
 | `make bootstrap` | Passed; uv verified the frozen Python environment and pnpm 11.21.0 verified the frozen two-workspace install and supply-chain policy. | 2026-08-30 / `4662d41` |
-| `make protocol-generate` | Passed; rewrote the complete generated tree transactionally from the Pydantic source and pinned generator. | 2026-08-30 / `22b5c06` |
-| `git diff --exit-code -- packages/protocol/schema packages/protocol/src/generated packages/protocol/fixtures` | Passed after regeneration; generated Schema, TypeScript, compatibility, and fixture bytes match the committed output. | 2026-08-30 / `22b5c06` |
-| `make protocol-check` | Passed: `protocol generated artifacts: ok`; the checker compared all expected paths and bytes from a temporary generation. | 2026-08-30 / `22b5c06` |
+| `make protocol-generate` | Passed; rewrote the complete generated tree transactionally from the Pydantic source and pinned generator. | 2026-08-30 / `978673b` |
+| `git diff --exit-code -- packages/protocol/schema packages/protocol/src/generated packages/protocol/fixtures` | Passed after regeneration; generated Schema, TypeScript, compatibility, and fixture bytes match the committed output. | 2026-08-30 / `978673b` |
+| `make protocol-check` | Passed: `protocol generated artifacts: ok`; the checker compared all expected paths and bytes from a temporary generation. | 2026-08-30 / `978673b` |
 | `uv run pytest -q tests/protocol/test_binary.py tests/protocol/test_state.py tests/protocol/test_golden.py` | Passed: 34 focused binary, runtime, and golden-corpus tests, including equal/stale creation, sequence exhaustion, end-of-segment release, idle expiry, higher-epoch replacement, and bounded cancellation state. | 2026-08-30 / `3061ef9` |
 | `uv run pytest -q tests/protocol/test_state.py tests/protocol/test_golden.py` | Passed: 30 focused runtime and golden-corpus tests, including transactional invalid replacement with no live-state retirement or active-entry leak. | 2026-08-30 / `a175430` |
 | `uv run pytest -q tests/protocol/test_state.py tests/protocol/test_golden.py` | Passed: 31 focused runtime and golden-corpus tests, including a negotiated-manifest mismatch that preserves the current runtime and active count. | 2026-08-30 / `56158c1` |
+| `uv run pytest -q tests/protocol/test_state.py tests/protocol/test_golden.py` | Passed: 31 focused runtime and golden-corpus tests, including cancellation replay identity precedence over altered bindings and epochs. | 2026-08-30 / `978673b` |
 | `uv run pytest -q tests/protocol/test_models.py tests/protocol/test_golden.py` | Passed: 36 focused model/parser and golden-corpus tests, including integral-fraction protocol-minor version precedence. | 2026-08-30 / `47f4588` |
 | `uv run pytest -q tests/protocol/test_binary.py tests/protocol/test_golden.py` | Passed: 10 focused codec and cross-language corpus tests, including uint64 boundaries and non-truncating one-byte flag validation. | 2026-08-30 / `22b5c06` |
 | `uv run pytest -q tests/protocol` | Passed: 67 protocol tests. | 2026-08-30 / `56158c1` |
-| `pnpm --filter @livecho/protocol typecheck` | Passed with TypeScript strict mode; also rerun by `make verify`. | 2026-08-30 / `22b5c06` |
-| `pnpm --filter @livecho/protocol test` | Passed: one Vitest file and 127 tests, comprising 126 generated parity cases plus the corpus integrity assertion; also rerun by `make verify`. | 2026-08-30 / `22b5c06` |
-| `make verify` | Passed; Ruff, workspace lint, mypy, TypeScript checks, 107 pytest tests, 127 Vitest tests, artifact lifecycle, protocol drift, and build all succeeded. | 2026-08-30 / `22b5c06` |
-| `git diff --check && git diff --cached --check` | Passed with no whitespace errors. | 2026-08-30 / `22b5c06` |
+| `pnpm --filter @livecho/protocol typecheck` | Passed with TypeScript strict mode; also rerun by `make verify`. | 2026-08-30 / `978673b` |
+| `pnpm --filter @livecho/protocol test` | Passed: one Vitest file and 128 tests, comprising 127 generated parity cases plus the corpus integrity assertion; also rerun by `make verify`. | 2026-08-30 / `978673b` |
+| `make verify` | Passed; Ruff, workspace lint, mypy, TypeScript checks, 107 pytest tests, 128 Vitest tests, artifact lifecycle, protocol drift, and build all succeeded. | 2026-08-30 / `978673b` |
+| `git diff --check && git diff --cached --check` | Passed with no whitespace errors. | 2026-08-30 / `978673b` |
 
-The generated corpus contains 126 unique cases: 40 accepted and 86 rejected. Every
+The generated corpus contains 127 unique cases: 40 accepted and 87 rejected. Every
 `StableCode` value occurs as an expected result. All 18 public Pydantic models have an
 accepted case; the remaining cases cover parser/version/capability/manifest failures,
 JSON and record-free PCM sequence boundaries, revision precedence/capacity/immutability,
@@ -53,7 +54,7 @@ all four final-object outcomes, cancellation CAS/tombstones, reconnect, RFC 8785
 representation variants, and metadata-only binary/PTS/budget boundaries.
 
 Generated output contains 21 Schema/compatibility files, one TypeScript contract, and
-127 fixture files including the manifest. Negative drift tests independently prove that
+128 fixture files including the manifest. Negative drift tests independently prove that
 a changed file, a missing file, and an unexpected extra file each fail comparison.
 
 ## Manual or hardware evidence
@@ -296,6 +297,11 @@ generation, shared golden cases, minimum versions, and the Issue #2 audio ceilin
   out-of-range binary flag value to 32 bits and could accept it as zero. Resolved with
   explicit JSON-integer, one-byte range, and allowed-value checks in both metadata
   evaluators; a shared `2^32` flag case requires `binary_header_invalid`.
+- Final exact-head Codex review P2 found that the runtime binding/epoch guards masked
+  `cancel_conflict` when an accepted cancellation message ID was replayed with altered
+  bindings. Resolved by routing only the addressed runtime's matching live tombstone to
+  digest comparison before those guards; runtime regressions cover changed session and
+  epoch, and a shared case pins cross-language conflict precedence.
 
 ## Deviations
 
