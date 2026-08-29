@@ -67,6 +67,14 @@ is 1-128 characters from a conservative ASCII allowlist. It has no URL, URI, fil
 path, command, environment, or options field. `AudioFormatV1` is exactly
 `encoding: "pcm_s16le"`, `sample_rate_hz: 16000`, `channels: 1`.
 
+The backend-to-worker control set also exports `LeaseCancelV1`, containing only the
+envelope, `lease_id`, `session_id`, `epoch`, the exact current lease `revision`, and one
+reason literal: `operator_stop`, `lease_expired`, `worker_replaced`, `policy_disable`,
+`protocol_violation`, or `session_end`. It is idempotent by message ID and bound lease
+revision, immediately prevents later PCM/output acceptance for that lease, and contains
+no arbitrary instruction or reason text. Repeating the identical cancellation is an
+accepted no-op; changing the reason under the same identity/revision is a conflict.
+
 Known worker capability literals in minor 0 are `asr.transcribe` and
 `protocol.binary-pcm`. A worker must advertise both. The backend intersects only known
 values and must reject an unknown or missing required capability rather than treating it
@@ -141,6 +149,12 @@ the current revision is a no-op; a changed value at the current revision is
 An `is_final: true` transcript cannot be revised. A revision cannot move an object to a
 different session, lease, epoch, time range, or identity.
 
+`LeaseCancelV1` closes the named lease at its exact current revision without consuming
+the PCM input sequence. It is checked before any later input/output message, and closed
+lease traffic returns `lease_closed` while expiry returns `lease_expired`. Cancellation
+clears bounded PCM/deduplication state; a cancellation cannot be undone or converted
+into a different reason by replay.
+
 `WorkerHelloV1` and `ViewerSubscribeV1` may include a reconnect cursor. Resume succeeds
 only when the named connection/session, exact lease where applicable, epoch, and next
 sequence still match live in-memory authoritative state and the lease is unexpired. The
@@ -158,7 +172,7 @@ text. Minor 0 defines at least:
 `malformed_json`, `duplicate_key`, `unknown_field`, `schema_invalid`,
 `control_frame_too_large`, `unknown_major`, `unsupported_minor`,
 `worker_version_too_old`, `capability_required`, `manifest_not_allowed`,
-`lease_unknown`, `lease_expired`, `binding_mismatch`, `epoch_stale`, `epoch_unknown`,
+`lease_unknown`, `lease_expired`, `lease_closed`, `binding_mismatch`, `epoch_stale`, `epoch_unknown`,
 `seq_duplicate`, `seq_conflict`, `seq_gap`, `revision_duplicate`,
 `revision_conflict`, `revision_stale`, `revision_gap`, `object_final`,
 `resync_required`, `binary_header_invalid`, `binary_frame_too_large`,
@@ -204,7 +218,7 @@ must call the drift check. Generated files are never manually edited.
 Golden cases use a closed wrapper containing `case_id`, `model`, `expect`, `code`, and
 exactly one input member: `wire` for a parsed object, `raw_text` for parser cases such as
 duplicate keys, or `binary_header` for metadata-only binary boundary cases. Accepted
-cases cover every model and both timeline payloads. Rejected cases
+cases cover every model, `LeaseCancelV1`, and both timeline payloads. Rejected cases
 cover every stable failure family, boundaries immediately below/at/above limits,
 duplicate JSON keys through raw-text cases, cross-session/lease binding, version and
 minimum-worker negotiation, stale/unknown epoch, duplicate/conflicting/gapped sequence
@@ -252,8 +266,8 @@ fixture retains its result. There is no silent downgrade.
   The receiver does not retain the message for retry.
 - Expiry, disconnect, cancellation, stale epoch, sequence conflict, or repeated policy
   violations invalidate or revoke the affected lease according to later gateway Issues;
-  Issue #3 supplies the deterministic decision and code but does not implement worker
-  scheduling.
+  Issue #3 supplies `LeaseCancelV1`, the deterministic close decision, and stable code
+  but does not implement worker scheduling.
 - The protocol can be disabled by not mounting its WebSocket endpoints. No deployment
   or production path is enabled by this Issue.
 - Generation drift, missing fixtures, cross-language disagreement, or an unpinned

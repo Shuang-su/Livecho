@@ -9,8 +9,8 @@
    TypeScript package layout specified above, and add root `protocol-generate` and
    `protocol-check` Make targets. Keep every existing workspace script contract green.
 3. Implement the strict Pydantic scalar/envelope/supporting models, six required public
-   models, compatibility matrix, stable codes, and semantic invariants. Unit-test model
-   boundaries before generating downstream files.
+   models, closed `LeaseCancelV1`, compatibility matrix, stable codes, and semantic
+   invariants. Unit-test model boundaries before generating downstream files.
 4. Implement the 56-byte binary header encode/decode and boundary validation. Tests must
    construct only minimal synthetic sample bytes in memory, must not print/snapshot/write
    them, and must assert cleanup and unchanged budget on rejection.

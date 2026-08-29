@@ -33,6 +33,9 @@ generation, shared golden cases, minimum versions, and the Issue #2 audio ceilin
   a closed `WorkerResumeV1`; viewer client/minor negotiation is explicit; and binary
   duplicate handling discards bytes without audio hashing. It also separates successful
   duplicate no-ops into `ProtocolAckV1` and defines the three allowed golden input forms.
+- A second interface trace resolved the missing bounded cancellation control required by
+  the accepted architecture: `LeaseCancelV1` now has exact bindings, fixed reasons,
+  idempotency, terminal behavior, and no arbitrary instruction text.
 - Security/data review found no permitted field for a credential, playback/download URL,
   arbitrary path/command/code/container, raw platform payload, or extensible metadata.
   The documents expressly prohibit audio fixtures, encodings, digests, persistence, and
