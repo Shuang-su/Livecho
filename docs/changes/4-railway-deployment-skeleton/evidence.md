@@ -2,7 +2,8 @@
 
 ## Artifact approval
 
-- Artifact PR: Pending
+- Artifact PR: [#25](https://github.com/Shuang-su/Livecho/pull/25) (artifact-only; does not
+  close Issue #4)
 - Approved by/date: @Shuang-su / 2026-08-30 (authorized continuation and merge after
   repository verification and review gates pass)
 
@@ -78,11 +79,15 @@ remove any package whose provenance or obligation remains unclear.
 
 | Command | Result | Date/commit |
 | --- | --- | --- |
-| `uv run python tools/check_change_artifacts.py` | Pending | Pending |
-| `make artifacts` | Pending | Pending |
-| `make verify` | Pending | Pending |
-| `git diff --check` | Pending | Pending |
-| `git diff --name-only origin/main...HEAD` | Pending artifact-only scope check | Pending |
+| `uv run python tools/check_change_artifacts.py` | Pass — `change artifacts: ok` | 2026-08-30 / `09b9b220798715e64f837d3917bb2b285ec92ae5` |
+| `make artifacts` | Pass — artifact checker reported `change artifacts: ok` | 2026-08-30 / `09b9b220798715e64f837d3917bb2b285ec92ae5` |
+| `make verify` | Pass — ruff check/format; mypy across 22 source files; 107 pytest tests; 128 Vitest tests; artifact and protocol-generation checks; TypeScript build | 2026-08-30 / `09b9b220798715e64f837d3917bb2b285ec92ae5` |
+| `git diff --check` and `git diff --cached --check` | Pass — no whitespace errors before commit | 2026-08-30 / `09b9b220798715e64f837d3917bb2b285ec92ae5` |
+| `git diff --name-only origin/main...HEAD` | Pass — exactly the four files under `docs/changes/4-railway-deployment-skeleton/` | 2026-08-30 / `09b9b220798715e64f837d3917bb2b285ec92ae5` |
+
+The commit above is the reviewed substantive artifact snapshot. The following evidence-only
+commit adds this table and the PR link; the same deterministic checks are rerun on that
+final pull-request head, and required GitHub checks remain authoritative for merge.
 
 ## Manual or hardware evidence
 
