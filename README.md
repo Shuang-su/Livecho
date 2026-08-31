@@ -32,9 +32,13 @@ review described in the change artifacts.
 - [Bilibili public-ingest policy](docs/policy/bilibili-public-ingest.md)
 - [Independent implementation and license isolation](docs/policy/independent-implementation.md)
 - [Incident disable and recovery runbook](docs/operations/incident-disable-and-recovery.md)
+- [Railway deployment, rollback, and destruction contract](docs/operations/railway-deployment.md)
+- [Railway secret and managed-reference inventory](docs/operations/railway-secrets.md)
 
 These records define constraints and later-Issue verification ownership; they do not
-claim that a runtime control has already been implemented.
+claim that a runtime control has already been implemented. The Railway records are
+repository-only, fail-closed contracts; they do not mean that any Railway environment,
+resource, provider control, or production deployment exists.
 
 ## Development
 

@@ -39,6 +39,67 @@
   reviewed the credential-bearing backend build gate and maintenance recreation-deployment
   reconciliation. None patched the files.
 
+## Implementation exposure and assignment
+
+- Identity/role/paths/date: `/root` (OpenAI Codex), Issue #4 implementation author,
+  `.railway/**`, `.env.example`, `pnpm-workspace.yaml`, `pnpm-lock.yaml`, `Makefile`,
+  `README.md`, `docs/operations/railway-deployment.md`,
+  `docs/operations/railway-secrets.md`, focused repository tests, and this evidence file,
+  2026-08-31.
+- Livecho material viewed before implementation: GitHub Issue #4; repository `AGENTS.md`;
+  all accepted Issue #4 intent/spec/plan/evidence; accepted Issues #1–#3 records referenced
+  by the artifact; the current `main` tree, root workspace manifest, Makefile, README,
+  verification workflow, workspace-script checker, protocol workspace layout, and existing
+  foundation verification conventions.
+- Upstream/context material viewed: the official Railway documentation, npm metadata, and
+  immutable Railway SDK/CLI source revisions enumerated in the provider fact/source map
+  below; read-only artifact-review findings derived from those materials; and official
+  OpenAI Developer Commands documentation solely to verify the local Codex `/status`
+  quota-reading workflow. The OpenAI material does not inform repository implementation.
+- Exclusions: no LAPLACE source, tests, fixtures, schemas, configuration, comments,
+  documentation, assets, screenshots, pasted snippets, generated code, or distinctive
+  implementation summaries were viewed. No third-party implementation repository is an
+  implementation input. Railway package declarations are compatibility facts, not code to
+  copy.
+- Assignment decision/reviewer: repository owner authorization permits only the Issue #4
+  repository skeleton and evidence in the paths above. It does not authorize Railway
+  login, link, plan, apply, deploy, variable mutation, environment/resource creation, or
+  destruction. `/root/issue4_security_test_audit` is the named isolated implementation
+  reviewer; it performs read-only review and must not patch implementation files.
+
+## Implementation collaboration exposure and process correction
+
+- Identity/role/paths/date: `/root/issue4_repo_audit` (OpenAI Codex child agent), first a
+  read-only Issue #4 repository auditor and later an operations-document draft author for
+  `docs/operations/railway-secrets.md` and
+  `docs/operations/railway-deployment.md`, 2026-08-31.
+- Material viewed before the draft assignment: repository `AGENTS.md`; GitHub Issue #4;
+  all accepted Issue #4 intent/spec/plan/evidence; the accepted Issue #2 architecture,
+  threat, lifecycle, incident, policy, and independent-implementation records; the current
+  repository baseline; and `/root`'s implementation-exposure commit. The child agent saw
+  no LAPLACE source, test, fixture, schema, configuration, documentation, asset,
+  screenshot, pasted snippet, generated code, or distinctive implementation summary, and
+  no other third-party implementation was a drafting input.
+- Actual assignment and correction: after completing its read-only audit, the child agent
+  was instructed to draft the two operations documents. That was substantive authorship,
+  but its individual author identity had not been recorded and committed before the
+  assignment. Treating the child as implicitly covered by the parent `/root` identity
+  would be inaccurate. The two uncommitted drafts were therefore removed after parent
+  review and before inclusion in an implementation snapshot. The child performs no
+  further implementation work and is not an independent reviewer of either path.
+- `/root` exposure addendum: `/root` read the discarded internal drafts. They were prose
+  derived only from the accepted Livecho artifacts above, but they are still disclosed as
+  internal requirements-derived draft material. This record is committed before `/root`
+  independently forms the final two documents from the accepted Issue #4 intent/spec/plan
+  and takes sole authorship responsibility under the paths already authorized in the
+  first implementation-exposure record.
+- Process classification and reviewer: the missed per-agent pre-assignment record is a
+  process deviation, not a secret, audio, license, or external-source contamination event.
+  It is not repaired by rewriting the first commit or pretending the record predated the
+  work. Remediation is the truthful record here, removal of the drafts, fresh parent
+  authorship after this commit, and final read-only review by the already named isolated
+  reviewer `/root/issue4_security_test_audit`.
+
 ## Planned dependency provenance pre-audit
 
 | Package | Immutable provenance | Observed license | Current decision/obligation |
@@ -51,6 +112,63 @@ dependencies and are reused rather than newly introduced. This pre-audit does no
 a lockfile: before implementation code, the implementation branch must generate the lock,
 record every new transitive package and license, resolve distribution obligations, and
 remove any package whose provenance or obligation remains unclear.
+
+## Implementation lock and license review
+
+- Comparison input: `origin/main@a39b1f5b345b6b29496c9643e5116aac14ee1bad`
+  against implementation lock SHA-256
+  `0c02ccbf1ef112a8fa6c36ed6732e459c644314a6c877fe3c58e81cc9241e00f`,
+  reviewed 2026-08-31. The lock `packages:` inventory grows from 109 to 140 records:
+  exactly 31 additions and zero removals.
+- The additions are `@graphql-typed-document-node/core@3.2.0`,
+  `graphql@16.14.2`, `railway@3.11.0`, `tsx@4.23.13`, `esbuild@0.28.2`, and the
+  26 exact `@esbuild/*@0.28.2` optional packages for
+  `aix-ppc64`, `android-arm`, `android-arm64`, `android-x64`, `darwin-arm64`,
+  `darwin-x64`, `freebsd-arm64`, `freebsd-x64`, `linux-arm`, `linux-arm64`,
+  `linux-ia32`, `linux-loong64`, `linux-mips64el`, `linux-ppc64`,
+  `linux-riscv64`, `linux-s390x`, `linux-x64`, `netbsd-arm64`, `netbsd-x64`,
+  `openbsd-arm64`, `openbsd-x64`, `openharmony-arm64`, `sunos-x64`,
+  `win32-arm64`, `win32-ia32`, and `win32-x64`.
+- Exact-version registry manifest and lock-integrity comparison found all 31 records to be
+  MIT licensed with matching SRI and no missing/unknown license or version drift. The five
+  non-platform SRIs are:
+  - `@graphql-typed-document-node/core@3.2.0`:
+    `sha512-mB9oAsNCm9aM3/SOv4YtBMqZbYj10R7dkq8byBqxGY/ncFwhf2oQzMV+LCRlWoDSEBJ3COiR1yeDvMtsoOsuFQ==`;
+  - `esbuild@0.28.2`:
+    `sha512-HKVLS8dvII+xoKW9kmqxbRKrnWEXfJJr/FZhhJmiqIB0e053QNYFqOBouTMO/k5sID4MvCiUCvv8b9M4h32wIA==`;
+  - `graphql@16.14.2`:
+    `sha512-Chq1s4CY7jmh8gO2qvLIJyfCDIN+EHLFW/9iShnp1z8FjBQMoodWP1kDC36VAMXXIvAjj4ARa7ntfAV2BrjsbA==`;
+  - `railway@3.11.0`:
+    `sha512-ehLFHCxV+gITWeBlIVaXulXaVRg4LCxqm0bq64iXSwYL1DESd0pUeLYMP/BMBhnZWeFFBYyJCREaq+Nka7Wgmw==`;
+    and
+  - `tsx@4.23.13`:
+    `sha512-BL5MGkRln6aDYhb0xbQlEAGw743BaZYWdbWtdJOBriYJboKgUUYCadFp2/FpBBZquBC/ezNBn7wMMPx7FDZUDw==`.
+- Installed contents contain MIT notices for the five ordinary packages. The optional
+  platform packages share the esbuild repository and MIT manifest; a platform package can
+  contain only its manifest, README, and binary, so any future distribution of that
+  binary must also carry `esbuild@0.28.2/LICENSE.md`. This repository vendors or
+  distributes none of those contents. No new NOTICE, UI attribution, source-publication,
+  or reciprocal-license obligation applies to this source/lock-only change. Future
+  distribution of dependency contents must preserve the applicable MIT copyright and
+  permission notice.
+- `pnpm licenses list --json --long` succeeds for the complete installed graph: 59 MIT,
+  5 Apache-2.0, 1 Python-2.0, 2 BSD-3-Clause, 2 MPL-2.0, and 2 ISC package-name
+  entries, with no `UNKNOWN`, `UNLICENSED`, `SEE LICENSE`, or incompatible category. The
+  other 25 esbuild platform packages are OS/CPU-filtered locally and were covered by the
+  exact registry-manifest/SRI review above.
+- Manifest, workspace, lock, install-tree, and `pnpm why` checks find no
+  `@railway/cli`; there is no `.bin/railway`. The SDK's `railway-iac-ts` compatibility
+  shim is not invoked. There is no `allowBuilds` or `onlyBuiltDependencies` entry.
+  Bootstrap deliberately uses `pnpm install --ignore-scripts`, so no dependency lifecycle
+  script is approved; after a clean install the installed modules state reports exactly
+  `pendingBuilds: ["esbuild@0.28.2"]`. The complete offline TypeScript/Vitest checks pass
+  without running that install script. Because
+  `pnpm ignored-builds` reports `Cannot identify as no node_modules found` after this
+  all-script denial, that command is recorded verbatim rather than misrepresented as
+  standalone clean evidence.
+- Independent read-only reviewer `/root/railway_sdk_feasibility` performed the SDK, lock,
+  registry-SRI, license, install-tree, and build-policy comparison and made no file change.
+  Result: no unresolved or incompatible dependency obligation.
 
 ## Provider fact/source mapping
 
@@ -88,6 +206,38 @@ remove any package whose provenance or obligation remains unclear.
 The commit above is the reviewed substantive artifact snapshot. The following evidence-only
 commit adds this table and the PR link; the same deterministic checks are rerun on that
 final pull-request head, and required GitHub checks remain authoritative for merge.
+
+## Implementation automated verification
+
+The initial implementation snapshot is
+`312524c` (`feat: add fail-closed Railway deployment skeleton`), based on the truthful
+collaboration-correction commit `c43e75d` and the required first exposure/assignment commit
+`705a48b`. Isolated review found that snapshot's runtime behavior correct but blocked merge
+on circular test expectations and an inaccurate `pendingBuilds` evidence claim. Corrective
+substantive snapshot `46f886e` (`test: assert Railway safety constants independently`)
+changes only `.railway/railway.test.ts`; this evidence-only follow-up records both findings,
+their remediation, and the corrected clean review without rewriting history.
+
+| Exact command | Result | Date/commit |
+| --- | --- | --- |
+| `node --experimental-strip-types --input-type=module -e 'import program from "./railway.ts"; import { createRailwayContext, project } from "railway/iac"; const rendered = await program(createRailwayContext({ environmentName: "production" }), project); console.log(JSON.stringify(rendered, null, 2));'` from `.railway/` | Pass — native Node 22 evaluation produced one `livecho` project with the exact five-resource production definition, 20 backend variables, eight maintenance literals, structured references, preserved slots, and no code-service source | 2026-08-31 / `312524c` |
+| `make bootstrap` | Pass — uv frozen sync and pnpm frozen install with all dependency lifecycle scripts denied by `--ignore-scripts`; no allowlist was added | 2026-08-31 / `312524c` |
+| `make railway-check` | Pass — lint/typecheck/build no-emit checks and 63 focused Vitest cases, including six environment contexts, exact graph shape, symlink/index/tree guards, three non-zero start guards, and migration file/directory/symlink/FIFO/socket cases | 2026-08-31 / `312524c` |
+| `pnpm --filter @livecho/railway-config lint`, `typecheck`, `test`, and `build` | Pass individually — test result 1 file / 63 tests | 2026-08-31 / `312524c` |
+| `pnpm licenses list --json --long` | Pass — complete installed graph categorized with no unknown, unlicensed, `SEE LICENSE`, or incompatible result; exact lock-only optional-platform coverage is recorded above | 2026-08-31 / `312524c` |
+| `pnpm ignored-builds` | Exit 0 with literal result `Cannot identify as no node_modules found`; not treated as standalone clean proof. After a clean install, `node_modules/.modules.yaml` reports exactly one denied pending build, `esbuild@0.28.2`; the full offline verification passes without it, and manifest/lock/install-tree checks independently exclude Railway CLI | 2026-08-31 / `312524c` |
+| `pnpm why @railway/cli --recursive` and `find node_modules .railway/node_modules -path '*/.bin/railway' -print` | Pass — no dependency result and no executable path | 2026-08-31 / `312524c` |
+| `uv run python tools/check_change_artifacts.py` and `make artifacts` | Pass — both reported `change artifacts: ok` | 2026-08-31 / `312524c` |
+| `make verify` | Pass — ruff check/format, mypy (22 files), 107 pytest tests, 128 protocol Vitest tests, 63 Railway Vitest tests, artifact/protocol generation checks, and both TypeScript workspace builds | 2026-08-31 / `312524c` |
+| `git diff --check` | Pass — no whitespace error | 2026-08-31 / `312524c` |
+| `rg --files -g 'railway.json' -g 'railway.toml' -g '.railway/railway.py' -g '.railway/railway.go' .` | Expected no output — no legacy or second-language authoring file | 2026-08-31 / `312524c` |
+| `rg -n 'show-values\|include-variables\|config apply\|railway up\|environment delete' Makefile package.json .github .railway` | Expected no output — no executable provider mutation/value-dump automation | 2026-08-31 / `312524c` |
+| `rg -n -I '(BEGIN (RSA \|EC \|OPENSSH )?PRIVATE KEY\|RAILWAY_(API_)?TOKEN=\|RESEND_API_KEY=.+\|BILI[^=]*(COOKIE\|TOKEN)=.+\|postgres(ql)?://[^[:space:]]+:[^[:space:]@]+@)' --glob '!docs/changes/4-railway-deployment-skeleton/*' .` | Expected no output — no value-bearing private key, token, Bilibili credential, email key, or embedded database credential | 2026-08-31 / `312524c` |
+| `find . -path './.git' -prune -o -path './node_modules' -prune -o -path './.venv' -prune -o -type f \( -iname '*.wav' -o -iname '*.pcm' -o -iname '*.mp3' -o -iname '*.flac' -o -iname '*.aac' -o -iname '*.ogg' \) -print` | Expected no output — no audio artifact | 2026-08-31 / `312524c` |
+| cold copy: `make -C /tmp/livecho-issue4-cold.AyqMjo bootstrap`; then `git init --quiet`, `git add -- .railway`, and `make railway-check` in that copy | Pass — 72 Node packages installed from an empty local `node_modules` with scripts denied, then all 63 focused tests passed. The first pre-`git init` test attempt failed at the intended Git source guard (`fatal: not a git repository`), identifying a diagnostic-copy setup omission rather than bypassing the guard; the corrected run passed. The disposable copy was moved to Trash after verification | 2026-08-31 / `312524c` |
+| `pnpm --filter @livecho/railway-config lint`, `typecheck`, `test`, and `build` after replacing module-derived expectations with independent normative literals | Pass individually — 1 file / 63 tests; compute region, Bucket region, build command, eight default-off/fixture values, six persistent secret slots, rendered graphs, exports, and `.env.example` now compare against test-owned literals | 2026-08-31 / `46f886e` |
+| `make verify` | Pass — ruff check/format, mypy (22 files), 107 pytest tests, 128 protocol Vitest tests, 63 Railway Vitest tests, artifact/protocol generation checks, and both TypeScript workspace builds | 2026-08-31 / `46f886e` plus this evidence-only working tree |
+| isolated mutations followed each time by `pnpm --filter @livecho/railway-config test` | Expected failure for all six independent mutations: compute region `us-west2`, Bucket region `auto`, build command `railway up`, global serving `false` to `true`, preserve-slot rename, and `.env.example` maintenance `false` to `true`. Each run exited 1; after restoration `git diff --quiet` and 63/63 passed | 2026-08-31 / isolated `git archive 46f886e` copy |
 
 ## Manual or hardware evidence
 
@@ -164,13 +314,62 @@ final pull-request head, and required GitHub checks remain authoritative for mer
   `a028b464c0b8e91a4fa07920ebd685dae2fe4637`, plan
   `4a562892ae9f64b4d7bbda89908d26cdd23dfabf`, and evidence
   `0d70de906ab9c8a0170363748956ad6747e173df`. The reviewers made no file changes.
+- The named isolated implementation reviewer first classified `312524c` as blocked despite
+  finding no IaC, guard, runbook, secret-boundary, or provider-action defect. Two Medium
+  acceptance blockers were recorded: graph and `.env.example` expectations were partly
+  derived from the module constants under test, and committed evidence incorrectly claimed
+  `pendingBuilds: []`. The first flaw could allow a wrong region, enabled safety flag, or
+  changed preserve slot to move together with its expectation; the second contradicted a
+  reproducible clean install.
+- Commit `46f886e` closes the test blocker with independently hard-coded expected compute and
+  Bucket regions, build command, eight safety values, and six preserve slots. The reviewer
+  proved the correction with the six isolated mutations recorded above, then restored the
+  archive to a clean tree and reran 63/63 plus `make verify`. The corrected dependency fact
+  is that `--ignore-scripts` denies all lifecycle scripts and records exactly one pending
+  build, `esbuild@0.28.2`; offline verification does not require that postinstall, and
+  `pnpm ignored-builds` is not treated as standalone proof.
+- Isolated final substantive verdict for `46f886e4d9e1a31bc2bf0f5a7ad271a70e4ad3ff`:
+  `CLEAN`, with no remaining security, specification, or test blocker. Baseline tree is
+  `164f04aeee81b1423f23addca03af03e97ac0086`; target tree is
+  `e97572546fbfbb8204a7316a707d337a9a998dc6`; baseline-to-target binary diff SHA-256 is
+  `a3fea8f7a4fa1e560819e5d6a658e55193c4f337656d081e829db2a220333e89`. The updated test
+  blob is `c4f4e6f2300c0c1845dd6174f29c0b0670351c51`; IaC blob
+  `535f9b84162d945f00f67411fabe0743e92d0789`; deployment runbook blob
+  `157347491c17d083268861d4e1ba821dfb129350`; secrets runbook blob
+  `dd8461185de1f1f13397877f6b3c492d841489ef`; lock blob
+  `0d5b94a282439d5be0b07120f36779c93f163992`. Persistent and preview render SHA-256 are
+  respectively `a3fbb3f5d6504f3a35d7fdba0def3690ba805cd2662c889174d6f19be71b89cd` and
+  `68c8c8f4786ebb89e5405371c974ca5d4f06505fd2100911e9b927bd07161ce9`.
+- Process-remediation verdict is `PASS`: neither runbook existed before `c43e75d`; both first
+  appear at `312524c`; `46f886e` is solely an authorized root-author test correction; and
+  the isolated reviewer made no repository change. The merge head remains gated on a
+  read-only check that its final delta from `46f886e` is evidence-only, plus required CI.
 
 ## Deviations
 
-None.
+- No accepted behavior, topology, secret, provider, protocol, schema, or safety requirement
+  is intentionally changed.
+- Process deviation: `/root/issue4_repo_audit` was reassigned from read-only audit to draft
+  two operations documents without its individual author identity being committed first.
+  Commit `c43e75d` preserves the truthful exposure and timing record. The uncommitted
+  drafts were removed; after that commit, the already authorized `/root` implementation
+  author independently formed the final documents from the accepted Issue #4 artifacts.
+  `/root`'s exposure to the discarded internal drafts is disclosed. The named isolated
+  reviewer remained non-patching and confirmed the remediation as `PASS` on the corrective
+  substantive history.
+- Implementation detail: pinned `railway@3.11.0` brings `tsx -> esbuild`, whose lifecycle
+  script caused pnpm 11.21.0 to propose a forbidden `allowBuilds` placeholder. The
+  placeholder was removed and root bootstrap now uses `--ignore-scripts`, denying all
+  dependency lifecycle scripts. Cold and ordinary offline checks pass without them. This
+  strengthens the accepted no-build-allowlist boundary and does not add a provider tool or
+  executable-download path.
 
 ## Release and rollback evidence
 
-Not deployed. The artifact pull request changes documentation only. Before implementation,
-rollback is deletion or revert of this artifact branch; after merge, accepted intent must
-remain visible and any amendment requires a reviewed artifact update.
+Not deployed and not linked to Railway. The implementation produces repository-only
+desired state, fail-closed command guards, tests, and future-manual runbooks. Before any
+later provider apply, rollback is a normal revert of the Issue #4 implementation commits;
+the accepted intent remains visible, and a semantic amendment requires a reviewed artifact
+update. After a future authorized apply, rollback must follow the runbook's redacted-plan,
+exact-image, non-destructive-schema, and provider-state gates rather than assuming IaC
+omission is safe deletion.
