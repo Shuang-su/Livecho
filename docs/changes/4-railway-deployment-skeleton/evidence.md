@@ -39,6 +39,34 @@
   reviewed the credential-bearing backend build gate and maintenance recreation-deployment
   reconciliation. None patched the files.
 
+## Implementation exposure and assignment
+
+- Identity/role/paths/date: `/root` (OpenAI Codex), Issue #4 implementation author,
+  `.railway/**`, `.env.example`, `pnpm-workspace.yaml`, `pnpm-lock.yaml`, `Makefile`,
+  `README.md`, `docs/operations/railway-deployment.md`,
+  `docs/operations/railway-secrets.md`, focused repository tests, and this evidence file,
+  2026-08-31.
+- Livecho material viewed before implementation: GitHub Issue #4; repository `AGENTS.md`;
+  all accepted Issue #4 intent/spec/plan/evidence; accepted Issues #1–#3 records referenced
+  by the artifact; the current `main` tree, root workspace manifest, Makefile, README,
+  verification workflow, workspace-script checker, protocol workspace layout, and existing
+  foundation verification conventions.
+- Upstream/context material viewed: the official Railway documentation, npm metadata, and
+  immutable Railway SDK/CLI source revisions enumerated in the provider fact/source map
+  below; read-only artifact-review findings derived from those materials; and official
+  OpenAI Developer Commands documentation solely to verify the local Codex `/status`
+  quota-reading workflow. The OpenAI material does not inform repository implementation.
+- Exclusions: no LAPLACE source, tests, fixtures, schemas, configuration, comments,
+  documentation, assets, screenshots, pasted snippets, generated code, or distinctive
+  implementation summaries were viewed. No third-party implementation repository is an
+  implementation input. Railway package declarations are compatibility facts, not code to
+  copy.
+- Assignment decision/reviewer: repository owner authorization permits only the Issue #4
+  repository skeleton and evidence in the paths above. It does not authorize Railway
+  login, link, plan, apply, deploy, variable mutation, environment/resource creation, or
+  destruction. `/root/issue4_security_test_audit` is the named isolated implementation
+  reviewer; it performs read-only review and must not patch implementation files.
+
 ## Planned dependency provenance pre-audit
 
 | Package | Immutable provenance | Observed license | Current decision/obligation |
