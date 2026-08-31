@@ -113,6 +113,62 @@ a lockfile: before implementation code, the implementation branch must generate 
 record every new transitive package and license, resolve distribution obligations, and
 remove any package whose provenance or obligation remains unclear.
 
+## Implementation lock and license review
+
+- Comparison input: `origin/main@a39b1f5b345b6b29496c9643e5116aac14ee1bad`
+  against implementation lock SHA-256
+  `0c02ccbf1ef112a8fa6c36ed6732e459c644314a6c877fe3c58e81cc9241e00f`,
+  reviewed 2026-08-31. The lock `packages:` inventory grows from 109 to 140 records:
+  exactly 31 additions and zero removals.
+- The additions are `@graphql-typed-document-node/core@3.2.0`,
+  `graphql@16.14.2`, `railway@3.11.0`, `tsx@4.23.13`, `esbuild@0.28.2`, and the
+  26 exact `@esbuild/*@0.28.2` optional packages for
+  `aix-ppc64`, `android-arm`, `android-arm64`, `android-x64`, `darwin-arm64`,
+  `darwin-x64`, `freebsd-arm64`, `freebsd-x64`, `linux-arm`, `linux-arm64`,
+  `linux-ia32`, `linux-loong64`, `linux-mips64el`, `linux-ppc64`,
+  `linux-riscv64`, `linux-s390x`, `linux-x64`, `netbsd-arm64`, `netbsd-x64`,
+  `openbsd-arm64`, `openbsd-x64`, `openharmony-arm64`, `sunos-x64`,
+  `win32-arm64`, `win32-ia32`, and `win32-x64`.
+- Exact-version registry manifest and lock-integrity comparison found all 31 records to be
+  MIT licensed with matching SRI and no missing/unknown license or version drift. The five
+  non-platform SRIs are:
+  - `@graphql-typed-document-node/core@3.2.0`:
+    `sha512-mB9oAsNCm9aM3/SOv4YtBMqZbYj10R7dkq8byBqxGY/ncFwhf2oQzMV+LCRlWoDSEBJ3COiR1yeDvMtsoOsuFQ==`;
+  - `esbuild@0.28.2`:
+    `sha512-HKVLS8dvII+xoKW9kmqxbRKrnWEXfJJr/FZhhJmiqIB0e053QNYFqOBouTMO/k5sID4MvCiUCvv8b9M4h32wIA==`;
+  - `graphql@16.14.2`:
+    `sha512-Chq1s4CY7jmh8gO2qvLIJyfCDIN+EHLFW/9iShnp1z8FjBQMoodWP1kDC36VAMXXIvAjj4ARa7ntfAV2BrjsbA==`;
+  - `railway@3.11.0`:
+    `sha512-ehLFHCxV+gITWeBlIVaXulXaVRg4LCxqm0bq64iXSwYL1DESd0pUeLYMP/BMBhnZWeFFBYyJCREaq+Nka7Wgmw==`;
+    and
+  - `tsx@4.23.13`:
+    `sha512-BL5MGkRln6aDYhb0xbQlEAGw743BaZYWdbWtdJOBriYJboKgUUYCadFp2/FpBBZquBC/ezNBn7wMMPx7FDZUDw==`.
+- Installed contents contain MIT notices for the five ordinary packages. The optional
+  platform packages share the esbuild repository and MIT manifest; a platform package can
+  contain only its manifest, README, and binary, so any future distribution of that
+  binary must also carry `esbuild@0.28.2/LICENSE.md`. This repository vendors or
+  distributes none of those contents. No new NOTICE, UI attribution, source-publication,
+  or reciprocal-license obligation applies to this source/lock-only change. Future
+  distribution of dependency contents must preserve the applicable MIT copyright and
+  permission notice.
+- `pnpm licenses list --json --long` succeeds for the complete installed graph: 59 MIT,
+  5 Apache-2.0, 1 Python-2.0, 2 BSD-3-Clause, 2 MPL-2.0, and 2 ISC package-name
+  entries, with no `UNKNOWN`, `UNLICENSED`, `SEE LICENSE`, or incompatible category. The
+  other 25 esbuild platform packages are OS/CPU-filtered locally and were covered by the
+  exact registry-manifest/SRI review above.
+- Manifest, workspace, lock, install-tree, and `pnpm why` checks find no
+  `@railway/cli`; there is no `.bin/railway`. The SDK's `railway-iac-ts` compatibility
+  shim is not invoked. There is no `allowBuilds` or `onlyBuiltDependencies` entry.
+  Bootstrap deliberately uses `pnpm install --ignore-scripts`, so no dependency lifecycle
+  script is approved; the installed modules state reports `pendingBuilds: []`, and the
+  complete offline TypeScript/Vitest checks pass without an install script. Because
+  `pnpm ignored-builds` reports `Cannot identify as no node_modules found` after this
+  all-script denial, that command is recorded verbatim rather than misrepresented as
+  standalone clean evidence.
+- Independent read-only reviewer `/root/railway_sdk_feasibility` performed the SDK, lock,
+  registry-SRI, license, install-tree, and build-policy comparison and made no file change.
+  Result: no unresolved or incompatible dependency obligation.
+
 ## Provider fact/source mapping
 
 | Externally imposed fact used by this artifact | Primary source reviewed 2026-08-30 |
