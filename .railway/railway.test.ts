@@ -37,6 +37,28 @@ const SOURCE_ALLOWLIST = Object.freeze([
   ".railway/tsconfig.json",
 ]);
 
+const EXPECTED_COMPUTE_REGION = "asia-southeast1-eqsg3a";
+const EXPECTED_BUCKET_REGION = "sin";
+const EXPECTED_BUILD_COMMAND = "make bootstrap && make build";
+const EXPECTED_SAFETY_VARIABLES = Object.freeze({
+  LIVECHO_GLOBAL_SERVING_ENABLED: "false",
+  LIVECHO_INGEST_ENABLED: "false",
+  LIVECHO_INGEST_MODE: "fixture",
+  LIVECHO_PERSISTENCE_ENABLED: "false",
+  LIVECHO_RAW_ARCHIVE_ENABLED: "false",
+  LIVECHO_EMAIL_ENABLED: "false",
+  LIVECHO_REAL_WORKER_AUDIO_ENABLED: "false",
+  LIVECHO_MAINTENANCE_ENABLED: "false",
+});
+const EXPECTED_PERSISTENT_SECRET_SLOTS = Object.freeze([
+  "LIVECHO_SESSION_SIGNING_KEY",
+  "LIVECHO_WORKER_TOKEN_SIGNING_KEY",
+  "LIVECHO_ARCHIVE_ENCRYPTION_KEY",
+  "LIVECHO_RECOVERY_INTEGRITY_KEY",
+  "LIVECHO_AUDIT_INTEGRITY_KEY",
+  "RESEND_API_KEY",
+] as const);
+
 const temporaryRepositories: string[] = [];
 
 function splitNul(value: string): string[] {
@@ -186,7 +208,7 @@ function resourceNamed(definition: ProjectDefinition, name: string): ResourceNod
 
 function expectedLiteralSafetyVariables() {
   return Object.fromEntries(
-    Object.entries(railway.SAFETY_VARIABLES).map(([name, value]) => [
+    Object.entries(EXPECTED_SAFETY_VARIABLES).map(([name, value]) => [
       name,
       { type: "literal", value },
     ]),
@@ -236,6 +258,11 @@ describe.each([
   it("renders the exact fail-closed topology and contracts", async () => {
     const definition = await render(input);
     expect(definition.name).toBe("livecho");
+    expect(railway.COMPUTE_REGION).toBe(EXPECTED_COMPUTE_REGION);
+    expect(railway.BUCKET_REGION).toBe(EXPECTED_BUCKET_REGION);
+    expect(railway.BUILD_COMMAND).toBe(EXPECTED_BUILD_COMMAND);
+    expect(railway.SAFETY_VARIABLES).toEqual(EXPECTED_SAFETY_VARIABLES);
+    expect(railway.PERSISTENT_SECRET_SLOTS).toEqual(EXPECTED_PERSISTENT_SECRET_SLOTS);
     expect(resourcesOf(definition).map(({ type, name }) => [type, name])).toEqual([
       ["service", "web"],
       ["service", "backend"],
@@ -249,32 +276,32 @@ describe.each([
       type: "service",
       kind: "empty",
       name: "web",
-      build: { buildCommand: railway.BUILD_COMMAND },
+      build: { buildCommand: EXPECTED_BUILD_COMMAND },
       deploy: {
         startCommand: "make railway-start-web",
         healthcheckPath: "/healthz",
         healthcheckTimeout: 30,
         multiRegionConfig: {
-          [railway.COMPUTE_REGION]: { numReplicas: 1 },
+          [EXPECTED_COMPUTE_REGION]: { numReplicas: 1 },
         },
       },
     });
 
     const persistentVariables = persistent
-      ? Object.fromEntries(railway.PERSISTENT_SECRET_SLOTS.map((name) => [name, { type: "preserve" }]))
+      ? Object.fromEntries(EXPECTED_PERSISTENT_SECRET_SLOTS.map((name) => [name, { type: "preserve" }]))
       : {};
     expect(resourceNamed(definition, "backend")).toEqual({
       address: "service.backend",
       type: "service",
       kind: "empty",
       name: "backend",
-      build: { buildCommand: railway.BUILD_COMMAND },
+      build: { buildCommand: EXPECTED_BUILD_COMMAND },
       deploy: {
         startCommand: "make railway-start-backend",
         healthcheckPath: "/healthz",
         healthcheckTimeout: 30,
         multiRegionConfig: {
-          [railway.COMPUTE_REGION]: { numReplicas: 1 },
+          [EXPECTED_COMPUTE_REGION]: { numReplicas: 1 },
         },
       },
       variables: {
@@ -316,7 +343,7 @@ describe.each([
       },
       deploy: {
         multiRegionConfig: {
-          [railway.COMPUTE_REGION]: { numReplicas: 1 },
+          [EXPECTED_COMPUTE_REGION]: { numReplicas: 1 },
         },
       },
     });
@@ -325,7 +352,7 @@ describe.each([
       address: "bucket.Archive",
       type: "bucket",
       name: "Archive",
-      config: { region: railway.BUCKET_REGION },
+      config: { region: EXPECTED_BUCKET_REGION },
     });
 
     expect(resourceNamed(definition, "maintenance")).toEqual({
@@ -333,13 +360,13 @@ describe.each([
       type: "service",
       kind: "empty",
       name: "maintenance",
-      build: { buildCommand: railway.BUILD_COMMAND },
+      build: { buildCommand: EXPECTED_BUILD_COMMAND },
       deploy: {
         restartPolicyType: "NEVER",
         drainingSeconds: 15,
         startCommand: "make railway-run-maintenance",
         multiRegionConfig: {
-          [railway.COMPUTE_REGION]: { numReplicas: 1 },
+          [EXPECTED_COMPUTE_REGION]: { numReplicas: 1 },
         },
       },
       variables: expectedLiteralSafetyVariables(),
@@ -425,7 +452,7 @@ describe("local safety and Make contracts", () => {
   it("keeps .env.example to the exact eight safe assignments", () => {
     const content = readFileSync(join(repositoryRoot, ".env.example"), "utf8");
     expect(content).toBe(
-      Object.entries(railway.SAFETY_VARIABLES)
+      Object.entries(EXPECTED_SAFETY_VARIABLES)
         .map(([name, value]) => `${name}=${value}`)
         .join("\n") + "\n",
     );
