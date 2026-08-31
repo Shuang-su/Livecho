@@ -67,6 +67,39 @@
   destruction. `/root/issue4_security_test_audit` is the named isolated implementation
   reviewer; it performs read-only review and must not patch implementation files.
 
+## Implementation collaboration exposure and process correction
+
+- Identity/role/paths/date: `/root/issue4_repo_audit` (OpenAI Codex child agent), first a
+  read-only Issue #4 repository auditor and later an operations-document draft author for
+  `docs/operations/railway-secrets.md` and
+  `docs/operations/railway-deployment.md`, 2026-08-31.
+- Material viewed before the draft assignment: repository `AGENTS.md`; GitHub Issue #4;
+  all accepted Issue #4 intent/spec/plan/evidence; the accepted Issue #2 architecture,
+  threat, lifecycle, incident, policy, and independent-implementation records; the current
+  repository baseline; and `/root`'s implementation-exposure commit. The child agent saw
+  no LAPLACE source, test, fixture, schema, configuration, documentation, asset,
+  screenshot, pasted snippet, generated code, or distinctive implementation summary, and
+  no other third-party implementation was a drafting input.
+- Actual assignment and correction: after completing its read-only audit, the child agent
+  was instructed to draft the two operations documents. That was substantive authorship,
+  but its individual author identity had not been recorded and committed before the
+  assignment. Treating the child as implicitly covered by the parent `/root` identity
+  would be inaccurate. The two uncommitted drafts were therefore removed after parent
+  review and before inclusion in an implementation snapshot. The child performs no
+  further implementation work and is not an independent reviewer of either path.
+- `/root` exposure addendum: `/root` read the discarded internal drafts. They were prose
+  derived only from the accepted Livecho artifacts above, but they are still disclosed as
+  internal requirements-derived draft material. This record is committed before `/root`
+  independently forms the final two documents from the accepted Issue #4 intent/spec/plan
+  and takes sole authorship responsibility under the paths already authorized in the
+  first implementation-exposure record.
+- Process classification and reviewer: the missed per-agent pre-assignment record is a
+  process deviation, not a secret, audio, license, or external-source contamination event.
+  It is not repaired by rewriting the first commit or pretending the record predated the
+  work. Remediation is the truthful record here, removal of the drafts, fresh parent
+  authorship after this commit, and final read-only review by the already named isolated
+  reviewer `/root/issue4_security_test_audit`.
+
 ## Planned dependency provenance pre-audit
 
 | Package | Immutable provenance | Observed license | Current decision/obligation |
