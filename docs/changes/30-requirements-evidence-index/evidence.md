@@ -1,5 +1,41 @@
 # Evidence: Requirement authority and evidence index
 
+## Implementation approval and author assignment
+
+- The repository owner explicitly approved PR #32 and delegated its merge to the
+  coordinating agent. It merged on 2026-10-02 as
+  `e62c65fa979b0895441f020c1d6db3eb42b4ea64`. The artifact-phase statements below are
+  historical; this approval authorizes the specified documentation implementation,
+  not any ADR, residual-risk acceptance, rights decision, or runtime activation.
+- Implementation base: `93d8b0a4b3e147ce0b7df903f118060117d56f0a`; branch:
+  `codex/issue-30-requirements-index-impl`.
+- Identity/role/date: `/root/audio_code_readiness` (OpenAI Codex), Issue #30
+  documentation implementer, 2026-10-02. Assignment is limited to
+  `docs/requirements-index.md`, `README.md`, `docs/roadmap.md`, and this evidence file.
+  Independent reviewer: `/root`; the implementer does not edit Issue #5/#8 code.
+- Prior exposure: this agent performed read-only Issue #8 readiness planning. Inputs
+  were local AGENTS, Issue #8 body, its four then-proposed artifacts, the local
+  independent-implementation policy in full, visible architecture/lifecycle/policy
+  excerpts, Issue #2 evidence excerpts, Makefile/pyproject, file inventories, and
+  portions of foundation/protocol tests. Long combined source output was truncated;
+  no complete prior architecture inventory is claimed. The policy disclosed reference
+  repository names, revisions, license metadata, and earlier authors' exposure
+  descriptions; no referenced upstream material or behavior summary itself was opened.
+- Current inputs before this declaration: AGENTS, Issue #30 body, all four accepted
+  Issue #30 artifacts, PR #32 merge metadata, CONTRIBUTING, change lifecycle README,
+  repository README/roadmap, and heading/control inventory of the eight local supporting
+  architecture/security/policy/operations records. Further index inputs will be those
+  accepted Livecho records, relevant local protocol contracts/evidence, and known Issue
+  status/dependencies; the exact audit inventory is recorded below after review.
+- No reference source/test/fixture/schema/configuration/comment/document/asset,
+  screenshot, external research memo/report, or Issue #31 body has been inspected.
+  No known prior contribution to a reference project exists in this task context.
+  No audio, dataset, model, decoder binary or upstream expression was downloaded.
+- Assignment decision: eligible for this independently authored navigation/index work
+  using accepted Livecho requirements only. This declaration is committed before index,
+  README, or roadmap implementation edits. It does not assign this author audio or ASR
+  implementation and does not waive the policy's separate review gate.
+
 ## Artifact approval
 
 - Artifact PR: [#32](https://github.com/Shuang-su/Livecho/pull/32) (draft; does not close #30).
