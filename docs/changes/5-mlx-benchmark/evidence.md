@@ -1187,3 +1187,67 @@ notice assets and receipt reopened successfully. Matching outer model/preparatio
 tensor-map/lock/output identity without Approval and inference rights was rejected with
 `inference_preparation_mismatch` before any final-cache root access; the receipt remained
 unapproved. This probe does not approve an inference manifest or execute a provider.
+
+## Serializer bridge assignment before code, 2026-10-03 (UTC+08:00)
+
+- Author `/root/audio_implementation`; isolated reviewer `/root/audio_code_readiness`
+  reviews pins, closed interfaces and input authority; root supplements lifecycle and
+  cleanup/commit ordering. Base is `b0330fa27344bc4d9853517831083363860de9a9`, same
+  Issue #5 worktree/branch/draft PR. This record is committed before new product code.
+- Actual exposure remains the previously recorded local requirements/code, policy and
+  reference-name/license metadata and allowed primary API/standard reads. The author
+  refreshed AGENTS, Issue #5 and its existing comments, accepted intent/spec/plan and
+  added evidence, plus the local conversion, verified-source and converted-storage APIs.
+  No new external source or excluded implementation expression was read, and the original
+  exposed author is not consulted. This is not a zero-context claim.
+- Scope is a new `serialization_session.py`, original ordinary-text/opaque-token tests,
+  README/evidence and only demonstrably necessary existing boundary corrections. No
+  actual serializer/format, model/audio/network/MLX execution, Approval, registry,
+  inference or public-protocol change is included.
+
+The frozen bridge contract is:
+
+- `prepare_converted_artifacts` is an internal async preparation-only coordinator with
+  explicit preparation, source mode/cache, converter, serializer, OutputPlan and private
+  output cache locations. It strictly revalidates manifest/plan, their preparation/
+  converter/lock binding, source-cache identity, converter pins plus `unloaded is True`,
+  and serializer pins plus `fresh is True` before source/storage I/O or backend methods.
+  A pre-admission rejection leaves both backends caller-owned and invokes no close.
+- Successful bridge admission transfers both backends to the bridge. A close-once
+  converter proxy preserves the existing conversion-session contract: that session may
+  close the proxy after its own admission, while the bridge also closes it on stage
+  creation failure or a later conversion-session pre-admission failure. The proxy invokes
+  the real converter close at most once, including when close raises. Serializer cleanup
+  similarly runs once; failure in either close still attempts the other. All successful
+  close operations must finish before this bridge can commit a receipt.
+- The bridge requires actual complete existing local source files. A local verified
+  collection is checked before conversion; conversion's response factory is a fixed
+  denying guard, with no caller network override. A missing/replaced source cannot
+  introduce a download bypass. After conversion, it reopens the actual local source
+  collection and exposes only allowlisted tokenizer/config/notice labels to serialization,
+  never weights as file readers, arbitrary paths or raw descriptors.
+- A cooperative `PreparationSerializer[T]` asserts exact converter/lock pins and fresh
+  state, synchronously `serialize`s closed preparation/plan metadata, a read-only borrowed
+  converted-tensor mapping, a read-only borrowed auxiliary-reader mapping, and a restricted
+  output facade, with explicit `local_files_only=True`, `trust_remote_code=False`. It
+  changes `fresh` to False on a successful call and releases its own resources in `close`.
+  No file format/operator behavior is invented by this interface.
+- The output facade offers only `write_output(path, chunks)`: one allowlisted output is
+  written sequentially from bounded byte chunks through the existing staging sink. It
+  exposes no commit/close/path/fd/network capability. Every observed cancellation/pin
+  change or failed output call is terminal even if the serializer catches the exception.
+  Serializer-owned iterators remain its cleanup responsibility; calls are synchronous
+  and cooperative, with no preemptive deadline claim.
+- Inputs/output facade are valid only during `serialize`, then revoked before serializer
+  close. Auxiliary readers are revalidated and closed, serializer closes, and conversion
+  scope revokes its original mapping and closes the converter. Only after all cleanup
+  succeeds and cancellation/pins are checked again may the bridge alone call commit.
+  Source-cache ownership stays with the caller. Escaped raw tensors/Python references
+  cannot be forcibly revoked or erased; this is not a sandbox against reflection or
+  malicious same-privilege backend code.
+- Missing/extra/failed outputs and serializer/source/converter cleanup faults prevent a
+  new receipt. Existing storage post-rename uncertainty is preserved: cancellation or
+  late failure never deletes an already published receipt/assets. A receipt remains
+  unapproved; returning one never creates inference authority. Tests use only original
+  ordinary text filesystem content and opaque tokens, including successful reopen and
+  failure ordering, without a real serializer or model execution.
