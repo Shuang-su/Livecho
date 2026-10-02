@@ -379,3 +379,14 @@ No old suite was repeated by the reviewer. It read only accepted local requireme
 this implementation/evidence; no new external fetch, network/model/audio/provider run,
 hardware proof, upstream-expression comparison or legal clearance is claimed. Quota
 gates returned exit 0 before and after this batch and the independent review.
+
+## Verified reader and local load boundary assignment, 2026-10-03
+
+The same independent author `/root/asr_implementation` continues with the bounded
+final-cache reader and local eager-load boundary. `/root/audio_code_readiness` remains
+the independent reviewer. Before this batch's code, the author rechecked AGENTS, owning
+Issue #5, accepted intent/spec/plan and the existing evidence/code context. No additional
+external sources, model implementation, weights or audio were accessed. Earlier policy
+and primary-document exposures above remain applicable; this is not a no-exposure claim.
+Scope is final-manifest-bound read-only handles and injected backend cleanup, not HTTPS,
+converted-asset writing, actual MLX loading, fresh-process proof or scored cold results.
