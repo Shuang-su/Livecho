@@ -651,3 +651,25 @@ def test_retry_does_not_repair_a_damaged_committed_set(tmp_path: Path) -> None:
             retry.commit()
     assert not missing.exists()
     assert_released(tmp_path)
+
+
+@pytest.mark.parametrize("append", [False, True])
+def test_receipt_readback_rejects_mutation_before_publication(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, append: bool
+) -> None:
+    original = os.fsync
+    with owner(tmp_path) as store:
+        write_all(store)
+
+        def sync(fd: int) -> None:
+            value = os.fstat(fd)
+            if (value.st_dev, value.st_ino) == store._owned.get("receipt.new"):
+                os.pwrite(fd, b"X", value.st_size if append else 0)
+            original(fd)
+
+        monkeypatch.setattr(os, "fsync", sync)
+        with pytest.raises(BlockedEvidence, match="conversion_receipt_changed"):
+            store.commit()
+        monkeypatch.undo()
+    assert not list((tmp_path / "cache").glob("*.receipt"))
+    assert_released(tmp_path)

@@ -504,6 +504,12 @@ class ConversionStaging:
                     _write_all(fd, payload)
                     os.fsync(fd)
                     stamp = _named_stamp(self._stage, "receipt.new", fd)
+                    if (
+                        stamp[2] != len(payload)
+                        or os.pread(fd, RECEIPT_BYTES + 1, 0) != payload
+                        or _named_stamp(self._stage, "receipt.new", fd) != stamp
+                    ):
+                        raise BlockedEvidence("conversion_receipt_changed")
                     self._check()
                     os.rename(
                         "receipt.new",
