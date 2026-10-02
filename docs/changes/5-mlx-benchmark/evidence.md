@@ -285,3 +285,21 @@ prefix denominator, and a failing initial clock read could strand a reservation.
 author bound prefix+overlap to the reserved/prepared duration before provider use and
 moved that initial clock read before reservation; metadata-only regressions cover both.
 Exact final review and updated verification outcomes follow after the stable checkpoint.
+
+At exact code head `48ee3632ce897add26e3b59dfa709d57cf02a8e2`, the isolated reviewer
+confirmed both fixes and reported no remaining actionable finding in the bounded scope.
+Its independent command `uv run pytest -q tests/asr_benchmark/test_instrumentation.py
+tests/asr_benchmark/test_artifacts.py tests/asr_benchmark/test_controls.py` passed 42
+tests in 2.51 seconds. It did not rerun the full repository suite or independently
+validate external model metadata, hardware, MLX, upstream similarity or legal clearance.
+
+Author verification on that code head, 2026-10-03 Asia/Shanghai:
+
+- `make asr-benchmark-check`: passed Ruff/format/mypy and **83 tests**.
+- `make verify`: passed Ruff/format/mypy/TypeScript, **190 pytest**, **128 protocol
+  Vitest**, **63 Railway Vitest**, artifacts/protocol checks and build (00:42).
+- `git diff --check`: passed. No accepted Issue #5 intent/spec/plan or protocol file changed.
+
+The earlier new report-roundtrip test failed while native JSON arrays/dates were
+mistakenly rejected; it passed after the documented strict conversion repair. No scoring
+or operational runtime result is inferred from these deterministic test results.
