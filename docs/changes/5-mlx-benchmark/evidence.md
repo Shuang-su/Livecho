@@ -1893,3 +1893,38 @@ query compatibility, host privacy or hardware acceptance.
 
 All gate checks remained active. The final evidence-only commit retains every reviewed
 product/test/README byte. No tests or probe are rerun for that documentation-only step.
+
+## ModelScope primary HTTP documentation audit assignment — 2026-10-03 05:12 +08:00
+
+Author `/root/audio_implementation` is assigned one bounded documentation-only audit
+of immutable model-asset HTTP acquisition. Reviewer `/root/audio_code_readiness` is
+independent and read-only; root coordinates scope and documentation review. No adapter,
+registry, endpoint probe or other product code is authorized in this batch. Before
+the audit the author refreshed AGENTS.md, Issue #5 body/comments and all four owning
+artifacts (full unchanged intent/spec/plan and latest evidence). Prior exposure records
+above remain accurate: accepted local contracts, direct primary HTTP/Python/Hugging
+Face documentation and the recorded metadata-only handoff/event contexts are known;
+no ModelScope SDK/reference implementation or corresponding incident expression has
+been supplied to this replacement author. Previous ModelScope endpoint support was
+left unestablished, not investigated to a complete HTTP contract.
+
+The source boundary is direct official ModelScope documentation entry points and
+documentation links actually observed there, plus primary HTTP standards if needed.
+There is no search, third-party page, source/SDK repository, model card/asset endpoint,
+network download, SDK execution, or link from the old exposure event. An official
+documentation API example can establish its documented call only; it cannot establish
+the wire contract. If implementation expression appears, stop that source path and
+report only exposure metadata. No inferred endpoint, branch-to-commit resolution,
+redirect/CDN authority or mirror fallback is permitted.
+
+Bound the investigation to at most four distinct official documentation pages and
+one rendered-browser fallback on the same documentation if extraction fails. Record
+the actual attempts and limits, then stop rather than repeat searches or inspect app
+bundles/SDK source. Build a fact/gap matrix for canonical repository plus immutable
+revision/file addressing, authentication/permission errors, redirect/CDN authority,
+Range/resumption and verifiable responses. If the requirements remain unestablished,
+keep acquisition blocked and name the missing official contract for owner/monitor
+review. Failure to retrieve documentation is not evidence that an interface does not
+exist. Even sufficient facts would only support a proposed later code scope, not
+implementation in this audit. Verify documentation with `make artifacts` and
+`git diff --check`; do not rerun the existing 673-test product suite.
