@@ -635,3 +635,33 @@ Asia/Shanghai (UTC+08:00):
 
 This batch is internal implementation progress, not Issue #5 acceptance. PR #36 remains
 a draft; no model is selected and no merge, deployment or real benchmark is performed.
+
+## Source-asset collection assignment (before code), 2026-10-03 (UTC+08:00)
+
+- Author: `/root/audio_implementation`, OpenAI Codex GUI subagent. New bounded assignment:
+  verified preparation source-asset collection and acquisition orchestration, planned
+  `source_cache.py` / `preparation_run.py`, focused tests, necessary shared model-cache/
+  reader interfaces, README and evidence. Isolated reviewer: `/root/audio_code_readiness`.
+  `/root` supplements lifecycle/permission review read-only. Existing PR #36 remains
+  the one Issue #5 implementation PR; no other author is writing this batch.
+- Earlier actual context/exposure is fully retained in the replacement assignment and
+  HTTPS integration records above, including official API examples and local policy
+  metadata. Those disclosures apply to this assignment; no zero-context claim is made.
+  The previous author's exclusion from corresponding HTTP/download modules continues.
+  No incident link, snippet, implementation advice or excluded material was received.
+- New reads: refreshed owning Issue #5 body/comments, AGENTS, accepted intent/spec/plan,
+  evidence and unchanged policy; existing local conversion, instrumentation, cold-load,
+  final reader, cache, transfer, runner and related original tests. All four artifacts
+  were previously read in full and reviewed again for this batch; no new external
+  source lookup, third-party repository, Issue #31 body or SDK source was opened.
+- Implement independently from these accepted local requirements and existing Livecho
+  interfaces. The collection must verify actual source files and expose all borrowed
+  readers only after the complete set verifies. Only genuinely missing assets may be
+  acquired through the existing restricted downloader. Corruption, identity mismatch
+  or unsafe files must not become a missing-file fallback. Keep preparation authority
+  separate from inference and return no approved inference manifest.
+- Tests remain original ordinary text and transport/control doubles only. No real
+  network/model/audio, MLX, converted-output writer or process runner work is included.
+  Registry remains empty, ModelScope/redirect acquisition remains blocked, and no
+  accepted intent/spec/plan or public protocol change is authorized. This assignment
+  record is committed before implementation.
