@@ -1781,3 +1781,115 @@ verification and independent stable-head execution follow below.
 These are control checks against original metadata, not actual command compatibility,
 live device measurements, complete runtime bindings, M3 Ultra identification, no-paging
 evidence or hardware acceptance. No model/audio/network/MLX workload was executed.
+
+### Inventory stable review and full verification — 2026-10-03 05:04 +08:00
+
+Reviewed code head: `578dbbb5fb7674c527575a4688ac75da4751b45c`.
+Author executed `make verify`: exit 0, ruff/format/mypy passed (**67 Python files**),
+pytest **673 passed in 45.25s**, protocol Vitest **128 passed**, Railway Vitest **63
+passed**, and workspace/change-artifact/protocol-generation/build checks passed.
+Existing accepted protocol tests include in-memory codec boundaries; this batch adds
+no audio admission or host query. `git diff --check` passed and the tree remained clean.
+
+The isolated reviewer read the complete collector and tests plus README/evidence, and
+executed at that same clean head:
+
+```sh
+uv run pytest -q tests/asr_benchmark/test_machine_inventory.py
+git diff --check
+```
+
+Results: **59 passed in 0.08s**, diff check exit 0; head/tree unchanged before and after.
+The four once-only guard-failure regressions were executed by both the author and this
+independent suite. Root reviewed guard wrapping, strict nested model validation,
+explicit cleanup retry, fixed queries and deadlines statically, without running tests.
+No remaining actionable finding was reported in either bounded review.
+
+The reviewer's actual new sources were the Apple-bundled sysctl(8)/sw_vers(1) manuals
+and Python platform documentation (including their documentation examples), Apple
+JavaScript-only/404 pages, and two narrowly filtered official-documentation searches
+that returned no results. The CPU-total/RAM-byte definitions were read only as the
+author's explicitly attributed short official-documentation quotations, not separately
+retrieved full Apple prose. The reviewer saw no forum content, excluded expression,
+SDK/reference source or new model/audio/network/MLX execution.
+
+The reviewer saved and executed one supplementary original metadata-child probe.
+Actual working directory:
+`/Users/szmg/.codex/worktrees/livecho-5-asr-impl/Livecho`. Actual command:
+
+```sh
+uv run python - < /Users/szmg/.codex/monitors/livecho-20261002/reviews/inventory-once-guard-578dbbb.py
+```
+
+Original saved stdin/script SHA256:
+`f8d73512a18afefa38060e86a63e9f380166aae1ccb858ca23d71e2baabe8d20`.
+Complete original input follows; the author transcribed/checked it without re-execution:
+
+```python
+import subprocess
+import sys
+from pathlib import Path
+from unittest.mock import patch
+
+
+if sys.argv[1:] == ['--metadata-child']:
+    sys.stdout.write('32\n')
+    sys.stdout.flush()
+else:
+    from tools.asr_benchmark import machine_inventory as inventory
+
+    script = Path('/Users/szmg/.codex/monitors/livecho-20261002/reviews/inventory-once-guard-578dbbb.py')
+    children = []
+    fields = []
+    raised = False
+
+    def spawn_metadata_only(field):
+        fields.append(field)
+        child = subprocess.Popen(
+            [sys.executable, '-I', '-B', str(script), '--metadata-child'],
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            env={},
+            close_fds=True,
+            bufsize=0,
+        )
+        children.append(child)
+        return child
+
+    def cancelled():
+        global raised
+        if children and not raised:
+            raised = True
+            raise FileNotFoundError('original one-shot cancellation-check fault')
+        return False
+
+    owner = inventory.MachineInventoryCollector()
+    with (
+        patch.object(inventory, '_spawn', spawn_metadata_only),
+        patch.object(inventory.sys, 'platform', 'darwin'),
+        patch.object(inventory.platform, 'python_version', lambda: '3.12.10'),
+    ):
+        try:
+            owner.collect(cancelled=cancelled)
+        except inventory.InventoryFailure as error:
+            assert str(error) == 'inventory_callback_failed', str(error)
+        else:
+            raise AssertionError('guard exception degraded into a missing field and snapshot')
+    assert raised and fields == ['cpu_cores'] and len(children) == 1
+    assert children[0].poll() is not None
+    assert children[0].stdout is not None and children[0].stdout.closed
+    assert owner._child is None
+    owner.close()
+    print('once-only FileNotFoundError from cancellation guard is terminal; no snapshot or next query, owned metadata child reaped and pipe closed; no host query executed')
+```
+
+Actual result: exit 0, output exactly the script's final print text. A real original
+metadata child had returned from Popen and was already owned when the cancellation
+guard raised FileNotFoundError once. The fault remained terminal: no snapshot, no next
+query spawn, and the child/stdout were reaped/closed. Python version was a stub and no
+actual sysctl/sw_vers query ran. This is OS-process cleanup evidence, not device inventory,
+query compatibility, host privacy or hardware acceptance.
+
+All gate checks remained active. The final evidence-only commit retains every reviewed
+product/test/README byte. No tests or probe are rerun for that documentation-only step.
