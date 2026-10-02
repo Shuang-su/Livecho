@@ -2,7 +2,8 @@
 
 ## Artifact approval
 
-- Artifact PR: Pending creation; documentation only, does not close Issue #8.
+- Artifact PR: [#34](https://github.com/Shuang-su/Livecho/pull/34); draft,
+  documentation only, does not close Issue #8.
 - Approved by/date: Pending @Shuang-su review and merge.
 - Base: `67fc6ed`; owning Issue #8 read on 2026-10-02.
 
@@ -28,8 +29,9 @@
 - Primary source for this draft: [FFmpeg pipe protocol documentation](https://ffmpeg.org/ffmpeg-protocols.html#pipe),
   viewed 2026-10-02, including inline examples. It documents pipe descriptors and
   bounded I/O block size; it does not prove a process memory cap or no-persistence.
-- Assignment is requirements only. Implementation and independent reviewer clearance
-  remain pending. No source, model, dataset, audio, decoder binary, or runtime code
+- Assignment is requirements only. `/root/artifact_review` performed independent
+  read-only requirements review; implementation assignment remains pending. No source,
+  model, dataset, audio, decoder binary, or runtime code
   was downloaded or added during drafting.
 
 ## Requirement source map
@@ -51,6 +53,7 @@
 | `git diff --check` | Passed; no whitespace errors | 2026-10-02 artifact worktree |
 | `make artifacts` | Passed; `change artifacts: ok` | 2026-10-02 artifact worktree |
 | `make verify` | Passed; Ruff, mypy, TypeScript, 107 pytest tests, 128 protocol and 63 Railway Vitest tests, artifact/protocol checks and build | 2026-10-02 artifact worktree |
+| `git diff --cached --check && make artifacts && git diff --cached --stat` | Passed after design fixes; exactly four Issue #8 Markdown additions | 2026-10-02 / `60bf7fb` |
 
 ## Manual or hardware evidence
 
@@ -71,6 +74,12 @@ are unverified, so audio preflight cannot be considered approved.
 - Cross-draft review found #5's benchmark-only provisional prefix access is absent from
   this completed-segment interface. This artifact now states final-caption scope and
   requires a separate accepted runtime decision before early partial delivery.
+- Final independent read-only review by `/root/artifact_review`, 2026-10-02, examined
+  all eight Issue #5/#8 artifact files, owning Issues and accepted local constraints.
+  It confirmed all reported fixes and no remaining actionable artifact-design finding.
+  No reviewer edits, runtime/hardware tests, external/reference pages, Issue #31 body,
+  or research outputs were involved. This is paper compatibility review only;
+  executable overlap, decoder allocation and host guarantees remain pending.
 - A 30-second PCM ring would consume the entire canonical allowance before overlap or
   transport. The proposed ring is 16 seconds with explicit reservation partitions.
 - Only fixed raw PCM input is admitted first; this avoids claiming that a synthetic
