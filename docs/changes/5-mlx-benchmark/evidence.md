@@ -503,3 +503,38 @@ legal clearance, new implementation
 or new test result is claimed from this lookup. The existing executable registry remains
 empty and Issue #5 remains incomplete. This exposure-only checkpoint changes no accepted
 intent/spec/plan, code, tests, protocol, model authority or runtime setting.
+
+## Replacement HTTPS/transfer assignment (before code), 2026-10-03
+
+- Author: `/root/audio_implementation` (OpenAI Codex GUI subagent), independently
+  assigned to fixed allowlisted HTTPS request/response/Range handling and integration
+  with `PreparationTransfer`/`ModelOnlyCache`. Planned paths are
+  `tools/asr_benchmark/http_transfer.py`, `tools/asr_benchmark/model_download.py`,
+  focused `tests/asr_benchmark/` tests, directly required preparation/cache interfaces,
+  README and this evidence. Isolated reviewer: `/root/audio_code_readiness`.
+- The coordinator released the write handoff after verifying metadata-only exposure
+  checkpoint `e64f90d4b4a57d29a1e0981ab6075dee000c7869`. The prior author is excluded
+  from this corresponding module. No exception to the source-isolation policy is used.
+- Actual earlier exposure: this replacement author implemented accepted Issue #8 and
+  read official FFmpeg command/protocol documentation (including pipe/file/cache and
+  protocol-list descriptions), Python 3.12 OS/subprocess documentation, and the Linux
+  parent-death-signal manual. No HTTP/model-download SDK source, third-party downloader
+  expression, source-derived summary, screenshot, or earlier implementation advice was
+  supplied or viewed. No prior contribution to the reference projects is known.
+- Local policy metadata exposure includes reference names/revisions/paths/license
+  classifications and its historical author's exposure statement. Issue #8 evidence
+  described another author's Qwen/MLX/Hugging Face primary-document reads; this author
+  did not open their contents. Owning Issue #8/#5 comments incidentally mention Issue
+  #31 and Cap/Soniox experience boundaries; Issue #31's body and linked materials were
+  not read. This is a disclosure of context, not a zero-exposure claim.
+- Inputs for this assignment: AGENTS, owning Issue #5 body/comments, all four accepted
+  Issue #5 artifacts, unchanged independent-implementation policy, local preparation,
+  cache, manifest/CLI/runtime contracts, README and related original tests. The exposure
+  event above was read only as recorded provenance locations/material categories; no
+  external event link, snippet, implementation summary or recommendation was opened.
+- Decision: write independently from accepted Livecho requirements and directly opened
+  official API/HTTP standards only. Missing endpoint/redirect authority stays blocked;
+  no inferred ModelScope endpoint or mirror fallback is permitted. The execution
+  registry remains empty. No real model, audio, converter, MLX provider or benchmark
+  execution is authorized by this assignment. Tests use original ordinary text and
+  transport/control doubles only. This record is committed before new module code.
