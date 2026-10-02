@@ -711,4 +711,33 @@ Pre-review focused verification:
 - `make asr-benchmark-check` — passed: ruff lint/format, strict mypy (32 files),
   **279 passed in 34.88s**. `git diff --check` — exit 0.
 
-Full repository verification and stable-head isolated review follow below when complete.
+Final verification and review at code head
+`7450cf824b774db1b2fb91dabb5fad72896b9ffe`, 2026-10-03 around 02:25–02:28
+Asia/Shanghai (UTC+08:00):
+
+- `make verify` — exit 0: ruff lint/format and strict mypy (54 files), workspace
+  lint/typechecks, **386 pytest passed in 37.22s**, **128 protocol Vitest tests**,
+  **63 Railway Vitest tests**, artifact checks, protocol-generation check and builds.
+  Existing protocol tests ran unchanged; no audio/model-runtime admission is inferred.
+  Dependencies/locks are unchanged, using the previously recorded workspace bootstrap.
+- Isolated `/root/audio_code_readiness` reviewed both new modules/tests and all reader,
+  cache and download changes plus README/evidence at that exact clean head. Independent
+  `uv run pytest -q tests/asr_benchmark/test_source_preparation.py tests/asr_benchmark/test_model_download.py tests/asr_benchmark/test_cache_reader.py`
+  — **109 passed in 0.60s**. Independent `git diff --check` — exit 0.
+- The reviewer additionally ran a stdin Python probe: while a missing asset downloaded
+  from the original notice/response doubles, a progress callback changed an earlier
+  probed file's bytes without changing its length. The collection rejected delivery
+  with `cache_reader_unavailable`; the sole response closed, all physical entry locks
+  reopened, the newly completed valid asset remained cached, and the caller's parent
+  cache stayed open. Exit 0. No complete mapping escaped and no socket was opened.
+- No remaining actionable finding was reported. The reviewer ran the focused suite,
+  not the full repository suite, and read no new external source in this batch. Earlier
+  permitted primary-source exposure remains recorded. `/root` separately reviewed local
+  ownership/permission/cancellation control flow read-only without tests or edits;
+  its two early cancellation observations were addressed before the stable code head.
+- GUI gates before/after batches and long tool boundaries returned active. These are
+  local text/control/filesystem checks, not real network/model/MLX/host acceptance.
+  Execution registry remains empty; converted output, actual conversion/inference,
+  audio/source/process orchestration and hardware evidence remain outstanding.
+
+This batch updates the same draft PR #36 without merging, deployment or closing Issue #5.
