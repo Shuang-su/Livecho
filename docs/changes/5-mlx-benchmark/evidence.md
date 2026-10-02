@@ -2,7 +2,8 @@
 
 ## Artifact approval
 
-- Artifact PR: Pending creation; documentation only, does not close Issue #5.
+- Artifact PR: [#33](https://github.com/Shuang-su/Livecho/pull/33); draft,
+  documentation only, does not close Issue #5.
 - Approved by/date: Pending @Shuang-su review and merge.
 - Base: `67fc6ed`; reviewed owning Issue #5 on 2026-10-02.
 
@@ -54,6 +55,10 @@ it is not a source of model-selection requirements.
 | `git diff --check` | Passed; no whitespace errors | 2026-10-02 artifact worktree |
 | `make artifacts` | Passed; `change artifacts: ok` | 2026-10-02 artifact worktree |
 | `make verify` | Passed; Ruff, mypy, TypeScript, 107 pytest tests, 128 protocol and 63 Railway Vitest tests, artifact/protocol checks and build | 2026-10-02 artifact worktree |
+| `git diff --cached --check && make artifacts && git diff --cached --stat` | Passed after design fixes; exactly four Issue #5 Markdown additions | 2026-10-02 / `7016dca` |
+
+[GitHub Verify](https://github.com/Shuang-su/Livecho/actions/runs/37024511675)
+passed for initial artifact head `7016dca`; evidence-only follow-up has separate CI.
 
 ## Manual or hardware evidence
 
@@ -68,11 +73,17 @@ Artifact thresholds are proposed local decisions for owner review, not measureme
   separating approved acquisition/conversion preparation from final converted-asset
   inference approval, defining first-provisional/final call clocks and metric
   populations, and explicitly applying boundary quality gates to both 4/6-second
-  overlap runs. Re-review is pending; these are specification fixes, not test claims.
+  overlap runs. Re-review confirmed the fixes; these are specification fixes, not
+  runtime test claims.
 - Cross-draft review found that #8's completed segments cannot supply this local
   benchmark's early partials. The specification now labels prefix access benchmark-only,
   prohibits an inferred end-to-end claim and requires an owning runtime artifact before
   adding incremental delivery. No unpublished draft is made normative for the other.
+- Final independent read-only review by `/root/artifact_review`, 2026-10-02, examined
+  all eight Issue #5/#8 artifact files, owning Issues and accepted local constraints.
+  It reported no remaining actionable artifact-design findings after the fixes.
+  Reviewer made no edits or runtime/hardware tests and opened no external/reference
+  source, Issue #31 body, or research output. Owner approval remains pending.
 - The owning Issue explicitly separates licensed human speech from synthetic protocol
   input. The artifact keeps human benchmark audio entirely outside `LeaseV1`.
 - Accepted ADR has no model-specific decision. The plan requires an owner-approved
