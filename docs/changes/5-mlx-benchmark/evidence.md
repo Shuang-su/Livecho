@@ -899,4 +899,94 @@ Pre-review verification:
 - `make asr-benchmark-check && git diff --check` — passed: ruff check/format and
   mypy (34 files), **317 passed in 37.39s**, and whitespace checks clean.
 
-Full repository verification and stable-head independent review follow below.
+Final verification and independent review, recorded 2026-10-03 02:58 UTC+08:00:
+
+- Stable code head: `a98b10cef62b15cd0528c361523b91dda7b78c7c`.
+- Author: `make verify` — exit 0; **424 pytest passed in 42.06s**, **128 protocol
+  Vitest** and **63 Railway Vitest** tests passed, ruff check/format and mypy (56
+  files), workspace scripts, change artifacts, protocol generation and builds passed.
+  The existing accepted protocol codec tests retain their in-memory synthetic-byte
+  scope; no new real model/audio/network/MLX execution was introduced.
+- Independent reviewer `/root/audio_code_readiness` confirmed the same clean code
+  head before and after executing
+  `uv run pytest -q tests/asr_benchmark/test_conversion_session.py tests/asr_benchmark/test_artifacts.py::test_conversion_calls_only_the_exact_affine_interface_and_synchronizes tests/asr_benchmark/test_controls.py::test_conversion_requires_exact_classified_inventory_and_shape`
+  — **40 passed in 0.45s**, and `git diff --check` — exit 0. This selection differs
+  from the author's 42-test command above. The reviewer read the new session/tests,
+  dispatcher changes, README and evidence, focusing on pins, source authority and
+  exhaustive inventory. No remaining actionable finding; no new external source read.
+- Root independently supplemented lifecycle/owned-reference review at the same code
+  head and found no remaining actionable issue. Root's check was read-only: no test
+  execution, real MLX or hardware proof. The three weakref regressions remain author
+  executions. Neither review claims revocation of escaped raw tensor references.
+- All GUI gate checks before/after these batches returned active. This final record
+  changes evidence only; `git diff a98b10cef62b15cd0528c361523b91dda7b78c7c --exit-code -- tools tests benchmarks/asr/README.md`
+  and `git diff --check` both passed before the evidence-only commit. No tests were
+  rerun for the documentation addition.
+
+The reviewer also executed this exact command once, from
+`/Users/szmg/.codex/worktrees/livecho-5-asr-impl/Livecho`:
+
+```sh
+uv run python - < /Users/szmg/.codex/monitors/livecho-20261002/reviews/conversion-negative-shape-a98b10c.py
+```
+
+The saved original script's SHA-256 is
+`f1a2d3b66a596c8b9a763b6be91e091a9ef813661f7ac281cd14ba4e2d9c187c`.
+The author read the script and checked this digest without re-executing it. Its full
+stdin contents are included for remote reproducibility:
+
+```python
+import asyncio
+from pathlib import Path
+from tempfile import TemporaryDirectory
+
+from tools.asr_benchmark.conversion import TensorShape
+from tools.asr_benchmark.conversion_session import conversion_session
+from tools.asr_benchmark.model_cache import ModelOnlyCache
+from tools.asr_benchmark.runtime import BlockedEvidence
+from tests.asr_benchmark.test_conversion_session import (
+    Backend, assert_released, manifest, populate,
+)
+
+with TemporaryDirectory() as temporary:
+    base = Path(temporary).resolve()
+    record = manifest()
+    with ModelOnlyCache(base / 'cache', base / 'repo', record, 'huggingface') as cache:
+        populate(cache)
+        backend = Backend()
+        first = record.tensor_map[0]
+        backend.descriptions[first.name] = TensorShape.model_construct(
+            rule=first, shape=(128, -64)
+        )
+        delivered = False
+        def forbidden_transport():
+            raise AssertionError('complete cache unexpectedly requested transport')
+        async def exercise():
+            global delivered
+            async with conversion_session(
+                record, 'huggingface', cache, backend,
+                response_factory=forbidden_transport,
+            ):
+                delivered = True
+        try:
+            asyncio.run(exercise())
+        except BlockedEvidence as error:
+            assert str(error) == 'tensor_description_invalid', str(error)
+        else:
+            raise AssertionError('negative tensor dimension reached conversion output')
+        assert not delivered and 'quantize' not in backend.events
+        assert backend.events == [
+            'load', 'evaluate_source', 'synchronize_source',
+            'describe:' + first.name, 'close',
+        ]
+        assert backend.closed and all(reader.closed for reader in backend.readers.values())
+        assert_released(cache)
+        print('model_construct negative dimension: rejected before quantization; no output or transport; owned backend/readers closed; cache locks reusable')
+```
+
+Actual result: exit 0 in 0.0476s; output was the script's final print text. The
+negative dimension was rejected as `tensor_description_invalid` before quantization,
+without yielding a mapping or requesting transport; backend/readers closed and cache
+locks were reusable. Input consisted solely of original notice text and opaque control
+tokens. This is no evidence for model serialization, actual MLX compatibility, fresh
+processes, protected hosts or scored hardware results; those acceptance gaps stay open.
