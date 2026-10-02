@@ -142,6 +142,10 @@ executable probing, process creation, or audio allocation with
 `audio_budget_unverified`. A locally installed broad FFmpeg build or a momentary
 zero-swap observation is not substituted for the missing evidence.
 
+Implementation PR: [#37](https://github.com/Shuang-su/Livecho/pull/37). Runtime/test
+commit: `14585113819d45a4a279a9dbbc0b24be0b7e5f6d`; preceding exposure/assignment
+commit: `39bdb36`. Follow-up evidence commits do not change that reviewed code.
+
 Implemented controls:
 
 - Closed synthetic binding, two exact raw formats, complete 20 ms source frames,
@@ -249,9 +253,26 @@ found pre-first-run cancellation leaking Alpha admission, concurrent close inter
 cleanup, incomplete loss/onset metrics, an incorrectly renewed startup deadline, and
 clean/late decoder-exit races, and a producer `close()` cancellation bypassing accounting
 release. The implementation now has dedicated regressions for
-those cases. The reviewer independently reproduced the corrected cancellation cases;
-final review status is recorded after the remaining review pass. No upstream expression
-was supplied by the reviewer or used for fixes.
+those cases. On 2026-10-03 the reviewer confirmed the exact clean code commit
+`14585113819d45a4a279a9dbbc0b24be0b7e5f6d` with no remaining actionable finding in the
+bounded review. No upstream expression was supplied by the reviewer or used for fixes.
+
+Independent reviewer verification:
+
+- `PYTHONPATH=services/backend/src:packages/protocol/python uv run pytest -q tests/audio`:
+  101 passed in 5.73 seconds before the final source-close regression.
+- `PYTHONPATH=services/backend/src:packages/protocol/python uv run pytest -q tests/audio/test_pipeline_control.py tests/audio/test_preflight_supervisor.py`:
+  33 passed in 5.70 seconds including the final regression.
+- The original source-close-cancellation reproduction then returned a terminal
+  `audio_admission_closed`, confirmed decoder reaping, zero ledger/process bytes and
+  live buffer owners, released Alpha admission, and did not cancel the owner task.
+- The reviewer re-read the exact committed cleanup and regression, but did not claim
+  to rerun the author's full `make verify` or execute an actual audio/decoder process.
+- Reviewer exposure was accepted Issue #8 planning and Issue #30 local index work,
+  local policy/reference-name/license metadata, and Issue #31 title/status only.
+  No Issue #31 body, reference expression, external research, audio, model, or real
+  child execution was involved. This records a local code/control review, not an
+  upstream-expression comparison or a legal conclusion.
 
 The completed-segment API is intended for Issue #9 after the pending evidence gates
 pass. It does not provide incremental prefix access, partial-caption timing, a public
