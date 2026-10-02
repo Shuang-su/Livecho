@@ -125,3 +125,94 @@ does not authorize a model download, hardware run, real worker audio, or public 
   copying or MIT-copy exception is requested. Exact model/source/provider/host evidence
   remains unavailable; the local executable entry points must fail closed without it.
   This record is committed before implementation. No model or audio download is authorized.
+
+## Implementation checkpoint (2026-10-03 Asia/Shanghai)
+
+The implementation branch is `codex/issue-5-asr-benchmark-impl`, rebased onto accepted
+`origin/main` `93d8b0a`. Pre-code assignment commits are `f2177ee` and `078fb2b`; the
+first code checkpoint is `838a914`. Rebase changed their IDs, not their ordering.
+
+Implemented independently from the accepted Issue #5 requirements:
+
+- Closed preparation/inference/corpus/machine/privacy/settings and report contracts,
+  canonical metadata digests, mirror parity and preparation-to-inference binding,
+  exhaustive tensor inventory/8-bit group-64 conversion planning (metadata only).
+- Unicode normalization, deterministic CER alignment/ties, exact target spans,
+  bounded overlap stitching and boundary counts, partial/finalization rewrite counts,
+  nearest-rank percentiles, disjoint preparation/execution RTF and clock validation.
+- Alternating independent-process run plans, 60-script/stratum/condition/window/repeat
+  coverage and fixed model decision gates. Cold observations retain their own full
+  score/call rows. Missing matrices/evidence block; measured failures never disappear.
+- Prefix coalescing/final priority, source stall/PTS controls, reservation-before-
+  preparation, aggregate ownership accounting, injected deadline/synchronization
+  instrumentation, and cancellation/error teardown. Tests use metadata-only doubles;
+  empty borrowed views contain no samples and do not establish host privacy guarantees.
+- Separate bounded model-transfer control plane with resumable offsets, immutable
+  revision invalidation, progress, attempt/delay/no-progress and integrity controls.
+  Transfer tests contain only asset labels/lengths/digests/outcomes, never model bytes.
+- Manual local commands and `make asr-benchmark-check`. Execution registry is empty;
+  caller-provided IDs/flags cannot enable a provider, network access or model loading.
+
+### Verification commands and results
+
+| Exact command | Actual result | Local date/tree |
+| --- | --- | --- |
+| `make bootstrap` | Passed: frozen uv/pnpm dependencies, no model/audio download | 2026-10-02 before code |
+| `make asr-benchmark-check` | Passed: Ruff/format/mypy, 54 pytest tests | 2026-10-03 `838a914` |
+| `make verify` on stale `df9f498` base | Failed: 160 pytest passed, foundation artifact test rejected missing newly accepted Issue #8 files; Ruff/mypy/TypeScript passed. Resolved by rebase, no accepted artifact deleted or rewritten | 2026-10-03 before rebase |
+| `make verify` | Passed: 161 pytest, 128 protocol Vitest and 63 Railway Vitest; Ruff/format/mypy/TypeScript/artifacts/protocol/build | 2026-10-03 `838a914` |
+| `git diff --check` | Passed | 2026-10-03 `838a914` |
+| `make asr-benchmark-check` after review fixes | Passed: 73 pytest tests plus Ruff/format/mypy | 2026-10-03 working tree |
+| `make verify` after review fixes | Passed: 180 pytest, 128 protocol Vitest and 63 Railway Vitest; Ruff/format/mypy/TypeScript/artifacts/protocol/build | 2026-10-03 00:21 Asia/Shanghai |
+| `git diff --check` after review fixes | Passed | 2026-10-03 00:23 Asia/Shanghai |
+| `uv run python -m tools.asr_benchmark prepare-models --manifest pending --source huggingface` | Expected exit 2, `blocked_evidence`; no download or write | 2026-10-03 |
+| `uv run python -m tools.asr_benchmark preflight --manifest pending` | Expected exit 2, `blocked_evidence` | 2026-10-03 |
+| `uv run python -m tools.asr_benchmark run --manifest pending` | Expected exit 2, `blocked_evidence`; no scoring or write | 2026-10-03 |
+
+`pending` above is deliberately unapproved; no reviewed runtime manifest exists.
+The synthetic fully populated report exists only in text/metadata test factories. Its
+qualification branches test the rule; they are never model measurements or an allowlist.
+
+### Read-only technical review and corrections
+
+`/root` reviewed only accepted local requirements and this implementation and made no
+code changes. It found cross-candidate provider/converter identity gaps, future-dated
+approval acceptance, Pydantic numeric/boolean `Literal` coercion despite strict mode,
+and provider/release cancellation skipping later cleanup. The implementation author
+fixed all four and added regression tests including complete revalidated report input,
+nested prerequisite approvals, malformed JSON scalar types and cancelled cleanup hooks.
+This review does not replace the named isolated review or any similarity/license review.
+Root independently reran its four metadata-only reproductions after the fixes: baseline
+1.7B branch still qualifies in test data, a provider mismatch/future approval blocks,
+boolean batch size is rejected, and cancelled provider close releases the allocation.
+It reported no further confirmed finding in its reviewed scope: contracts, metrics,
+timing, report/coverage/decision, runtime, preparation, conversion, instrumentation,
+runner, CLI and selected tests. Root remains outside corresponding implementation
+authorship; only accepted local requirements and this code supplied these findings.
+No new provider implementation is covered by that checkpoint review.
+
+### Incomplete acceptance and remaining code
+
+This checkpoint is **not** completion of Issue #5 and does not select a model. No
+hardware score, rights approval, source rendition, model download, network acquisition,
+weight conversion or MLX inference was performed. No actual provider architecture or
+model compatibility has been inferred from a model card.
+
+Still missing code: independently authored Qwen encoder/decoder/feature extraction and
+MLX conversion execution with an exhaustive real tensor map; reviewed pinned dependency
+integration; a model-only network/cache backend with verified atomic promotion; bounded
+real source acquisition/preprocessing and real-time process orchestration; and a proven
+provider deadline guard. The current guard interface requires actual termination before
+return/cleanup, but no real guard is installed. Missing hardware evidence alone is not
+the reason these implementation items remain incomplete.
+
+Still missing evidence/approvals: immutable source/model/converter/provider/mirror
+provenance, per-source permissions and repeatable 60-script corpus, exact allocation
+inventory and protected-host no-paging/no-dump/write-sink/failure evidence, complete real
+M3 Ultra matrices and the owner-approved model-decision ADR. These are separate from
+deterministic test coverage. No production, worker protocol, public API or CUDA change.
+
+No third-party source, tests, fixtures, schema, configuration or assets were copied.
+No audio representation (including synthetic samples), audio digest or model weight is
+persisted by these tests. Metadata release/write-denial tests do not claim hostile-host
+erasure, real provider memory bounds or proof that a real host cannot page audio.

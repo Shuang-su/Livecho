@@ -1,4 +1,5 @@
 import builtins
+from asyncio import CancelledError
 from dataclasses import replace
 from typing import Literal
 
@@ -53,6 +54,46 @@ def test_manifest_mirror_parity_and_unknown_fields() -> None:
         PreparationManifest.model_validate(data)
     with pytest.raises(ValidationError):
         Settings(output_token_limit=513)  # type: ignore[arg-type]
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        '{"batch_size":true}',
+        '{"batch_size":1.0}',
+        '{"output_token_limit":512.0}',
+        '{"output_token_limit":"512"}',
+    ],
+)
+def test_literal_types_cannot_coerce_bools_floats_or_strings(payload: str) -> None:
+    with pytest.raises(ValidationError, match="literal_type"):
+        Settings.model_validate_json(payload)
+
+
+def test_evidence_true_is_not_numeric_one() -> None:
+    from tools.asr_benchmark.contracts import PrivacyEvidence, Source
+
+    from .factories import corpus, report
+
+    with pytest.raises(ValidationError, match="literal_type"):
+        Source.model_validate_json(
+            corpus()
+            .sources[0]
+            .model_dump_json()
+            .replace(
+                '"adult_consent":true',
+                '"adult_consent":1',
+            )
+        )
+    with pytest.raises(ValidationError, match="literal_type"):
+        PrivacyEvidence.model_validate_json(
+            report()
+            .privacy.model_dump_json()
+            .replace(
+                '"no_paging":true',
+                '"no_paging":1',
+            )
+        )
 
 
 def test_conversion_requires_exact_classified_inventory_and_shape() -> None:
@@ -158,6 +199,28 @@ def test_cancel_always_releases_and_sanitizes_provider_failure() -> None:
     with pytest.raises(BlockedEvidence, match="^provider_failure$"):
         guarded_session(UnavailableMLXProvider(), budget, operation)
     assert released == ["input"] and budget.live_count == 0
+
+
+def test_provider_and_release_cancellation_do_not_skip_remaining_cleanup() -> None:
+    class CancelledProvider(UnavailableMLXProvider):
+        def close(self) -> None:
+            raise CancelledError
+
+    def cancelled_release() -> None:
+        raise CancelledError
+
+    budget = Budget()
+    released = []
+    budget.reserve(Allocation("bad", 0, 1, 1, 0), cancelled_release)
+    budget.reserve(Allocation("good", 0, 1, 1, 0), lambda: released.append("good"))
+    with pytest.raises(BlockedEvidence, match="^teardown_failed$"):
+        guarded_session(CancelledProvider(), budget, lambda: None)
+    assert released == ["good"] and budget.live_count == 1 and budget.tainted
+    budget = Budget()
+    budget.reserve(Allocation("good", 0, 1, 1, 0), lambda: released.append("second"))
+    with pytest.raises(BlockedEvidence, match="^teardown_failed$"):
+        guarded_session(CancelledProvider(), budget, lambda: None)
+    assert released == ["good", "second"] and budget.live_count == 0
 
 
 def test_prefix_coalescing_final_priority_and_no_concurrent_calls() -> None:

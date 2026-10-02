@@ -1,10 +1,11 @@
 from collections.abc import Callable
 from datetime import timedelta
+from typing import Any
 
 import pytest
 from pydantic import ValidationError
 
-from tools.asr_benchmark.contracts import MODELS, NS, Corpus, Machine
+from tools.asr_benchmark.contracts import MODELS, NS, Corpus, Machine, metadata_digest
 from tools.asr_benchmark.report import (
     Cell,
     Count,
@@ -69,6 +70,69 @@ def test_missing_source_manifest_privacy_and_process_evidence_block() -> None:
     assert evaluate(
         good.model_copy(update={"scored_on": good.scored_on + timedelta(days=1)})
     ).missing
+
+
+@pytest.mark.parametrize("component", ["provider", "converter"])
+def test_both_candidates_use_identical_reviewed_implementations(component: str) -> None:
+    baseline = report()
+    manifests = list(baseline.manifests)
+    preparations = list(baseline.preparations)
+    if component == "provider":
+        manifests[1] = manifests[1].model_copy(update={"provider_revision": "f" * 40})
+    else:
+        preparations[1] = preparations[1].model_copy(update={"converter_revision": "f" * 40})
+        manifests[1] = manifests[1].model_copy(
+            update={
+                "preparation_sha256": metadata_digest(preparations[1]),
+            }
+        )
+    runs = tuple(
+        run.model_copy(
+            update={
+                "model_manifest_sha256": metadata_digest(manifests[MODELS.index(run.model)]),
+            }
+        )
+        for run in baseline.repetitions
+    )
+    changed = baseline.model_copy(
+        update={
+            "manifests": tuple(manifests),
+            "preparations": tuple(preparations),
+            "repetitions": runs,
+        }
+    )
+    changed = Report.model_validate(changed.model_dump())
+    assert evaluate(changed).state == "blocked_evidence"
+    assert f"{component}_identity" in evaluate(changed).missing
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        ("privacy", "approval"),
+        ("corpus", "approval"),
+        ("corpus", "sources", 0, "rights", "approval"),
+        ("manifests", 0, "approval"),
+        ("manifests", 0, "inference_rights", "approval"),
+        ("preparations", 0, "approval"),
+        ("preparations", 0, "source_rights", "approval"),
+        ("preparations", 0, "tokenizer_rights", "approval"),
+        ("preparations", 0, "conversion_rights", "approval"),
+        ("preparations", 0, "mirrors", 0, "approval"),
+    ],
+)
+def test_every_prerequisite_approval_predates_scoring(path: tuple[str | int, ...]) -> None:
+    data = report().model_dump()
+    node: Any = data
+    for key in path:
+        node = node[key]
+    node["approved_on"] = report().scored_on + timedelta(days=1)
+    changed = Report.model_validate(data)
+    assert "approval_after_scoring" in evaluate(changed).missing
+
+
+def test_incomplete_matrix_denominators_and_process_clocks_block() -> None:
+    good = report()
     assert evaluate(good.model_copy(update={"manifests": good.manifests[:1]})).missing
     assert evaluate(alter_run(good, 0, process_id=good.repetitions[1].process_id)).missing
     assert evaluate(alter_run(good, 0, order=1)).missing
@@ -121,28 +185,11 @@ def test_memory_threshold_equality_and_just_outside(field: str, limit: int) -> N
 def test_cold_population_not_pooled_with_warm_and_load_boundary() -> None:
     good = report()
     cold = good.repetitions[0].cold
-    at_limit = cold.model_copy(
-        update={
-            "ready_ns": cold.load_start_ns + 30 * NS,
-            "first_inference_start_ns": 31 * NS,
-            "first_inference_end_ns": 31 * NS + 1,
-            "first_final_ns": 32 * NS,
-        }
-    )
-    # Move only process-start/load observations while preserving its first-final clock.
-    at_limit = cold.model_copy(
-        update={
-            "process_start_ns": 0,
-            "load_start_ns": 0,
-            "ready_ns": 30 * NS,
-            "first_inference_start_ns": 31 * NS,
-            "first_inference_end_ns": 31 * NS + 1,
-            "first_final_ns": 32 * NS,
-        }
-    )
+    at_limit = cold.model_copy(update={"ready_ns": cold.load_start_ns + 30 * NS})
     changed = alter_run(good, 0, cold=at_limit)
-    # The changed cold end overlaps the first warm row: this must block.
-    assert evaluate(changed).state == "blocked_evidence"
+    assert evaluate(changed).state == "qualified_1_7b"
+    outside = at_limit.model_copy(update={"ready_ns": at_limit.ready_ns + 1})
+    assert evaluate(alter_run(good, 0, cold=outside)).state == "qualified_0_6b"
     populations = cold_populations(good)
     assert all(v["load_ns"]["count"] == 3 for v in populations.values())
     assert all(v["load_ns"]["p95"] == NS - 1 for v in populations.values())

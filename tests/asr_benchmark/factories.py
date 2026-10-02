@@ -302,9 +302,10 @@ def report() -> Report:
                 process_start_ns=0,
                 load_start_ns=1,
                 ready_ns=NS,
-                first_inference_start_ns=2 * NS,
-                first_inference_end_ns=2 * NS + 1,
-                first_final_ns=3 * NS,
+                first_inference_start_ns=32 * NS + 251_000_000,
+                first_inference_end_ns=32 * NS + 252_000_000,
+                first_final_ns=(32 + plan.window_seconds) * NS + 2_000_000,
+                score=script_score(current_corpus.scripts[0], plan.window_seconds, 32 * NS),
             ),
             unscored_warmups=3,
             cells=tuple(
@@ -314,7 +315,7 @@ def report() -> Report:
                         script_score(
                             s,
                             plan.window_seconds,
-                            (condition_index * 60 + script_index + 1) * 20 * NS,
+                            (condition_index * 60 + script_index + 1) * 100 * NS,
                         )
                         for script_index, s in enumerate(current_corpus.scripts)
                     ),
@@ -353,6 +354,8 @@ def report() -> Report:
             mlx_version="unavailable",
             provider_version="unavailable",
             converter_version="unavailable",
+            provider_revision=REVISION,
+            converter_revision=REVISION,
             dependency_lock_sha256=DIGEST,
             code_revision=REVISION,
             cache_state="verified-cached-weights",

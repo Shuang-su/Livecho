@@ -3,7 +3,7 @@
 from collections import Counter
 from datetime import date
 from pathlib import PurePosixPath
-from typing import Annotated, Literal, Self
+from typing import Annotated, Literal, Self, get_args, get_origin
 
 import rfc8785
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
@@ -27,6 +27,19 @@ NS = 1_000_000_000
 
 class Closed(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True, frozen=True)
+
+    @model_validator(mode="before")
+    @classmethod
+    def exact_literal_types(cls, value: object) -> object:
+        # Pydantic Literal[1] accepts True and Literal[True] accepts 1 even in
+        # strict mode. Evidence/contract values must preserve their JSON types.
+        if isinstance(value, dict):
+            for name, field in cls.model_fields.items():
+                if name in value and get_origin(field.annotation) is Literal:
+                    literals = get_args(field.annotation)
+                    if not any(type(value[name]) is type(item) for item in literals):
+                        raise ValueError("literal_type")
+        return value
 
 
 class Approval(Closed):
@@ -290,6 +303,8 @@ class Machine(Closed):
     mlx_version: Identifier
     provider_version: Identifier
     converter_version: Identifier
+    provider_revision: Revision
+    converter_revision: Revision
     dependency_lock_sha256: Digest
     code_revision: Revision
     cache_state: Literal["verified-cached-weights"]

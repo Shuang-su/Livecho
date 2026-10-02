@@ -61,7 +61,7 @@ class Budget:
             return
         try:
             item[1]()
-        except Exception:
+        except BaseException:
             self.tainted = True
             raise BlockedEvidence("teardown_failed") from None
         del self._live[allocation_id]
@@ -213,12 +213,12 @@ def guarded_session(provider: Provider, budget: Budget, operation: Callable[[], 
         operation()
     except BlockedEvidence as exc:
         failure = str(exc)
-    except Exception:
+    except BaseException:
         failure = "provider_failure"
     finally:
         try:
             provider.close()
-        except Exception:
+        except BaseException:
             failure = "teardown_failed"
         try:
             budget.close()

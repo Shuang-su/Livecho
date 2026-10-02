@@ -107,6 +107,8 @@ def instrument_call(
     finally:
         # Invalidate this borrow even when provider/guard throws; the owner's callback
         # clears all backing storage and provider features represented by the reservation.
-        if prepared is not None:
-            prepared.view.release()
-        budget.release(allocation.allocation_id)
+        try:
+            if prepared is not None:
+                prepared.view.release()
+        finally:
+            budget.release(allocation.allocation_id)

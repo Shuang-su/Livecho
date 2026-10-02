@@ -11,6 +11,7 @@ from .contracts import (
     NS,
     STRATA,
     WINDOWS,
+    Approval,
     Closed,
     Condition,
     Corpus,
@@ -138,6 +139,7 @@ class Cold(Closed):
     first_inference_start_ns: Nonnegative
     first_inference_end_ns: Nonnegative
     first_final_ns: Nonnegative
+    score: ScriptScore
 
     @model_validator(mode="after")
     def ordered(self) -> Self:
@@ -150,6 +152,15 @@ class Cold(Closed):
             <= self.first_final_ns
         ):
             raise ValueError("cold_timing")
+        if self.score.script_id != self.script_id or not self.score.segments:
+            raise ValueError("cold_sample")
+        first = self.score.segments[0].timing
+        if (
+            self.first_inference_start_ns != first.calls[0].execution_start_ns
+            or self.first_inference_end_ns != first.calls[0].execution_end_ns
+            or self.first_final_ns != first.tf_ns
+        ):
+            raise ValueError("cold_observation")
         return self
 
 
@@ -209,12 +220,40 @@ def _coverage(report: Report) -> list[str]:
         missing.append("source_rights")
     if report.machine.code_revision != report.privacy.reviewed_code_revision:
         missing.append("privacy_revision")
+
+    def approvals_current(record: Closed) -> bool:
+        if isinstance(record, Approval) and record.approved_on > report.scored_on:
+            return False
+        for field in type(record).model_fields:
+            value = getattr(record, field)
+            if isinstance(value, Closed) and not approvals_current(value):
+                return False
+            if isinstance(value, tuple) and any(
+                isinstance(item, Closed) and not approvals_current(item) for item in value
+            ):
+                return False
+        return True
+
+    if any(
+        not approvals_current(record)
+        for record in (
+            report.corpus,
+            report.privacy,
+            *report.manifests,
+            *report.preparations,
+        )
+    ):
+        missing.append("approval_after_scoring")
     manifests = {manifest.model: manifest for manifest in report.manifests}
     if set(manifests) != set(MODELS) or len(report.manifests) != 2:
         missing.append("manifest_inventory")
     preparations = {manifest.model: manifest for manifest in report.preparations}
     if set(preparations) != set(MODELS) or len(report.preparations) != 2:
         missing.append("preparation_inventory")
+    if {m.provider_revision for m in report.manifests} != {report.machine.provider_revision}:
+        missing.append("provider_identity")
+    if {m.converter_revision for m in report.preparations} != {report.machine.converter_revision}:
+        missing.append("converter_identity")
     for model, inference_manifest in manifests.items():
         if model not in preparations:
             missing.append("preparation_inventory")
@@ -245,7 +284,12 @@ def _coverage(report: Report) -> list[str]:
             missing.append(f"{label}:run_order")
         if {c.condition for c in run.cells} != {"clean", "noise"} or len(run.cells) != 2:
             missing.append(f"{label}:conditions")
-        previous_execution_end = run.cold.first_final_ns
+        previous_execution_end = run.cold.score.segments[-1].timing.tf_ns
+        if (
+            run.cold.score.reference_characters != len(normalize(scripts[first_script].reference))
+            or run.cold.score.segments[-1].end_ns != 12 * NS
+        ):
+            missing.append(f"{label}:cold_sample")
         for cell in run.cells:
             if [s.script_id for s in cell.scripts] != sorted(scripts):
                 missing.append(f"{label}:{cell.condition}:script_inventory")
@@ -384,6 +428,10 @@ def evaluate(report: Report) -> Decision:
         current: list[str] = []
         if run.cold.ready_ns - run.cold.load_start_ns > 30 * NS:
             current.append("cold_load")
+        if run.cold.score.failure or any(
+            segment.failure or segment.timing.failed for segment in run.cold.score.segments
+        ):
+            current.append("cold_failed_sample")
         if run.incremental_peak_physical_bytes > 8 * 1024**3:
             current.append("physical_footprint")
         if (
