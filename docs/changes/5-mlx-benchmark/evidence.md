@@ -1402,3 +1402,64 @@ first ordinary-text chunk, a pin change before the second chunk was rejected. Ca
 the error and restoring the pin did not permit another allowlisted output or receipt
 commit; both owners closed once and source locks were reusable. This is control evidence,
 not real model serialization or pin-provenance proof.
+
+## Fixed local pass supervisor assignment — 2026-10-03 04:16 +08:00
+
+Before product code for this batch, author `/root/audio_implementation` refreshed
+AGENTS.md, Issue #5 (including its existing comments), all accepted change artifacts
+(unchanged intent/spec/plan; latest evidence delta), and the local runner, timing,
+instrumentation, runtime, cold-load, contracts and manual CLI interfaces. Previous
+source exposure remains recorded above; the Issue comment's reference names were
+metadata only and no referenced issue body or repository was opened. New external
+reads were the official Python 3.12 documentation pages for
+[subprocess](https://docs.python.org/3.12/library/subprocess.html),
+[selectors](https://docs.python.org/3.12/library/selectors.html), and
+[isolated invocation](https://docs.python.org/3.12/using/cmdline.html#cmdoption-I).
+These were opened directly, including their documentation examples; no search,
+SDK/stdlib implementation source, reference repository, or prior incident expression
+was read. Independent reviewer is `/root/audio_code_readiness` (entry, metadata,
+plan binding and phase clocks); `/root` supplements ownership/cleanup by read-only
+control-flow review. No reviewer authors this batch's implementation.
+
+Frozen implementation contract:
+
+- Add a fixed repository `pass_child.py`, closed metadata `pass_control.py`, and
+  `pass_supervisor.py`. Public supervisor accepts one strictly revalidated PassPlan
+  and manifest/corpus selection IDs, never executable/module/argv/path/URL/code.
+  These IDs select reviewed entries only; the execution registry remains empty.
+  Thus the real fixed child always refuses execution, with no model/audio imports.
+- A fresh single-use owner invokes only the current interpreter with `-I -B` and
+  the fixed absolute first-party child path, empty environment, fixed repository
+  cwd, closed inherited descriptors, piped bounded metadata, discarded stderr.
+  The entry adds only its own fixed repository root for first-party imports.
+  Run-local random ID plus SHA of the complete metadata request binds every event;
+  this SHA is not derived from audio. OS PID is never report identity.
+- Request limit 16 KiB, event/command limit 512 bytes, strict JSON fields/types and
+  duplicate-key rejection; at most 131072 child events, no event history retained.
+  No transcript, tensor, audio, file path or free-form error field is permitted.
+- Sequential cooperative handshake only: ready grants cached load; successful load
+  permits input; completed input permits a provider call; completed call permits
+  another input or terminal. Each parent grant starts a fresh phase's absolute
+  operational deadline before writing permission: cached load 30 s, provider call
+  10 s, input progress 2 s. Strictly increasing bounded media PTS alone renews the
+  input deadline. Stall supervision is active only in input, suspended during the
+  explicitly sequential call; overlapping phases and repeated/late events fail.
+  Startup is 5 s; between-phase/terminal-exit waits are 2 s. These operational
+  timeouts are separate from child-clock Cold/Warm measurements and do not create
+  report rows or prove that the PassPlan's full benchmark work occurred.
+- Parent nonblocking pipe I/O keeps the original phase deadline through partial
+  frames/writes. Successful control termination requires terminal metadata, EOF,
+  exit status zero, reaping and successful cleanup. A blocked result is not a
+  completed pass. Unknown/late/extra metadata, cancellation or failures are always
+  incomplete. No bridge to the in-process callable ExecutionGuard is invented.
+- Cancellation before spawn creates nothing. Once Popen returns, the owner records
+  the handle before checking cancellation or doing fallible pipe setup. Every exit
+  path closes owned pipes and reaps that handle; termination has a 1 s grace, then
+  kill and a 1 s reap wait. Failed cleanup retains ownership and forbids reuse;
+  explicit repeated cleanup may retry only that handle. Initial OS process creation,
+  signal delivery and other OS calls cannot be forcibly bounded by this Python
+  control loop; this is not a hard native/MLX deadline or hostile-code sandbox.
+- Tests use original metadata children/control doubles only. Test spawning is a
+  private monkeypatch seam, never a production arbitrary-execution parameter.
+  No real provider/source/MLX, model/audio/network, approval, registry activation,
+  public protocol change, or complete benchmark report belongs to this batch.
