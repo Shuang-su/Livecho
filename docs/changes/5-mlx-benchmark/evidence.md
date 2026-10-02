@@ -351,3 +351,31 @@ protected-host inventory and complete M3 Ultra scoring/ADR remain separate evide
 This cache backend does not turn the always-blocked CLI into an operational benchmark.
 
 Stable snapshot verification and independent review are recorded below when completed.
+
+Stable cache code commit: `7c8ad30edafe3de013d444debbbf35412890cb1f`.
+Author verification on 2026-10-03 Asia/Shanghai:
+
+- Initial `uv run ruff check tools/asr_benchmark/model_cache.py
+  tests/asr_benchmark/test_model_cache.py` found two test-context SIM117 style findings;
+  they were corrected with no behavior change. Ruff format/check and focused mypy then
+  passed; initial `uv run pytest -q tests/asr_benchmark/test_model_cache.py` passed 41.
+- After additional path/promotion/checkpoint regressions, `make asr-benchmark-check`
+  passed Ruff/format/mypy and **129 tests in 37.87s**. The subsequent two-line addition
+  of nonblocking open flags for partial/lock files was included in the full check below.
+- Exact code head `7c8ad30`: `make verify` passed at 01:00, with Ruff/format/mypy,
+  TypeScript checks, **236 pytest in 40.87s**, **128 protocol Vitest**, **63 Railway
+  Vitest**, artifact/protocol checks and build. This includes all 46 new cache cases.
+- `git diff --check` passed; accepted Issue #5 intent/spec/plan and protocol unchanged.
+
+Independent reviewer `/root/audio_code_readiness` reviewed exact `7c8ad30`, including
+all new cache implementation/tests and the preparation docstring/README/evidence.
+It independently ran `uv run pytest -q tests/asr_benchmark/test_model_cache.py`:
+**46 passed in 0.23s**. Separate ordinary-notice reproductions confirmed a FIFO fails
+as `checkpoint_invalid` within 0.25 seconds; a same-inode overwrite with restored mtime
+still fails promotion through the ctime check with no final file; and a descriptor-close
+callback that closes then raises cancellation still attempts/closes all three descriptors
+and releases the lock. It reported no remaining actionable finding in this bounded scope.
+No old suite was repeated by the reviewer. It read only accepted local requirements and
+this implementation/evidence; no new external fetch, network/model/audio/provider run,
+hardware proof, upstream-expression comparison or legal clearance is claimed. Quota
+gates returned exit 0 before and after this batch and the independent review.
