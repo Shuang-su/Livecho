@@ -100,3 +100,27 @@ No product implementation, accepted-artifact rewrite, or policy relaxation.
 
 Not deployed. All production switches remain unchanged and disabled. This documentation
 does not authorize a model download, hardware run, real worker audio, or public output.
+
+## Implementation assignment and exposure (before code)
+
+- Author: `/root/asr_implementation` (OpenAI Codex), 2026-10-02; assigned independently
+  to `tools/asr_benchmark/**`, `benchmarks/asr/**`, benchmark tests and Makefile wiring.
+  Independent post-implementation reviewer: `/root/implementation_review`.
+- Accepted base: `df9f498ba1c5f2496e2ad69fa5b4ff2fd5c599cd`; owner-authorized artifact
+  PR #33 is merged. The historical artifact-stage pending labels above are retained.
+- Inputs viewed: supplied instructions, repository AGENTS, owning Issue #5, all four
+  Issue #5 change artifacts, the independent-implementation policy, relevant accepted
+  architecture/lifecycle audio controls, accepted Issue #2 requirements in a partially
+  truncated read, Makefile, pyproject, and local path inventory. Unrelated long
+  architecture/recovery output was truncated; full unrelated line review is not claimed.
+- The local policy disclosed reference repository names, pinned license/path metadata,
+  and its historical author's exposure declaration. This is disclosed metadata exposure,
+  not a claim of zero context. No reference repository content, Issue #31, external
+  research memo, source, tests, schema, fixture, configuration, screenshot, or distinctive
+  behavior summary was accessed for this assignment; no prior contribution is known in
+  this agent's supplied context. Vendor links in accepted evidence were read as local
+  citations only at assignment time; no external page has yet been opened.
+- Assignment decision: implement solely from accepted Livecho requirements. No upstream
+  copying or MIT-copy exception is requested. Exact model/source/provider/host evidence
+  remains unavailable; the local executable entry points must fail closed without it.
+  This record is committed before implementation. No model or audio download is authorized.
