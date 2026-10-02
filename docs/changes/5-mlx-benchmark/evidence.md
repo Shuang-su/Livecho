@@ -1640,3 +1640,95 @@ All gates remained active. The real local subprocesses, pipes and signals establ
 control behavior only; there was no model/audio/network/provider/MLX execution or
 hardware acceptance, and no child clock observation or completed PassPlan report was
 manufactured. The final evidence-only commit preserves all reviewed product/test bytes.
+
+## Machine inventory assignment and field contract — 2026-10-03 04:47 +08:00
+
+Before new product code, author `/root/audio_implementation` refreshed AGENTS.md,
+Issue #5 and its comments, all four owning artifacts (full unchanged spec/intent/plan,
+latest evidence delta), local Machine/PrivacyEvidence/report coverage contracts and
+the independent-implementation policy. Earlier exposure/contributions remain recorded
+above, including the Issue comment's reference-name metadata; no reference link was
+followed. Assignment covers `tools/asr_benchmark/machine_inventory.py` and its ordinary
+metadata/control tests. Independent reviewer `/root/audio_code_readiness` checks the
+field semantics, closed result and absence of inferred authority. Root supplements
+fixed-query ownership/deadline cleanup by static review, without authoring code.
+
+New source reads (documentation only, never SDK/reference implementation source):
+
+- Apple [sysctl(3) archived manual](https://developer.apple.com/library/archive/documentation/System/Conceptual/ManPages_iPhoneOS/man3/sysctl.3.html),
+  including its API examples. This older page does not establish modern memory keys.
+- Apple [Determining system capabilities](https://developer.apple.com/documentation/kernel/1387446-sysctlbyname/determining_system_capabilities?changes=_7),
+  whose official search result supplied the processor/memory parameter definitions.
+  Direct HTML returned a JavaScript shell, and its linked Markdown fetch returned 404;
+  no implementation/source link was opened.
+- Python [platform documentation](https://docs.python.org/3.12/library/platform.html#platform.python_version),
+  including page documentation examples; no linked Python source was opened.
+- Apple-bundled local documentation, actually read with
+  `MANPAGER=cat man 8 sysctl | col -b` and `MANPAGER=cat man 1 sw_vers | col -b`.
+  `sysctl(8)` OPTIONS `-n`, the variable table, and EXIT STATUS define fixed scalar
+  output/exit behavior; `sw_vers(1)` DESCRIPTION/OPTIONS define `--buildVersion`.
+  These are documentation, not queried machine values or SDK source. `command -v
+  sysctl sw_vers` confirmed `/usr/sbin/sysctl` and `/usr/bin/sw_vers` locally.
+- Direct Apple Foundation physicalMemory, processorCount and thermalState pages
+  returned JavaScript shells only. Archived sysctl(8)/sw_vers(1) URL attempts under
+  both Darwin/Reference and System/Conceptual/ManPages_iPhoneOS failed. Those failed
+  reads supply no implementation semantics or inferred fallback interface.
+
+Source-exposure event (metadata record only; do not follow these links): two searches
+used the actual `domains=["developer.apple.com"]` filter, with queries for
+`hw.physicalcpu`/`hw.memsize` and `sw_vers`/`buildVersion`. Alongside the official
+capabilities article, the tool automatically displayed Apple forum/tag-page snippets:
+`/forums/tags/release-notes`, `/forums/tags/macos?page=4&sortBy=newest&sortOrder=DESC`,
+`/forums/thread/756746`, `/forums/tags/macos/?page=7&sortBy=oldest`, and
+`/forums/tags/oslog/?page=3&sortBy=oldest&sortOrder=DESC` on developer.apple.com.
+Visible material included OS version/API-command usage discussion and an unrelated
+AppKit GUI code excerpt; portions of the result were truncated. No forum page/link
+was opened, no corresponding collector implementation was read, and none of these
+snippets supplies this implementation or tests. The author reported the exposure to
+root immediately and did not forward expression to the isolated reviewer. Subsequent
+reads stayed with direct official documentation and bundled manuals. This is not a
+zero-exposure declaration; no prior incident/reference expression was consulted.
+
+Frozen field/API contract:
+
+| Observed field | Fixed source | Semantics and unit |
+| --- | --- | --- |
+| `cpu_cores` | `/usr/sbin/sysctl -n hw.physicalcpu_max` | Total/max physical CPU cores in the SoC, not currently enabled cores or logical threads; positive integer count. Apple capabilities article and sysctl(8) table. |
+| `physical_ram_bytes` | `/usr/sbin/sysctl -n hw.memsize` | Dynamic RAM size in bytes, not available/free/process memory. Same Apple sources. |
+| `os_build` | `/usr/bin/sw_vers --buildVersion` | Current macOS build-system revision, not product version or kernel release. Bundled sw_vers(1) DESCRIPTION/OPTIONS. |
+| `python_version` | Current-process `platform.python_version()` | Python major.minor.patchlevel string; no MLX/provider import or environment/version dump. Python documentation. |
+
+`MachineInventoryCollector.collect()` returns a separate closed, frozen, always
+`incomplete` snapshot: four optional observations, fixed per-field source identifiers,
+stable missing reasons and explicit missing Machine field names, plus local monotonic
+start/end observations. The four reads are sequential point-in-time observations,
+not an atomic machine snapshot. No raw command output/error enters the result.
+Positive integer caps (4096 cores, 2**60 RAM bytes) and bounded build/version patterns
+are internal parsing limits, not claims about a device. Invalid/non-ASCII/multiline/
+extra-token output is missing, never normalized into a plausible value or zero.
+
+Chip, GPU cores, power mode, thermal status, MLX/provider/converter versions, their
+revisions, dependency lock, code revision, verified cache state and benchmark
+measurement method remain missing. No caller-supplied replacement or binding-evidence
+shortcut exists in this batch. In particular, there is no M3 Ultra default, no Machine
+projection, PrivacyEvidence construction, approval, registration or host-security claim.
+Future binding fields must derive from actual reviewed code/manifest/cache evidence.
+
+The only external queries are the three fixed argv tuples above, on Darwin, with
+`shell=False`, empty environment, cwd `/`, closed inherited descriptors, stdin and
+stderr discarded, and stdout limited during reading to 128 bytes (plus one overflow
+sentinel). No arbitrary query/path/argv, sysctl dump, system_profiler, hostname, serial,
+user name, device UUID or environment capture is allowed. Non-Darwin fields remain
+missing. Each query has an absolute 2-second budget, within an absolute 6-second total
+collection budget starting before reads. Partial reads never renew either budget;
+late spawn/read/exit/reap/close results cannot become observations, and total expiry
+prevents remaining query spawns. Query failure/timeout gives a stable field reason.
+
+Cancellation or cleanup failure returns no snapshot. A single-use collector immediately
+owns a returned child handle before fallible setup; close sends TERM, waits 1 second,
+then KILL and waits 1 second to reap only that child, closes its pipe, and retains the
+handle if cleanup fails for an explicit retry. It never reuses the owner to collect
+again. OS process creation/syscalls are not forcibly preempted; late returns fail
+closed. The Python version read shares total-deadline/cancel checks. Tests use original
+metadata/process doubles, with no machine query required in CI. Any separately recorded
+real fixed read is only a point-in-time observation, never hardware acceptance.
