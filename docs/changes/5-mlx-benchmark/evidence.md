@@ -1732,3 +1732,52 @@ again. OS process creation/syscalls are not forcibly preempted; late returns fai
 closed. The Python version read shares total-deadline/cancel checks. Tests use original
 metadata/process doubles, with no machine query required in CI. Any separately recorded
 real fixed read is only a point-in-time observation, never hardware acceptance.
+
+### Machine inventory author checks — 2026-10-03T05:01:38+08:00
+
+Implemented the fixed four-field collector and 59 original metadata/process-double
+cases. Every available value keeps its explicit source identity, and the other 13
+Machine fields remain missing. The collector has no Machine/PrivacyEvidence projection
+or runtime registration and does not import MLX/provider code. No actual host query
+was executed for this batch; the process, pipe, selector and clock tests use doubles.
+
+Root and the isolated reviewer identified that a broad query-I/O handler could catch
+an OSError/ValueError from a cancellation callback or clock and degrade it to a field
+missing result. Guard exceptions now become terminal InventoryFailure before that
+handler; four once-only fault regressions prove no snapshot and owned-child cleanup.
+This finding was static; the author executed the regressions. Additional controls
+revalidate constructed nested observation models, reject late cleanup results and
+preserve the failed cleanup handle for explicit caller retry, without an implicit
+outer-finally retry. All stages keep their original absolute budget.
+
+One additional direct official documentation attempt after the source record,
+`https://developer.apple.com/tutorials/data/documentation/kernel/1387446-sysctlbyname/determining_system_capabilities.json`,
+was inaccessible through the tool and supplied no content or implementation semantics.
+The author provided the reviewer only the two short public parameter definitions
+returned by the original official capabilities result, with attribution to that
+retrieval; this is not a claim that the reviewer independently retrieved that body.
+
+Actual commands in this worktree:
+
+```sh
+uv run ruff check tools/asr_benchmark/machine_inventory.py
+uv run mypy tools/asr_benchmark/machine_inventory.py
+uv run ruff format tools/asr_benchmark/machine_inventory.py tests/asr_benchmark/test_machine_inventory.py
+uv run ruff check tools/asr_benchmark/machine_inventory.py tests/asr_benchmark/test_machine_inventory.py
+uv run mypy tools/asr_benchmark/machine_inventory.py tests/asr_benchmark/test_machine_inventory.py
+uv run pytest -q tests/asr_benchmark/test_machine_inventory.py
+make asr-benchmark-check
+git diff --check
+```
+
+The first single-module lint command stopped on one long line, fixed before mypy ran;
+the subsequent single-module lint/mypy passed. The first two-file format/lint/mypy and
+focused pytest run passed **51 tests in 0.09s**. After the additional strictness and
+cleanup regressions, the same two-file commands passed **59 tests in 0.10s**.
+`make asr-benchmark-check` then passed ruff/format/mypy (**45 files**) and **566 tests
+in 42.03s**. Diff check passed and all gate checks were active. Full repository
+verification and independent stable-head execution follow below.
+
+These are control checks against original metadata, not actual command compatibility,
+live device measurements, complete runtime bindings, M3 Ultra identification, no-paging
+evidence or hardware acceptance. No model/audio/network/MLX workload was executed.

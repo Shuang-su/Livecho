@@ -132,6 +132,25 @@ provider hard deadline. Freshness is one spawn per owner, with opaque run-local 
 it does not assume OS PIDs never repeat. Tests run original metadata-only child scripts
 and inject clock/process controls; they execute no model, audio, source or network.
 
+`MachineInventoryCollector` separately collects four bounded point-in-time observations:
+total/max physical CPU cores (`hw.physicalcpu_max`, not currently enabled/logical
+cores), dynamic RAM bytes (`hw.memsize`), macOS build (`sw_vers --buildVersion`) and
+the current Python version. Only three fixed read-only Darwin commands are available,
+with empty environment, discarded stderr, a 128-byte stdout cap, a two-second absolute
+query budget and a six-second total collection budget. Partial reads do not extend
+deadlines; late values after reap/close are missing, and total expiry skips remaining
+commands. Cancellation/guard or cleanup failure withholds the snapshot; failed cleanup
+retains only the owned child for explicit close retry. OS calls cannot be forcibly
+preempted by this synchronous controller. Tests use metadata/process doubles only.
+
+The closed result is always incomplete, with per-field provenance and stable missing
+reasons. It is a sequence of observations, not an atomic snapshot or a `Machine` report.
+Chip/GPU/power/thermal and MLX/provider/converter versions, revisions, lock, code/cache
+binding and benchmark measurement method remain missing. There is no chip default,
+caller-supplied replacement path, Machine/PrivacyEvidence projection, broad profiler
+capture, hostname/serial/user/UUID query, or host admission. Those missing bindings
+must eventually come from actual reviewed execution/cache evidence, not platform guesses.
+
 Manual entry points accept a reviewed identifier, never a path or URL:
 
 ```sh
