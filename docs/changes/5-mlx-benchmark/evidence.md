@@ -1081,3 +1081,109 @@ receipt revalidation versus durability retry. All tests so far were run by the a
   matrix **58 passed in 0.34s**, then expanded fd/substitution/canonical-identity matrix
   **66 passed in 0.35s**. Subsequent final checks are recorded below; no network, model,
   tensor/audio bytes, MLX, serializer or inference execution occurred.
+
+Final verification and review, recorded 2026-10-03 03:34 UTC+08:00:
+
+- Initial code snapshot `c525c7754a1e5a7f7093f2bc4ccf52f5dde758cf` passed
+  `make asr-benchmark-check && git diff --check`: **384 passed in 40.16s**, ruff
+  check/format and mypy (36 files), whitespace check clean. The author then identified
+  missing receipt-byte readback before publication and added bounded payload equality,
+  length and stable inode/fingerprint checks plus same-length/append regressions.
+- Final code head is `f71db2fb4de8955b4799212f3e29f668270cdffc`. Author commands
+  `uv run ruff check tools/asr_benchmark/converted_store.py tests/asr_benchmark/test_converted_store.py`,
+  `uv run ruff format --check tools/asr_benchmark/converted_store.py tests/asr_benchmark/test_converted_store.py`,
+  `uv run mypy tools/asr_benchmark/converted_store.py tests/asr_benchmark/test_converted_store.py`
+  and `uv run pytest -q tests/asr_benchmark/test_converted_store.py` passed: 2 files,
+  **69 tests in 0.38s**.
+- Author ran `make asr-benchmark-check && make verify` at that final code head:
+  specialized **386 passed in 40.28s** with ruff/format/mypy (36 files); complete
+  verification **493 pytest passed in 39.49s**, **128 protocol Vitest**, **63 Railway
+  Vitest**, ruff/format/mypy (58 files), workspace scripts, change artifacts, protocol
+  generation and builds all passed, exit 0. Existing accepted in-memory protocol-byte
+  tests are unchanged. No new runtime audio admission or real model execution occurred.
+- Isolated reviewer `/root/audio_code_readiness` checked that same clean head before
+  and after the actual command
+  `uv run pytest -q tests/asr_benchmark/test_converted_store.py tests/asr_benchmark/test_cache_reader.py::test_final_binding_mismatch_fails_before_cache_open tests/asr_benchmark/test_cache_reader.py::test_preparation_files_cannot_substitute_for_converted_files tests/asr_benchmark/test_controls.py::test_conversion_requires_exact_classified_inventory_and_shape`
+  — **75 passed in 0.38s**, comprising 69 storage cases and 6 selected binding cases;
+  `git diff --check` passed. This is a different selection from the author's 69-test
+  command. The reviewer read the new store/tests, strict manifest binding, README and
+  evidence, focusing on closed plan/pins/bounds, fd hashing, receipt authority and final
+  cache compatibility. No remaining actionable finding; no new external source read.
+- Root independently reviewed publication/cleanup control flow and the receipt readback
+  delta at `f71db2f`, with no remaining actionable finding. Root did not execute tests.
+  These tests and the independent probe below perform real filesystem I/O with original
+  ordinary text and control doubles; they execute no real model/audio/network/serializer/
+  MLX operations. They do not establish power-loss durability, actual format correctness,
+  rights approval, trusted-host behavior or measured model quality.
+- All GUI gates before/after work remained active. The final addition changes evidence
+  only; `git diff f71db2fb4de8955b4799212f3e29f668270cdffc --exit-code -- tools tests benchmarks/asr/README.md`
+  and `git diff --check` passed before its commit. No tests/probes were rerun for the
+  documentation-only record.
+
+Independent probe: from
+`/Users/szmg/.codex/worktrees/livecho-5-asr-impl/Livecho`, the reviewer executed exactly
+once:
+
+```sh
+uv run python - < /Users/szmg/.codex/monitors/livecho-20261002/reviews/converted-receipt-authority-f71db2f.py
+```
+
+The saved script SHA-256 is
+`318d4485dd301ad05dad84f3b0eee6cf0bb0fc185d67e70e20edc0b8f030040e`.
+The author read and hashed this file without re-execution. The exact stdin script is:
+
+```python
+from pathlib import Path
+from tempfile import TemporaryDirectory
+from types import SimpleNamespace
+from unittest.mock import patch
+
+from tools.asr_benchmark.cache_reader import FinalModelCache
+from tools.asr_benchmark.contracts import metadata_digest
+from tools.asr_benchmark.conversion import TensorInventory
+from tools.asr_benchmark.runtime import BlockedEvidence
+from tests.asr_benchmark.factories import preparation
+from tests.asr_benchmark.test_converted_store import owner, read, write_all
+
+with TemporaryDirectory() as temporary:
+    base = Path(temporary).resolve()
+    source = preparation()
+    with owner(base) as store:
+        write_all(store)
+        receipt = store.commit()
+    assert read(base) == receipt
+    assert receipt.status == 'unapproved'
+    assert not hasattr(receipt, 'approval') and not hasattr(receipt, 'inference_rights')
+    fields = {
+        'schema_version': 1,
+        'manifest_id': 'unapproved-storage-probe',
+        'model': source.model,
+        'source_revision': source.source_revision,
+        'preparation_sha256': metadata_digest(source),
+        'converted_assets': receipt.outputs,
+        'tensor_map_sha256': metadata_digest(TensorInventory(tensors=source.tensor_map)),
+        'provider_revision': source.converter_revision,
+        'dependency_lock_sha256': source.dependency_lock_sha256,
+    }
+    lookalike = SimpleNamespace(**fields, model_dump=lambda: dict(fields))
+    root_calls = []
+    def forbidden_root(*args, **kwargs):
+        root_calls.append(True)
+        raise AssertionError('unapproved metadata reached final-cache filesystem access')
+    with patch('tools.asr_benchmark.cache_reader._root_fd', forbidden_root):
+        try:
+            FinalModelCache(base / 'cache', base / 'repo', source, lookalike)
+        except BlockedEvidence as error:
+            assert str(error) == 'inference_preparation_mismatch', str(error)
+        else:
+            raise AssertionError('unapproved lookalike entered final cache')
+    assert root_calls == []
+    assert read(base) == receipt and receipt.status == 'unapproved'
+    print('valid stored bytes and matching outer identity do not confer inference authority: missing approval/rights rejected before cache open; receipt remains unapproved')
+```
+
+Actual result: exit 0 in 0.155s; output was the script's final print text. Actual stored
+notice assets and receipt reopened successfully. Matching outer model/preparation/revision/
+tensor-map/lock/output identity without Approval and inference rights was rejected with
+`inference_preparation_mismatch` before any final-cache root access; the receipt remained
+unapproved. This probe does not approve an inference manifest or execute a provider.
