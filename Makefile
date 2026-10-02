@@ -1,4 +1,4 @@
-.PHONY: bootstrap build dev lint test typecheck verify artifacts protocol-generate protocol-check railway-check railway-start-web railway-start-backend railway-run-maintenance railway-migrate
+.PHONY: bootstrap build dev lint test typecheck verify artifacts protocol-generate protocol-check audio-check audio-runtime-check railway-check railway-start-web railway-start-backend railway-run-maintenance railway-migrate
 
 bootstrap:
 	uv sync --all-groups --frozen
@@ -31,6 +31,13 @@ protocol-generate:
 
 protocol-check:
 	uv run python tools/protocol_codegen.py --check
+
+audio-check:
+	uv run pytest -q tests/audio
+	@echo "Audio control checks only: trusted FFmpeg/host acceptance remains pending."
+
+audio-runtime-check:
+	PYTHONPATH=services/backend/src uv run python -m livecho_backend.audio.preflight
 
 railway-check:
 	pnpm --filter @livecho/railway-config lint
