@@ -4,6 +4,8 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Literal, Protocol, TypeVar
 
+from pydantic import ValidationError
+
 from .contracts import (
     Asset,
     Closed,
@@ -114,12 +116,24 @@ def convert_verified_tensors(
     """
     if verified_source_assets != manifest.source_assets:
         raise BlockedEvidence("source_assets_unverified")
-    descriptions = tuple(backend.describe(name, tensor) for name, tensor in tensors.items())
-    if {item.rule.name for item in descriptions} != set(tensors):
-        raise BlockedEvidence("tensor_inventory_mismatch")
-    plan = plan_conversion(manifest, descriptions)
     result: dict[str, ConvertedTensor[Tensor]] = {}
+    tensor: Tensor | None = None
+    source: Tensor | None = None
+    weight: Tensor | None = None
+    scales: Tensor | None = None
+    biases: Tensor | None = None
     try:
+        descriptions = []
+        for name, tensor in tensors.items():
+            described = backend.describe(name, tensor)
+            try:
+                described = TensorShape.model_validate(described.model_dump())
+            except (AttributeError, ValidationError):
+                raise BlockedEvidence("tensor_description_invalid") from None
+            if described.rule.name != name:
+                raise BlockedEvidence("tensor_inventory_mismatch")
+            descriptions.append(described)
+        plan = plan_conversion(manifest, tuple(descriptions))
         for item in plan.tensors:
             source = tensors[item.rule.name]
             if item.rule.operation == "retain":
@@ -131,7 +145,12 @@ def convert_verified_tensors(
                 backend.evaluate((weight, scales, biases))
                 backend.synchronize()
                 result[item.rule.name] = ConvertedTensor(weight, scales, biases)
-    except Exception:
+    except BaseException as error:
         result.clear()
-        raise BlockedEvidence("conversion_failed") from None
+        if isinstance(error, Exception) and not isinstance(error, BlockedEvidence):
+            raise BlockedEvidence("conversion_failed") from None
+        raise
+    finally:
+        tensor = source = weight = scales = biases = None
+        del tensors
     return result

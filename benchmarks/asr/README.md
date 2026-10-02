@@ -41,6 +41,20 @@ ModelScope acquisition is still blocked; a complete, verified cache bound to tha
 explicit mirror may be read locally without requesting its unverified endpoint. This
 collection neither approves an inference manifest nor invokes conversion or inference.
 
+`conversion_session` adds a preparation-only lifecycle around an injected cooperative
+backend. Exact converter/lock pins and fresh unloaded state precede acquisition; only
+successful admission transfers backend cleanup to the session. The eager decoder consumes
+the complete verified source mapping with local-only/no-remote-code arguments, evaluates
+and synchronizes, then releases all readers. Named tensor records and every description
+must match the exhaustive map before quantization starts. The existing dispatcher retains
+unsupported tensors and uses the fixed affine 8-bit/group-64 call for classified weights.
+Results are borrowed through a checked mapping; exiting clears that mapping and closes the
+backend. Cancellation/error paths also clear this layer's containers and temporary token
+references, including when its traceback survives. This is a cooperative interface: pin
+self-reports are not revision proof, escaped raw tensor references cannot be revoked,
+third-party frames cannot be erased, and synchronous compute has no hard deadline here.
+No actual tensor decoder, MLX backend, serializer, inference manifest or registry is added.
+
 The final-cache reader separately binds the final inference manifest to preparation,
 checks every converted asset before exposing any handle, and shares a locked reader for
 equal-content path aliases. Bounded read-at access checks the held inode and mutation

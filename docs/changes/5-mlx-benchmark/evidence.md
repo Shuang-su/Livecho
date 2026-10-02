@@ -852,3 +852,51 @@ The preparation-only backend contract for this batch is:
   wrappers. No strong erasure, synchronous-compute deadline or actual MLX claim is made.
 - Registry remains empty. Tests use original notices and opaque token/control doubles,
   without real network/model/audio, MLX, writer, process runner, or inference approval.
+
+## Preparation conversion-session implementation, 2026-10-03 (UTC+08:00)
+
+Author `/root/audio_implementation` implemented `conversion_session.py` and its original
+text/token tests after pre-code assignment/interface commit
+`eecf9c8554549780d2fefae02b3a4f0aec5419c1`. No new external source was read. The
+existing dispatcher received the minimum name/shape validation and cleanup changes.
+
+The session validates preparation/cache identity, converter/lock pins and fresh unloaded
+state before acquisition or backend methods. Rejection before admission leaves ownership
+with the caller and calls no backend methods. After admission, the session closes the
+backend on every exit, while the caller continues owning its cache. Only actual verified
+source readers from `prepare_sources` reach the eager local-only/no-remote-code decoder.
+It must return an exact named tuple inventory, evaluate/synchronize, report loaded state
+and pass reader revalidation. The readers close before the existing dispatcher runs.
+All descriptions are now individually bound to requested names and strictly revalidated,
+so swapped names or `model_copy`/`model_construct` shape bypasses cannot reach quantization.
+
+The output is a preparation-only borrowed mapping; no source/converted writer, inference
+manifest approval, transcribe call or executable registration is introduced. The backend
+contract owns cooperative tensor cleanup. This layer clears its containers and temporary
+references on failure/cancellation/exit, including retained local traceback paths. It
+cannot erase references already escaped to callers or third-party traceback frames.
+Likewise, pin properties are interface assertions, not independently verified source
+revision, and post-call cancellation checks are not preemptive synchronous deadlines.
+
+Root's early read-only feedback identified local reference retention during cancellation.
+The author added cleanup of the session's converted/source containers and loop locals,
+dispatcher partial results under `BaseException`, and wrapper operation/result locals.
+Three author-run opaque weakref regressions retain the cancellation exception/traceback
+and cover eager-load return, quantized-output evaluation and complete dispatcher return;
+the locally owned token references release and backend close occurs exactly once. These
+are author-executed tests, not independent executions by root.
+
+Pre-review verification:
+
+- `uv run ruff check tools/asr_benchmark tests/asr_benchmark/test_conversion_session.py`
+  — passed.
+- `uv run mypy tools/asr_benchmark tests/asr_benchmark/test_conversion_session.py`
+  — passed, 22 files.
+- `uv run pytest -q tests/asr_benchmark/test_conversion_session.py tests/asr_benchmark/test_artifacts.py`
+  — **42 passed in 2.89s**, including 38 new session cases and directly related existing
+  artifact/dispatcher checks. Only original notices and opaque tokens were used.
+
+- `make asr-benchmark-check && git diff --check` — passed: ruff check/format and
+  mypy (34 files), **317 passed in 37.39s**, and whitespace checks clean.
+
+Full repository verification and stable-head independent review follow below.
