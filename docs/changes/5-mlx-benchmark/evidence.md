@@ -1251,3 +1251,43 @@ The frozen bridge contract is:
   unapproved; returning one never creates inference authority. Tests use only original
   ordinary text filesystem content and opaque tokens, including successful reopen and
   failure ordering, without a real serializer or model execution.
+
+## Serializer bridge implementation, 2026-10-03 (UTC+08:00)
+
+Author `/root/audio_implementation` implemented `serialization_session.py` after pre-code
+commit `700b2640d1ac83ab56074afef8f3393df80d8571`. No new external source was read.
+The bridge connects actual local source verification, the existing conversion session,
+an injected cooperative serializer and bounded storage. Admission strictly validates the
+preparation/OutputPlan/cache and both pin/fresh-state sets before I/O or backend methods.
+After admission it owns cleanup, including stage creation and inner conversion admission
+failure. A close-once proxy preserves the old session contract; when one object fills both
+backend roles, identity-based deduplication closes that object once in either unwind order.
+
+The serializer sees readonly borrowed converted values and only auxiliary model-file
+labels through size/read-at facades, plus a sequential write-output facade with no public
+commit/close/path/fd/network capability. Local source files are verified before conversion
+and reopened after conversion; a fixed denying response factory prevents missing files
+from gaining network access. All public borrows expire before serializer close. Sticky
+failure state prevents a swallowed output error, pin drift or cancellation from allowing
+a receipt. Reader/serializer/converter cleanup converges before bridge-only commit;
+post-commit cleanup/cancellation errors preserve the existing storage uncertainty rules.
+
+Root's static draft feedback identified a locally held invalid serializer return value
+and the same-object dual-role double-close edge. The author clears the return local in
+finally, including retained traceback paths, and deduplicates the shared object. Added
+original-token regressions cover these cases; this does not claim erasure of third-party
+frames, escaped raw tensors or protection against reflection/same-privilege malicious code.
+The isolated reviewer's draft feedback also prompted explicit fresh-state drift tests
+during load/quantization and borrowing only read-at/size rather than a reader's close API.
+
+Author pre-review commands:
+
+- `uv run ruff format tools/asr_benchmark/serialization_session.py tests/asr_benchmark/test_serialization_session.py`
+  and `uv run ruff check tools/asr_benchmark/serialization_session.py tests/asr_benchmark/test_serialization_session.py`
+  passed. `uv run mypy tools/asr_benchmark/serialization_session.py tests/asr_benchmark/test_serialization_session.py`
+  passed, 2 files, after addressing proxy protocol typing and the deliberate invalid-return
+  check. No type-check failure was represented as a passing run.
+- `uv run pytest -q tests/asr_benchmark/test_serialization_session.py` — initial matrix
+  **43 passed in 0.86s**; final expanded focused matrix **51 passed in 1.03s**. Inputs are
+  original ordinary text with real local filesystem I/O and opaque tokens/control doubles,
+  not a real serializer, network, model/audio, MLX or inference run.

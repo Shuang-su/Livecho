@@ -77,9 +77,25 @@ sets stop. Injected failure tests are not power-loss/filesystem durability proof
 The receipt contains actual output metadata only, without Approval or inference rights.
 It cannot enter the final loader as an inference manifest. Independently approved final
 manifests can reference these compatible content keys and still verify the complete set.
-No real serializer, model-format validation, quantization-quality proof or automatic
-source/conversion-to-storage bridge is supplied here. Storage accepts only model bytes
+No real serializer, model-format validation or quantization-quality proof is supplied
+here. Storage accepts only model bytes
 from a separately reviewed cooperative caller; it is not an audio or arbitrary-file API.
+
+`prepare_converted_artifacts` now connects these boundaries through an injected
+cooperative serializer. Strict preparation/plan/cache identity, converter/serializer pins
+and exact fresh states are checked before I/O or ownership transfer. Once admitted, both
+backend roles close exactly once even if storage construction or inner conversion
+admission fails; a shared backend instance is deduplicated by identity. Existing local
+source files must actually verify, and a fixed denying transport prevents a missing-file
+download bypass. The serializer receives only borrowed converted values, allowlisted
+auxiliary tokenizer/config/notice inputs with `size`/`read_at`, and sequential
+`write_output(label, chunks)`. These facades expose no commit, close, path, fd or network
+operation. They expire before serializer cleanup; observed errors/cancellation/pin changes
+remain terminal even if the backend catches them. After reader, serializer and converter
+cleanup succeeds, the bridge alone commits the unapproved receipt. A late failure after
+publication preserves the stored set while withholding a successful return. No concrete
+serialization format, backend pin provenance, hostile-code sandbox, raw-reference erasure,
+hard synchronous deadline, inference approval or executable registry is provided.
 
 The final-cache reader separately binds the final inference manifest to preparation,
 checks every converted asset before exposing any handle, and shares a locked reader for
