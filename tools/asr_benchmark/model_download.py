@@ -11,6 +11,7 @@ from contextlib import suppress
 from functools import partial
 from typing import Literal
 
+from .cache_reader import MissingModelAsset, VerifiedModelReader
 from .contracts import NS, PreparationManifest
 from .http_transfer import (
     CHUNK_LIMIT,
@@ -33,10 +34,15 @@ def _close_response(response: ModelResponse) -> None:
 
 
 async def _bounded[T](
-    transfer: PreparationTransfer, clock: Callable[[], int], operation: Callable[[], Awaitable[T]]
+    transfer: PreparationTransfer,
+    clock: Callable[[], int],
+    operation: Callable[[], Awaitable[T]],
+    cancelled: Callable[[], bool],
 ) -> T:
     """One absolute progress deadline, including a check before accepting a late result."""
     try:
+        if cancelled():
+            raise asyncio.CancelledError
         now = clock()
         transfer.check(now)
         remaining = (transfer.last_progress_ns + 60 * NS - now) / NS
@@ -44,7 +50,7 @@ async def _bounded[T](
         async with timeout:
             result = await operation()
         task = asyncio.current_task()
-        if task is not None and task.cancelling():
+        if cancelled() or (task is not None and task.cancelling()):
             raise asyncio.CancelledError
         if timeout.expired():
             raise TimeoutError
@@ -63,13 +69,16 @@ async def _retry(
     entry: ModelCacheEntry,
     clock: Callable[[], int],
     sleep: Callable[[float], Awaitable[None]],
+    cancelled: Callable[[], bool],
 ) -> None:
+    if cancelled():
+        raise asyncio.CancelledError
     if transfer.retry_at_ns is None:
         return
     delay = max(0, transfer.retry_at_ns - clock()) / NS
     await sleep(delay)
     task = asyncio.current_task()
-    if task is not None and task.cancelling():
+    if cancelled() or (task is not None and task.cancelling()):
         raise asyncio.CancelledError
     transfer.resume(transfer.identity, clock())
     # Persist the started attempt before another network request can be emitted.
@@ -86,6 +95,7 @@ async def download_asset(
     clock: Callable[[], int] = time.monotonic_ns,
     sleep: Callable[[float], Awaitable[None]] = asyncio.sleep,
     progress: Callable[[TransferProgress], None] | None = None,
+    cancelled: Callable[[], bool] = lambda: False,
 ) -> TransferProgress:
     """Verify/promote one manifest asset; no mirrors, headers or URLs come from callers.
 
@@ -93,14 +103,34 @@ async def download_asset(
     partial survives only if its explicit persisted checkpoint still matches actual
     length/identity/attempt count. All other failures invalidate the partial.
     """
+
+    def cancel_requested() -> bool:
+        task = asyncio.current_task()
+        return cancelled() or (task is not None and task.cancelling() > 0)
+
     transfer = PreparationTransfer(manifest, mode, asset_path, clock())
     # Endpoint admission happens before opening a cache entry or allocating a transport.
     model_request(manifest, mode, asset_path, 0)
-    if cache.mode != mode:
-        raise BlockedEvidence("cache_identity_denied")
+    cache.require_preparation(manifest, mode)
+    if cancel_requested():
+        raise asyncio.CancelledError
     entry = cache.entry(transfer.identity)
     response: ModelResponse | None = None
     try:
+        # A cooperating client may finish between a collection's missing probe and
+        # this lock acquisition. Verify the final under this same lock, before IO.
+        try:
+            reader = VerifiedModelReader.from_entry(entry, cancel_requested, owns_entry=False)
+        except MissingModelAsset:
+            pass
+        else:
+            try:
+                if cancel_requested():
+                    raise asyncio.CancelledError
+                transfer.received = reader.size
+                return transfer.progress("verified")
+            finally:
+                reader.close()
         offset = entry.offset()
         checkpoint = entry.checkpoint_if_present()
         if checkpoint is None:
@@ -110,7 +140,7 @@ async def download_asset(
         else:
             transfer.restore_checkpoint(checkpoint, clock())
         while True:
-            await _retry(transfer, entry, clock, sleep)
+            await _retry(transfer, entry, clock, sleep, cancel_requested)
             if transfer.received == transfer.asset.size:
                 return transfer.promote(entry, clock())
             request = model_request(manifest, mode, asset_path, entry.offset())
@@ -118,11 +148,15 @@ async def download_asset(
                 raise BlockedEvidence("checkpoint_offset")
             try:
                 response = response_factory()
-                header = await _bounded(transfer, clock, partial(response.start, request))
+                header = await _bounded(
+                    transfer, clock, partial(response.start, request), cancel_requested
+                )
                 validate_response(header, request)
                 while transfer.received < transfer.asset.size:
                     limit = min(CHUNK_LIMIT, transfer.asset.size - transfer.received)
-                    chunk = await _bounded(transfer, clock, partial(response.read, limit))
+                    chunk = await _bounded(
+                        transfer, clock, partial(response.read, limit), cancel_requested
+                    )
                     if type(chunk) is not bytes or len(chunk) > limit:
                         raise DownloadFailure("download_body_invalid")
                     if not chunk:
@@ -134,7 +168,7 @@ async def download_asset(
                         progress(item)
                 # Connection: close plus an exact EOF check rejects an overlong payload.
                 # No HTTP request is ever issued with a Range beginning at EOF.
-                extra = await _bounded(transfer, clock, partial(response.read, 1))
+                extra = await _bounded(transfer, clock, partial(response.read, 1), cancel_requested)
                 if type(extra) is not bytes or extra:
                     raise DownloadFailure("download_body_excess")
             except DownloadFailure as error:
@@ -149,6 +183,8 @@ async def download_asset(
                     response = None
                     _close_response(closing)
             if transfer.retry_at_ns is None:
+                if cancel_requested():
+                    raise asyncio.CancelledError
                 return transfer.promote(entry, clock())
     except asyncio.CancelledError:
         try:

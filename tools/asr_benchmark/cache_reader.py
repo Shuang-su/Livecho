@@ -11,7 +11,7 @@ from collections.abc import Callable, Mapping
 from contextlib import suppress
 from pathlib import Path
 from types import MappingProxyType, TracebackType
-from typing import Self
+from typing import Literal, Self
 
 from .contracts import Asset, InferenceManifest, PreparationManifest
 from .conversion import bind_inference
@@ -28,6 +28,10 @@ from .runtime import BlockedEvidence
 CHUNK_BYTES = 1024**2
 
 
+class MissingModelAsset(BlockedEvidence):
+    """Only a locked final-file open returned ENOENT; other failures are not missing."""
+
+
 class VerifiedModelReader:
     """Bounded read-at access while holding the cooperating cache's asset lock.
 
@@ -41,39 +45,68 @@ class VerifiedModelReader:
         identity: Identity,
         asset: Asset,
         cancelled: Callable[[], bool],
+        *,
+        mode: Literal["huggingface", "modelscope"] = "huggingface",
     ) -> None:
-        self._entry = ModelCacheEntry(directory, identity, asset, "huggingface")
+        self._initialize(ModelCacheEntry(directory, identity, asset, mode), cancelled, True)
+
+    @classmethod
+    def from_entry(
+        cls, entry: ModelCacheEntry, cancelled: Callable[[], bool], *, owns_entry: bool
+    ) -> Self:
+        """Use an already-held lock; a borrowed reader closes only its final-file fd.
+
+        With owns_entry=False the caller must hold the entry until this reader closes.
+        Ownership is transferred otherwise, including constructor failure cleanup.
+        """
+        value = cls.__new__(cls)
+        value._initialize(entry, cancelled, owns_entry)
+        return value
+
+    def _initialize(
+        self, entry: ModelCacheEntry, cancelled: Callable[[], bool], owns_entry: bool
+    ) -> None:
+        self._entry = entry
+        self._owns_entry = owns_entry
         self._fd = -1
-        self._size = asset.size
+        self._size = entry.asset.size
         self._cancelled = cancelled
         self._stamp: Fingerprint | None = None
         self.closed = False
         try:
+            entry._require(entry.identity)
             self._check_cancelled()
-            self._fd = os.open(
-                self._entry._name("asset"),
-                os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK,
-                dir_fd=self._entry._directory,
-            )
+            try:
+                self._fd = os.open(
+                    self._entry._name("asset"),
+                    os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK,
+                    dir_fd=self._entry._directory,
+                )
+            except FileNotFoundError:
+                raise MissingModelAsset("cache_final_missing") from None
             before = _fingerprint(_private_file(self._fd))
-            if before[2] != asset.size:
+            if before[2] != entry.asset.size:
                 raise BlockedEvidence("cache_final_length")
             digest = hashlib.sha256()
             offset = 0
-            while offset < asset.size:
+            while offset < entry.asset.size:
                 self._check_cancelled()
-                data = os.pread(self._fd, min(CHUNK_BYTES, asset.size - offset), offset)
+                data = os.pread(self._fd, min(CHUNK_BYTES, entry.asset.size - offset), offset)
                 if not data:
                     raise BlockedEvidence("cache_final_length")
                 digest.update(data)
                 offset += len(data)
-            if os.pread(self._fd, 1, asset.size) or digest.hexdigest() != asset.sha256:
+            if os.pread(self._fd, 1, entry.asset.size) or digest.hexdigest() != entry.asset.sha256:
                 raise BlockedEvidence("cache_final_integrity")
             self._stamp = before
             self.validate()
-        except BaseException:
-            with suppress(BaseException):
+        except BaseException as error:
+            try:
                 self.close()
+            except BaseException:
+                raise BlockedEvidence("cache_reader_close_failed") from None
+            if isinstance(error, MissingModelAsset):
+                raise
             raise BlockedEvidence("cache_final_invalid") from None
 
     @property
@@ -130,10 +163,11 @@ class VerifiedModelReader:
                 os.close(fd)
             except BaseException:
                 failed = True
-        try:
-            self._entry.close()
-        except BaseException:
-            failed = True
+        if self._owns_entry:
+            try:
+                self._entry.close()
+            except BaseException:
+                failed = True
         if failed:
             raise BlockedEvidence("cache_reader_close_failed")
 

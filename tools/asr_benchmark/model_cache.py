@@ -10,16 +10,20 @@ import fcntl
 import hashlib
 import os
 import stat
+from collections.abc import Callable
 from contextlib import suppress
 from pathlib import Path
 from types import TracebackType
-from typing import Literal, Self
+from typing import TYPE_CHECKING, Literal, Self
 
 from pydantic import ValidationError
 
 from .contracts import Asset, PreparationManifest, metadata_digest
 from .preparation import TransferCheckpoint
 from .runtime import BlockedEvidence
+
+if TYPE_CHECKING:
+    from .cache_reader import VerifiedModelReader
 
 Identity = tuple[str, str, str]
 Fingerprint = tuple[int, int, int, int, int]
@@ -88,8 +92,9 @@ class ModelOnlyCache:
         mirrors = [mirror for mirror in manifest.mirrors if mirror.mode == mode]
         if len(mirrors) != 1:
             raise BlockedEvidence("preparation_not_allowlisted")
+        self._preparation_sha256 = metadata_digest(manifest)
         self._assets = {
-            (metadata_digest(manifest), mirrors[0].revision, asset.sha256): asset
+            (self._preparation_sha256, mirrors[0].revision, asset.sha256): asset
             for asset in manifest.source_assets
         }
         # Two assets can have identical content, but their shared key must not conceal
@@ -128,6 +133,23 @@ class ModelOnlyCache:
         if self.closed or identity not in self._assets:
             raise BlockedEvidence("cache_identity_denied")
         return ModelCacheEntry(self._directory, identity, self._assets[identity], self.mode)
+
+    def require_preparation(
+        self, manifest: PreparationManifest, mode: Literal["huggingface", "modelscope"]
+    ) -> None:
+        if (
+            self.closed
+            or mode != self.mode
+            or metadata_digest(manifest) != self._preparation_sha256
+        ):
+            raise BlockedEvidence("cache_identity_denied")
+
+    def open_verified_source(
+        self, identity: Identity, cancelled: Callable[[], bool]
+    ) -> "VerifiedModelReader":
+        from .cache_reader import VerifiedModelReader
+
+        return VerifiedModelReader.from_entry(self.entry(identity), cancelled, owns_entry=True)
 
 
 class ModelCacheEntry:

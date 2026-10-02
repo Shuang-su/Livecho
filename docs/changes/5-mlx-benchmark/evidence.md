@@ -665,3 +665,50 @@ a draft; no model is selected and no merge, deployment or real benchmark is perf
   Registry remains empty, ModelScope/redirect acquisition remains blocked, and no
   accepted intent/spec/plan or public protocol change is authorized. This assignment
   record is committed before implementation.
+
+## Verified preparation source collection, 2026-10-03 (UTC+08:00)
+
+Author `/root/audio_implementation` implemented this batch after assignment
+`e7be8357b92861ed648ebfa10ee13adbae8bd345`; no additional external source was read.
+The original source/exposure record above remains applicable. This batch adds:
+
+- `VerifiedSourceAssets`, bound to a revalidated preparation manifest, the exact cache
+  manifest digest, and explicitly selected mirror mode/revision. It hashes actual files
+  and shares one locked reader for content aliases. All members must verify before a
+  read-only mapping is exposed. It accepts no final-inference authority and generates
+  no converted digest or approved inference manifest.
+- `prepare_sources`, an async context owning all collection readers/locks while borrowing
+  the caller-owned cache. It probes the entire existing set, downloads only missing
+  physical identities through the restricted single-asset downloader, revalidates the
+  complete set before delivery, and revokes every borrowed reader on exit or failure.
+  Actual files must verify even if an injected downloader claims success.
+- Reader reuse with explicit ownership of an already-held entry lock. Borrowed readers
+  close their file descriptor but not that entry; owning readers close both. Only ENOENT
+  from opening the locked final file produces `MissingModelAsset`. Corruption, unsafe
+  files, permission failures and lock contention are terminal, not acquisition fallbacks.
+- Single-asset download now verifies an existing final under its acquired lock before
+  emitting any network request, covering completion by another cooperating cache client
+  after the collection's missing probe. Callback and task cancellation are checked on
+  local-completion paths and before/after network/retry awaits; cancellation observed
+  in progress prevents further chunk writes. No preemption of synchronous disk/hash
+  operations is claimed. Existing partial/checkpoint retention rules remain enforced.
+
+ModelScope's endpoint remains unimplemented and blocked. A fully cached source collection
+with the selected ModelScope revision may be verified/read locally; a missing member
+cannot invoke that endpoint or silently switch to Hugging Face. Redirect handling and the
+empty executable registry are unchanged. No socket/model/audio/MLX/converter/process
+execution, model selection, public protocol change or accepted artifact amendment occurs.
+
+Pre-review focused verification:
+
+- `uv run pytest -q tests/asr_benchmark/test_source_preparation.py tests/asr_benchmark/test_model_download.py tests/asr_benchmark/test_cache_reader.py`
+  — **109 passed in 0.62s**, with 29 new source-collection cases. Tests write only the
+  original ordinary notice doubles; no weight/tokenizer/audio content is created.
+- `uv run ruff check tools/asr_benchmark tests/asr_benchmark/test_source_preparation.py`
+  and `uv run mypy tools/asr_benchmark tests/asr_benchmark/test_source_preparation.py`
+  — passed (21 mypy files). Early lint/type feedback was corrected before this run.
+
+- `make asr-benchmark-check` — passed: ruff lint/format, strict mypy (32 files),
+  **279 passed in 34.88s**. `git diff --check` — exit 0.
+
+Full repository verification and stable-head isolated review follow below when complete.

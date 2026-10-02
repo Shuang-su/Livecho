@@ -29,6 +29,18 @@ be locally verified/promoted without a request beyond EOF, including after attem
 Synchronous cache fsync/hash work is bounded in chunk size but cannot be preempted by the
 async network deadline. This transport has no CLI registration or live-network evidence.
 
+`prepare_sources` now acquires a complete preparation-only source collection. It first
+verifies existing files under their selected mirror identities and downloads only truly
+missing physical assets. Corruption, unsafe files, permission and lock failures terminate;
+they never trigger replacement downloads. Matching content aliases share a locked reader.
+All files must verify before a read-only mapping is borrowed, and the context revokes all
+readers on exit. The caller retains ownership of the cache. Downloader success metadata
+alone cannot establish that files exist or are valid. A cooperating client that completes
+an asset after the missing probe is handled by another locked actual-file verification.
+ModelScope acquisition is still blocked; a complete, verified cache bound to that
+explicit mirror may be read locally without requesting its unverified endpoint. This
+collection neither approves an inference manifest nor invokes conversion or inference.
+
 The final-cache reader separately binds the final inference manifest to preparation,
 checks every converted asset before exposing any handle, and shares a locked reader for
 equal-content path aliases. Bounded read-at access checks the held inode and mutation
