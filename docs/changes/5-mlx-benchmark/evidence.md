@@ -1508,3 +1508,135 @@ objects/clocks. This is not model/audio/network/MLX/source execution, host no-pa
 proof, arbitrary-code containment, a callable ExecutionGuard implementation, complete
 PassPlan execution or measured hardware acceptance. The current control protocol is
 strictly sequential; overlapping input and provider work remains unimplemented.
+
+### Supervisor stable review and full verification — 2026-10-03 04:32 +08:00
+
+Reviewed code head: `a42262330e5a4b71ba22c9dca991630c1e4403f2`.
+Author executed `make verify` at this head: exit 0; ruff/format/mypy passed (65 Python
+files), pytest **614 passed in 43.05s**, protocol Vitest **128 passed**, Railway
+Vitest **63 passed**, and workspace, change-artifact, protocol-generation and build
+checks passed. This baseline includes the existing protocol's accepted in-memory
+codec tests; this batch's new inputs are metadata only and do not admit audio runtime.
+`git diff --check` passed, and the tree remained clean at the reviewed head.
+
+Independent reviewer `/root/audio_code_readiness` read all three new modules, the
+metadata child, new tests, README and evidence, then executed:
+
+```sh
+uv run pytest -q tests/asr_benchmark/test_pass_supervisor.py
+git diff --check
+```
+
+Results: **70 passed in 2.47s**, diff check exit 0, same clean head before/after. These
+70 cases include the pre-encoding bounds and post-cleanup deadline regressions, also
+executed by the author. Root separately reread the stable ownership, deadline and
+validation ordering statically, without running tests. Neither review has a remaining
+actionable finding in this bounded scope. The reviewer read no new external source;
+the author's official Python documentation reads are registered separately above.
+
+The reviewer additionally saved and ran the following original metadata subprocess
+probe once. Actual working directory was
+`/Users/szmg/.codex/worktrees/livecho-5-asr-impl/Livecho`; actual command:
+
+```sh
+uv run python - < /Users/szmg/.codex/monitors/livecho-20261002/reviews/pass-cross-plan-pipe-a422623.py
+```
+
+Saved input SHA256:
+`e15b204b9c28180fb0a32f5daf234413c9d0ad16eaa9387c684ba3c8c0397de2`.
+The following is the complete original stdin/script, not a newly executed variation:
+
+```python
+import hashlib
+import json
+import subprocess
+import sys
+from pathlib import Path
+from unittest.mock import patch
+
+
+def metadata_child():
+    data = sys.stdin.buffer.readline(16385)
+    request = json.loads(data)
+    digest = hashlib.sha256(data).hexdigest()
+
+    def send(sequence, kind, identity=digest, **extra):
+        value = {
+            'run_id': request['run_id'],
+            'request_sha256': identity,
+            'seq': sequence,
+            'kind': kind,
+            **extra,
+        }
+        sys.stdout.buffer.write((json.dumps(value) + '\n').encode('ascii'))
+        sys.stdout.buffer.flush()
+
+    def grant(sequence, phase):
+        received = json.loads(sys.stdin.buffer.readline(513))
+        assert received == {
+            'run_id': request['run_id'],
+            'request_sha256': digest,
+            'seq': sequence,
+            'grant': phase,
+        }
+
+    send(0, 'ready')
+    grant(0, 'load')
+    send(1, 'loaded')
+    send(2, 'input')
+    grant(2, 'input')
+    request['plan']['window_seconds'] = 4
+    alternate = (json.dumps(request, sort_keys=True, separators=(',', ':')) + '\n').encode('ascii')
+    wrong_digest = hashlib.sha256(alternate).hexdigest()
+    assert wrong_digest != digest
+    send(3, 'progress', identity=wrong_digest, pts_ns=0)
+
+
+if sys.argv[1:] == ['--metadata-child']:
+    metadata_child()
+else:
+    from tools.asr_benchmark import pass_supervisor as supervisor
+    from tools.asr_benchmark.pass_control import PassFailure
+    from tests.asr_benchmark.test_pass_supervisor import plan
+
+    script = Path('/Users/szmg/.codex/monitors/livecho-20261002/reviews/pass-cross-plan-pipe-a422623.py')
+    children = []
+
+    def spawn_metadata_only():
+        child = subprocess.Popen(
+            [sys.executable, '-I', '-B', str(script), '--metadata-child'],
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            env={},
+            close_fds=True,
+            bufsize=0,
+        )
+        children.append(child)
+        return child
+
+    owner = supervisor.PassSupervisor()
+    with patch.object(supervisor, '_spawn', spawn_metadata_only):
+        try:
+            owner.run(plan(), 'original-metadata-manifest', 'original-metadata-corpus')
+        except PassFailure as error:
+            assert str(error) == 'child_metadata_invalid', str(error)
+        else:
+            raise AssertionError('another valid window plan reached control completion')
+    assert len(children) == 1 and children[0].poll() is not None
+    assert children[0].stdin.closed and children[0].stdout.closed
+    assert owner._child is None
+    owner.close()
+    print('real metadata pipe rejected same-run sequential input progress bound to a different window plan; no outcome delivered, child reaped and pipes closed')
+```
+
+Actual result: exit 0 in 0.076s, output exactly the final print text. After valid load
+and input grants, the child used the correct run ID/sequence and a valid progress
+value, but bound its digest to another window plan. The real pipe rejected the frame,
+delivered no outcome and closed/reaped the owned child. The author checked saved input
+bytes/SHA for transcription without re-executing the probe.
+
+All gates remained active. The real local subprocesses, pipes and signals establish
+control behavior only; there was no model/audio/network/provider/MLX execution or
+hardware acceptance, and no child clock observation or completed PassPlan report was
+manufactured. The final evidence-only commit preserves all reviewed product/test bytes.
