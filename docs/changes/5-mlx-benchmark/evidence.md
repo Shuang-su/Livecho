@@ -810,3 +810,45 @@ returned exit 0, confirming all non-evidence files equal the reviewed code snaps
 `git diff --check` also returned exit 0. Only this evidence document changes. The
 proposed conversion-session batch remains a future checkpoint; no next-batch code is
 started here and no stronger tensor-erasure or synchronous deadline claim is added.
+
+## Conversion-session assignment and interface (before code), 2026-10-03 (UTC+08:00)
+
+- Author `/root/audio_implementation`, OpenAI Codex GUI subagent; isolated reviewer
+  `/root/audio_code_readiness`, with `/root` providing read-only lifecycle review.
+  Assignment: `conversion_session.py`, focused original text/token tests, the minimum
+  required dispatcher validation fix, README and evidence on the existing Issue #5 PR.
+- Prior exposure remains exactly the author records above: accepted local requirements,
+  local code/tests/policy metadata and the enumerated direct primary documents. New
+  reads refresh the owning Issue, all accepted artifacts and local conversion/source/
+  cache interfaces. No new external source or excluded author's implementation advice
+  was accessed. Reviewer feedback derives from these existing local interfaces only.
+  This record precedes code. No accepted intent/spec/plan or public protocol changes.
+
+The preparation-only backend contract for this batch is:
+
+- A synchronous cooperative backend extends the existing `ConversionBackend` operations
+  with `converter_revision`, `dependency_lock_sha256`, an `unloaded` state, eager
+  `load_sources(preparation, borrowed_readers, local_files_only=True,
+  trust_remote_code=False)`, and `close()`. Pin strings/state are interface assertions,
+  not proof of actual source revision, isolated execution or host behavior.
+- Admission validates the preparation/cache binding, exact converter/lock pins and fresh
+  `unloaded is True` before acquisition or backend operations. Ownership transfers to the
+  session only after these checks succeed. Before that, rejection performs no backend
+  methods and the caller retains cleanup responsibility. After admission, every path
+  closes the backend; the caller continues to own its cache.
+- Only the complete actual-file-verified mapping from `prepare_sources` enters the eager
+  decoder. It returns an exact tuple of named tensor records so duplicate names remain
+  detectable. Records must exactly cover the manifest. Source tensors are evaluated and
+  synchronized while readers remain borrowed, readers are revalidated, then closed.
+  The backend must own everything needed after reader closure and report loaded state.
+- Before quantizing anything, describe every tensor and bind each returned rule name to
+  its requested name; revalidate shape metadata and the complete dtype/classification/
+  operation inventory. Reuse the existing dispatcher for retain and affine 8-bit/group-64
+  operations. No new operator implementation, output serialization or inference call.
+- Check cooperative cancellation/pin stability before and after backend stages and before
+  delivering results. The returned preparation-only borrowed mapping becomes unavailable
+  on scope exit and releases its own references; backend close owns cooperative tensor
+  cleanup. Already escaped raw tensor references cannot be revoked or erased by Python
+  wrappers. No strong erasure, synchronous-compute deadline or actual MLX claim is made.
+- Registry remains empty. Tests use original notices and opaque token/control doubles,
+  without real network/model/audio, MLX, writer, process runner, or inference approval.
