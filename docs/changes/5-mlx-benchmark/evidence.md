@@ -1047,3 +1047,37 @@ The pre-code storage contract is:
   their existing locks. This proves stored bytes and metadata only, not serializer format,
   quantization semantics, rights, MLX compatibility or owner approval. This batch does not
   wire a serializer or authorize inference. Tests persist only original ordinary text.
+
+## Converted storage implementation, 2026-10-03 (UTC+08:00)
+
+Author `/root/audio_implementation` implemented the storage contract after pre-code
+commit `ca344c17e0698e0e46eb27acbd42b0ad76f5103f`, using only the recorded local
+requirements and existing code. No new external source was read. `converted_store.py`
+adds closed output plans, bounded borrowed sinks, actual fd size/SHA verification,
+canonical final-cache identity/locks, content alias reuse, and an unapproved complete-set
+receipt. `bind_inference` now strictly revalidates both manifest schemas so a receipt or
+an unapproved lookalike cannot act as an inference manifest. No Approval is created.
+
+The complete-set commit is the receipt rename followed by directory fsync, after durable
+individual asset publication. Errors before that point preserve earlier immutable assets
+without granting complete-set authority. Errors after rename preserve the receipt and
+assets; a reopen rehashes visible bytes but does not repair a failed directory fsync.
+An identical commit retry revalidates the entire prior set and fsyncs again; it does not
+repair a damaged/missing previously committed asset. Unknown orphan stages are retained,
+and cleanup removes only names/inodes owned by this transaction. Cooperative locks and
+injected faults do not prove malicious-host or actual power-loss durability guarantees.
+
+Root's read-only draft review identified the fd between output creation and a second
+fallible stat; the author added explicit local ownership cleanup and targeted tests for
+both stat boundaries and the stage-directory open failure. Root also clarified visible
+receipt revalidation versus durability retry. All tests so far were run by the author:
+
+- `uv run ruff format tools/asr_benchmark/converted_store.py tests/asr_benchmark/test_converted_store.py`
+  and `uv run ruff check tools/asr_benchmark/converted_store.py tests/asr_benchmark/test_converted_store.py`
+  — passed after routine style corrections.
+- `uv run mypy tools/asr_benchmark/converted_store.py tests/asr_benchmark/test_converted_store.py`
+  — passed, 2 files, after using the imported `os` directly in fault injections.
+- `uv run pytest -q tests/asr_benchmark/test_converted_store.py` — initial full fault
+  matrix **58 passed in 0.34s**, then expanded fd/substitution/canonical-identity matrix
+  **66 passed in 0.35s**. Subsequent final checks are recorded below; no network, model,
+  tensor/audio bytes, MLX, serializer or inference execution occurred.

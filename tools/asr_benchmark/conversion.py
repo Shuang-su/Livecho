@@ -61,6 +61,11 @@ def plan_conversion(
 
 
 def bind_inference(preparation: PreparationManifest, inference: InferenceManifest) -> None:
+    try:
+        preparation = PreparationManifest.model_validate(preparation.model_dump())
+        inference = InferenceManifest.model_validate(inference.model_dump())
+    except (AttributeError, ValidationError):
+        raise BlockedEvidence("inference_preparation_mismatch") from None
     if (
         inference.model != preparation.model
         or inference.source_revision != preparation.source_revision

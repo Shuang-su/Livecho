@@ -55,6 +55,32 @@ self-reports are not revision proof, escaped raw tensor references cannot be rev
 third-party frames cannot be erased, and synchronous compute has no hard deadline here.
 No actual tensor decoder, MLX backend, serializer, inference manifest or registry is added.
 
+`ConversionStaging` now provides a separate model-only storage boundary for a future
+reviewed serializer. A closed preparation/converter/lock-bound output plan declares every
+path/kind and per-file/total byte limit, within internal ceilings of 256 outputs, 64 GiB
+per file and 128 GiB total. These limits concern model storage, not audio. Bounded sinks
+write private staging files; held-inode checks and actual size/SHA verification precede
+publication under the existing canonical final-cache keys. Same-content aliases share
+physical files while counting separately toward declared logical output limits. Existing
+assets are verified and preserved. A preparation-scoped writer lock coordinates receipt
+transactions; existing per-asset locks coordinate content access.
+
+One atomic unapproved-receipt rename is the complete-set publication point, followed by
+directory fsync before success. Individual asset renames do not commit a set. A failed
+attempt may leave immutable assets without a receipt; future attempts may rehash/reuse
+them. Cleanup touches only the current transaction's staging, and does not collect unknown
+crash-abandoned stages. After receipt rename, errors preserve the visible set; reopening
+rehashes current bytes but does not repair a failed directory fsync. An identical commit
+retry revalidates the prior complete set and fsyncs again; conflicts or damaged prior
+sets stop. Injected failure tests are not power-loss/filesystem durability proof.
+
+The receipt contains actual output metadata only, without Approval or inference rights.
+It cannot enter the final loader as an inference manifest. Independently approved final
+manifests can reference these compatible content keys and still verify the complete set.
+No real serializer, model-format validation, quantization-quality proof or automatic
+source/conversion-to-storage bridge is supplied here. Storage accepts only model bytes
+from a separately reviewed cooperative caller; it is not an audio or arbitrary-file API.
+
 The final-cache reader separately binds the final inference manifest to preparation,
 checks every converted asset before exposing any handle, and shares a locked reader for
 equal-content path aliases. Bounded read-at access checks the held inode and mutation
@@ -86,7 +112,8 @@ operation, evaluation and synchronization; no actual MLX backend is installed.
 Transfer-control tests simulate lengths/digests/outcomes; cache tests exercise local
 filesystem promotion and final reads with ordinary text. HTTP/control tests inject streams
 and responses without opening sockets. They do not establish live endpoint/CDN support,
-model downloads, a converted-asset writer or an MLX cold loader. Cache locking assumes
+model downloads, a real model serializer or an MLX cold loader. Storage tests write only
+original notice text. Cache locking assumes
 cooperating cache clients in
 a private operator directory, not protection against a hostile process with the same
 operator privileges. Resource tests observe release callbacks;
