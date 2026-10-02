@@ -303,3 +303,51 @@ Author verification on that code head, 2026-10-03 Asia/Shanghai:
 The earlier new report-roundtrip test failed while native JSON arrays/dates were
 mistakenly rejected; it passed after the documented strict conversion repair. No scoring
 or operational runtime result is inferred from these deterministic test results.
+
+## Model-only cache backend follow-up, 2026-10-03
+
+The same assigned implementation author implemented `model_cache.py` and original
+notice-text temporary-directory tests. The only additional external exposure was the
+official [Python 3.12 os documentation](https://docs.python.org/3.12/library/os.html)
+for directory-relative open/replace and no-follow flags and
+[fcntl documentation](https://docs.python.org/3.12/library/fcntl.html) for nonblocking
+advisory locks. No implementation source or examples were copied. This continues the
+same Issue/PR and independent review assignment; accepted intent/spec/plan are unchanged.
+
+The backend opens a private cache outside Git, detects `.git` files as well as
+directories, walks ancestors without following symlinks and keeps a directory descriptor
+for all subsequent I/O. Names derive only from the preparation/revision/asset identity.
+One nonblocking lock protects each asset transaction. Partial/checkpoint files must be
+private regular files with one link. Actual length governs resume offsets; checkpoint
+identity and offsets must agree. Model-asset hashing reads at most the manifest length
+plus one byte and cannot follow unbounded concurrent growth. Final promotion requires
+the held inode, matching file-name inode, unchanged size/mtime/ctime and manifest SHA;
+it fsyncs before/after rename and preserves any pre-existing final asset.
+
+Failure tests cover overwrite/truncate/append after verification, inode swaps, symlinks,
+hardlinks, FIFO rejection, root/ancestor substitution, a second controller, wrong length/
+digest/offset/checkpoint, cancellation, failed writes/replace/fsync and cleanup continuation.
+Normal close preserves an interrupted model partial; exceptional context exit discards
+it and releases descriptors/lock. The backend does not log exception payloads or paths.
+Reviewer preliminary inspection identified FIFO-open blocking and an unbounded hash-to-EOF
+loop; both were corrected before the stable snapshot and have bounded regressions.
+
+These tests write only a short independently written notice and checkpoint JSON, never
+audio, audio hashes, samples, weights, downloaded vendor text or generated model assets.
+No model execution or registry authority is added. Cooperating clients in a private
+operator cache are the lock boundary; hostile same-user processes or failed storage
+cannot be claimed safe merely from these tests. A failed filesystem cleanup returns a
+closed error after attempting all cleanup stages; it is not a secure-erasure guarantee.
+
+Remaining implementation is now more specific: fixed allowlisted HTTPS transport and
+response/range handling, integration with the bounded retry controller, and a verified
+final-cache reader/cold loader can still be independently written with text doubles.
+They need transport/read/failure contracts and tests, not benchmark hardware. They are
+outside this bounded cache-write batch and remain unregistered. The exact model operator
+and feature/token framing contracts, MLX graph/converter, acquisition/process runner and
+real cancellation guard listed above remain code gaps. Candidate architecture metadata
+does not supply those complete contracts. Approved assets/provenance, source corpus,
+protected-host inventory and complete M3 Ultra scoring/ADR remain separate evidence gates.
+This cache backend does not turn the always-blocked CLI into an operational benchmark.
+
+Stable snapshot verification and independent review are recorded below when completed.

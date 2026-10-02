@@ -9,8 +9,12 @@ the lowercase canonical model basename, its immutable source revision, and SHA-2
 the complete canonical local inference manifest. This helper does not allowlist a model.
 Report serialization verifies a separately reviewed frozen run identity before writing
 to an already-open text sink; changed corpus/settings/machine/provenance requires a new
-run identity. Transfer checkpoints and atomic-promotion coordination are metadata-only
-until a reviewed cache backend is installed.
+run identity. The POSIX model-only cache uses private directory descriptors, nonblocking
+per-asset locks, fixed identity-derived names, actual file offsets, metadata checkpoints,
+bounded SHA-256 reads and mutation-checked atomic promotion. Context cancellation or an
+integrity failure invalidates the partial; deliberate normal close preserves resumable
+progress. It is callable only as a preparation backend, with no CLI registration or
+network transport. Tests persist original notice text in temporary directories only.
 
 Manual entry points accept a reviewed identifier, never a path or URL:
 
@@ -31,8 +35,11 @@ the qualified 60-script consenting-speaker corpus, protected-host evidence preve
 paging/dumps, real-time runner/watchdog integration, and real M3 Ultra measurements.
 The model conversion dispatcher calls only the reviewed backend's affine 8-bit/group-64
 operation, evaluation and synchronization; no actual MLX backend is installed.
-Transfer tests simulate only lengths/digests/outcomes; they do not verify a real network
-transport or atomic filesystem promotion. Resource tests observe release callbacks;
+Transfer-control tests simulate lengths/digests/outcomes; cache tests exercise local
+filesystem promotion with ordinary text. They do not verify a real network transport,
+model download or cold asset loader. Cache locking assumes cooperating cache clients in
+a private operator directory, not protection against a hostile process with the same
+operator privileges. Resource tests observe release callbacks;
 they do not establish physical RAM erasure or no-paging on any host.
 
 No model is selected. A synthetic complete report in tests exercises the fixed decision

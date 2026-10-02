@@ -1,6 +1,6 @@
 """Model-only transfer control plane, tested using metadata doubles.
 
-The transport and asset writer are intentionally not installed: immutable source
+The transport and CLI cache registration are intentionally not installed: immutable source
 manifests, conversion/provider pins and approvals are still missing. No arbitrary URL,
 path, body, request header or server diagnostic is accepted by this control plane.
 """
