@@ -741,3 +741,72 @@ Asia/Shanghai (UTC+08:00):
   audio/source/process orchestration and hardware evidence remain outstanding.
 
 This batch updates the same draft PR #36 without merging, deployment or closing Issue #5.
+
+### Exact independent mutation probe command
+
+The reviewer executed the following command at reviewed code head
+`7450cf824b774db1b2fb91dabb5fad72896b9ffe`, with working directory
+`/Users/szmg/.codex/worktrees/livecho-5-asr-impl/Livecho`. It returned exit 0 in 0.03s
+and printed the final literal below. The original stdin was subsequently saved verbatim
+at `/Users/szmg/.codex/monitors/livecho-20261002/reviews/source-collection-mutation-7450cf8.py`.
+Its SHA-256, checked during this documentation follow-up, is
+`e90e6915a744b06d28e0f1eb4fd03a4677794f92264633349cf1037ef1cf1b5c`.
+The script is included here so remote reviewers do not need that local file.
+
+```sh
+uv run python - <<'PY'
+import asyncio
+from pathlib import Path
+from tempfile import TemporaryDirectory
+from tools.asr_benchmark.model_cache import ModelOnlyCache
+from tools.asr_benchmark.preparation_run import prepare_sources
+from tools.asr_benchmark.runtime import BlockedEvidence
+from tests.asr_benchmark.test_source_preparation import (
+    Factory, assert_unlocked, content, file_path, manifest, populate,
+)
+from tests.asr_benchmark.test_model_download import Clock
+
+with TemporaryDirectory() as temporary:
+    base = Path(temporary).resolve()
+    record = manifest()
+    existing = record.source_assets[0]
+    missing = record.source_assets[1]
+    with ModelOnlyCache(base / 'cache', base / 'repo', record, 'huggingface') as cache:
+        populate(cache, (existing,))
+        factory, clock = Factory(), Clock()
+        delivered = False
+        changed = False
+        def on_progress(item):
+            global changed
+            if item.outcome == 'partial' and not changed:
+                assert item.asset_label != existing.path
+                payload = content(existing)
+                file_path(base, existing).write_bytes(b'X' + payload[1:])
+                changed = True
+        async def exercise():
+            global delivered
+            async with prepare_sources(record, 'huggingface', cache,
+                                       response_factory=factory, clock=clock,
+                                       sleep=clock.sleep, progress=on_progress):
+                delivered = True
+        try:
+            asyncio.run(exercise())
+        except BlockedEvidence as error:
+            assert str(error) == 'cache_reader_unavailable', str(error)
+        else:
+            raise AssertionError('mutated original asset set was delivered')
+        assert changed and not delivered and len(factory.responses) == 1
+        assert all(response.closed for response in factory.responses)
+        assert file_path(base, missing).read_bytes() == content(missing)
+        assert not cache.closed
+        assert_unlocked(cache)
+        print('mutation during missing-asset acquisition: complete mapping not delivered; valid new final preserved; response closed; every lock reusable; parent cache open')
+PY
+```
+
+This follow-up copied the preserved command into evidence; it did not rerun the probe,
+tests or `make verify`. `git diff --exit-code 7450cf824b774db1b2fb91dabb5fad72896b9ffe -- . ':(exclude)docs/changes/5-mlx-benchmark/evidence.md'`
+returned exit 0, confirming all non-evidence files equal the reviewed code snapshot.
+`git diff --check` also returned exit 0. Only this evidence document changes. The
+proposed conversion-session batch remains a future checkpoint; no next-batch code is
+started here and no stronger tensor-erasure or synchronous deadline claim is added.
