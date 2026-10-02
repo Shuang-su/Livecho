@@ -113,6 +113,7 @@ def inference(model: Model) -> InferenceManifest:
         manifest_id="test-inference",
         model=model,
         preparation_sha256=metadata_digest(prep),
+        source_revision=prep.source_revision,
         converted_assets=prep.source_assets,
         tensor_map_sha256=metadata_digest(TensorInventory(tensors=prep.tensor_map)),
         provider_revision=REVISION,

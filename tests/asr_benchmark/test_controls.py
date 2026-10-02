@@ -156,6 +156,61 @@ def test_no_progress_timeout_exact_boundary() -> None:
         task.check(60 * NS)
 
 
+def test_checkpoint_preserves_identity_offset_and_attempts_without_host_fallback() -> None:
+    original = transfer()
+    original.advance(25, NS)
+    checkpoint = original.checkpoint()
+    restored = transfer()
+    restored.restore_checkpoint(checkpoint, 100 * NS)
+    with pytest.raises(BlockedEvidence, match="not_ready"):
+        restored.resume(restored.identity, 100 * NS)
+    restored.resume(restored.identity, 101 * NS)
+    assert restored.received == 25 and restored.attempt == 2
+    mirror = PreparationTransfer(preparation(), "modelscope", "model.safetensors", 0)
+    with pytest.raises(BlockedEvidence, match="revision_changed"):
+        mirror.restore_checkpoint(checkpoint, 100 * NS)
+    assert mirror.stopped
+    exhausted = checkpoint.replace('"attempts_started":1', '"attempts_started":3')
+    with pytest.raises(BlockedEvidence, match="checkpoint_invalid"):
+        transfer().restore_checkpoint(exhausted, 100 * NS)
+
+
+@pytest.mark.parametrize(
+    "bad_digest,promotion_failure", [(False, False), (True, False), (False, True)]
+)
+def test_cache_promotion_requires_actual_verified_file_and_successful_atomic_commit(
+    bad_digest: bool,
+    promotion_failure: bool,
+) -> None:
+    calls = []
+
+    class MetadataCache:
+        def inspect_partial(self, identity: tuple[str, str, str]) -> tuple[int, str]:
+            calls.append("inspect")
+            return 100, "f" * 64 if bad_digest else DIGEST
+
+        def atomic_promote(self, identity: tuple[str, str, str]) -> None:
+            calls.append("promote")
+            if promotion_failure:
+                raise OSError("private-cache-path")
+
+        def invalidate_partial(self, identity: tuple[str, str, str]) -> None:
+            calls.append("invalidate")
+
+    task = transfer()
+    task.advance(100, NS)
+    if bad_digest or promotion_failure:
+        with pytest.raises(BlockedEvidence, match="^promotion_failed$"):
+            task.promote(MetadataCache(), NS)
+        assert task.stopped and not task.verified and not task.promoted
+        assert calls[-1] == "invalidate"
+        if bad_digest:
+            assert "promote" not in calls
+    else:
+        assert task.promote(MetadataCache(), NS).outcome == "verified"
+        assert task.promoted and calls == ["inspect", "promote"]
+
+
 def test_budget_includes_overlap_and_derivatives_before_allocation() -> None:
     released = []
     budget = Budget()

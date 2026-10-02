@@ -47,9 +47,21 @@ def instrument_call(
     """
     if cancelled():
         raise BlockedEvidence("cancelled")
+    if (
+        type(prefix.new_duration_ns) is not int
+        or not 0 < prefix.new_duration_ns <= 6 * NS
+        or prefix.kind not in {"provisional", "final"}
+        or type(overlap_ns) is not int
+        or overlap_ns not in {0, 800_000_000}
+        or allocation.end_pts_ns - allocation.start_pts_ns != prefix.new_duration_ns + overlap_ns
+    ):
+        raise BlockedEvidence("allocation_mismatch")
+    try:
+        preparation_start = clock()
+    except BaseException:
+        raise BlockedEvidence("invalid_timing") from None
     budget.reserve(allocation, release)
     prepared: MemoryInput | None = None
-    preparation_start = clock()
     preparation_end = execution_start = execution_end = preparation_start
     text = ""
     output_tokens = 0

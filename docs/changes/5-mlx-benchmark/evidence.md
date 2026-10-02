@@ -216,3 +216,72 @@ No third-party source, tests, fixtures, schema, configuration or assets were cop
 No audio representation (including synthetic samples), audio digest or model weight is
 persisted by these tests. Metadata release/write-denial tests do not claim hostile-host
 erasure, real provider memory bounds or proof that a real host cannot page audio.
+
+## Bounded follow-up implementation and primary-source audit
+
+Draft implementation PR: [#36](https://github.com/Shuang-su/Livecho/pull/36), first
+pushed review checkpoint `8646e25`; attached to the Codex task. It does not close #5.
+On 2026-10-03 the same implementation author additionally read the official pages below,
+including inline usage examples, and official Hugging Face API/configuration metadata.
+No example was copied/executed; no vendor model source, community adapter, reference
+repository, Issue #31, model weights, tokenizer contents or audio was fetched.
+
+| Primary input | Captured fact and limit |
+| --- | --- |
+| [Qwen technical report v1, section 2.1](https://arxiv.org/html/2601.21337v1) | AuT/projector/Qwen architecture, 128-channel features and eightfold encoder downsampling. These architectural facts do not define the full operator graph or prove a local MLX implementation. |
+| [Official 1.7B model card](https://huggingface.co/Qwen/Qwen3-ASR-1.7B), [0.6B card](https://huggingface.co/Qwen/Qwen3-ASR-0.6B) | Described package backends remain transformers/vLLM. Inline API examples were exposed but not executed, copied or used to enable their automatic downloads. |
+| [1.7B config at `7278e1e70fe206f11671096ffdd38061171dd6e5`](https://huggingface.co/Qwen/Qwen3-ASR-1.7B/blob/7278e1e70fe206f11671096ffdd38061171dd6e5/config.json) | Candidate shape facts: encoder width/layers/heads 1024/24/16, decoder width/layers/KV-heads/head-width 2048/28/8/128. This is candidate metadata, not an approved asset manifest. |
+| [0.6B config at `5eb144179a02acc5e5ba31e748d22b0cf3e303b0`](https://huggingface.co/Qwen/Qwen3-ASR-0.6B/blob/5eb144179a02acc5e5ba31e748d22b0cf3e303b0/config.json) | Encoder width/layers/heads 896/18/14, decoder width/layers/KV-heads/head-width 1024/28/8/128. Candidate metadata only. |
+| [Pinned 1.7B preprocessing metadata](https://huggingface.co/Qwen/Qwen3-ASR-1.7B/blob/7278e1e70fe206f11671096ffdd38061171dd6e5/preprocessor_config.json), [pinned 0.6B metadata](https://huggingface.co/Qwen/Qwen3-ASR-0.6B/blob/5eb144179a02acc5e5ba31e748d22b0cf3e303b0/preprocessor_config.json) | 128 features, FFT 400, hop 160; identifies a Whisper feature extractor but does not pin its full mathematical/padding/normalization implementation. No waveform was requested. |
+| [MLX quantize](https://ml-explore.github.io/mlx/build/html/python/_autosummary/mlx.core.quantize.html), [synchronize](https://ml-explore.github.io/mlx/build/html/python/_autosummary/mlx.core.synchronize.html), displayed version 0.32.3 | Affine quantization supports group 64 and 8 bits; returns packed values, scales and biases; last dimension must divide the group size. Synchronization is stream/device scoped. These APIs support the injected conversion-call contract, not an installed or pinned MLX dependency. |
+
+The web reader could not retrieve the Hugging Face model API endpoints. A bounded
+standard-library HTTPS metadata read retrieved each model's `sha`, then only the pinned
+`config.json` and `preprocessor_config.json` into RAM and printed selected scalar facts.
+No downloaded asset file or network/auth diagnostics was saved. Only independently
+written shape facts and links enter this change.
+
+Additional code now implements the exact existing four-field protocol projection,
+frozen-identity report parsing/serialization/text-sink writing, affine conversion-call
+dispatch with evaluation/synchronization, persistent text-only transfer checkpoints and
+verification-before-atomic-promotion coordination against a metadata cache double.
+The new JSON roundtrip test exposed strict-model pre-validation losing native JSON
+array/date semantics; explicit array/ISO-date handling fixes that without permitting
+boolean/integer/float literal coercion.
+
+The candidate shape planner calculates 58,720,256 bytes for a conventional full-layer
+K+V cache with 512 positions and two-byte elements (`2 * 28 * 8 * 128 * 512 * 2`). That
+specific audio-conditioned layout alone exceeds the 16,777,216-byte process audio cap.
+This rejects that layout, **not** every possible MLX implementation. A different bounded
+recomputation/cache strategy may be independently implemented and proved; the budget
+is not relaxed. This is a shape calculation, not measured memory usage.
+
+### Remaining work after this bounded batch
+
+- Independently writable code still includes concrete model-only HTTPS/cache I/O,
+  same-inode verification/promotion, a real-time acquisition/process runner and a
+  cancellation guard. Existing interfaces/tests constrain them but do not implement
+  these backends. They require deliberate filesystem/transport/termination failure
+  tests; no hardware benchmark is needed merely to write that code.
+- Exact AuT convolution/padding/chunk masks, projector, Qwen decoder/position encoding,
+  token framing, feature normalization and weight-name/layout conversion remain missing.
+  The consulted paper/configs are insufficient to invent those details. The next code
+  step is to establish each exact operator/shape contract from permitted primary
+  documentation, then independently implement and test model operations without weights.
+  No statement is made that this work is impossible or blocked solely by hardware.
+- Runtime asset loading additionally needs reviewed dependency pins, complete tensor/
+  asset manifests, conversion licenses/notices and approvals. Real equivalence/quality
+  and memory/timing tests need approved weights and the qualified source corpus.
+- Real audio execution additionally needs a complete allocation inventory, actual
+  bounded deadline termination and protected-host no-paging/no-dump evidence. It remains
+  disabled; an empty directory or a model's size does not satisfy these gates.
+
+Independent reviewer `/root/audio_code_readiness` inspected accepted local requirements
+and the implementation only, without editing code or fetching external sources. Its
+bounded scope included contracts/report, runtime/instrumentation/runner/timing,
+conversion/preparation/serialization/adapter planning/CLI and selected tests. It found
+two instrumentation defects: supplied input duration could differ from the reported
+prefix denominator, and a failing initial clock read could strand a reservation. The
+author bound prefix+overlap to the reserved/prepared duration before provider use and
+moved that initial clock read before reservation; metadata-only regressions cover both.
+Exact final review and updated verification outcomes follow after the stable checkpoint.

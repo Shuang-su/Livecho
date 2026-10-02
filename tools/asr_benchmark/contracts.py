@@ -6,7 +6,7 @@ from pathlib import PurePosixPath
 from typing import Annotated, Literal, Self, get_args, get_origin
 
 import rfc8785
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, ValidationInfo, field_validator, model_validator
 
 Identifier = Annotated[str, Field(pattern=r"^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,95}$")]
 Digest = Annotated[str, Field(pattern=r"^[0-9a-f]{64}$")]
@@ -30,15 +30,27 @@ class Closed(BaseModel):
 
     @model_validator(mode="before")
     @classmethod
-    def exact_literal_types(cls, value: object) -> object:
+    def exact_literal_types(cls, value: object, info: ValidationInfo) -> object:
         # Pydantic Literal[1] accepts True and Literal[True] accepts 1 even in
         # strict mode. Evidence/contract values must preserve their JSON types.
         if isinstance(value, dict):
+            value = dict(value)
             for name, field in cls.model_fields.items():
                 if name in value and get_origin(field.annotation) is Literal:
                     literals = get_args(field.annotation)
                     if not any(type(value[name]) is type(item) for item in literals):
                         raise ValueError("literal_type")
+                # A model-before validator materializes JSON values as Python.
+                # Restore only JSON's legitimate array/date representations; do
+                # not enable scalar coercion for Python input or numeric literals.
+                if name in value and info.mode == "json":
+                    if get_origin(field.annotation) is tuple and isinstance(value[name], list):
+                        value[name] = tuple(value[name])
+                    elif field.annotation is date and isinstance(value[name], str):
+                        parsed = date.fromisoformat(value[name])
+                        if parsed.isoformat() != value[name]:
+                            raise ValueError("date_format")
+                        value[name] = parsed
         return value
 
 
@@ -151,6 +163,7 @@ class InferenceManifest(Closed):
     schema_version: Literal[1] = 1
     manifest_id: Identifier
     model: Model
+    source_revision: Revision
     preparation_sha256: Digest
     converted_assets: tuple[Asset, ...]
     tensor_map_sha256: Digest
@@ -177,6 +190,23 @@ def metadata_digest(record: Closed) -> str:
     import hashlib
 
     return hashlib.sha256(rfc8785.dumps(record.model_dump(mode="json"))).hexdigest()
+
+
+class ManifestProjection(Closed):
+    """Exactly the existing ModelManifestRefV1 tuple, without protocol changes."""
+
+    provider: Literal["mlx"] = "mlx"
+    model_id: Literal["qwen3-asr-1.7b", "qwen3-asr-0.6b"]
+    revision: Revision
+    sha256: Digest
+
+
+def protocol_projection(manifest: InferenceManifest) -> ManifestProjection:
+    return ManifestProjection(
+        model_id="qwen3-asr-1.7b" if manifest.model == MODELS[0] else "qwen3-asr-0.6b",
+        revision=manifest.source_revision,
+        sha256=metadata_digest(manifest),
+    )
 
 
 class Source(Closed):

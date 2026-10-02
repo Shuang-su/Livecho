@@ -4,6 +4,14 @@ The Issue #5 contracts, text metrics, matrix evaluator, scheduling and transfer 
 planes live in `tools/asr_benchmark`. Run `make asr-benchmark-check` for deterministic
 text/metadata tests. No audio, weight, source rendition, or approved manifest ships here.
 
+The local final manifest projects to the unchanged protocol tuple: provider `mlx`,
+the lowercase canonical model basename, its immutable source revision, and SHA-256 of
+the complete canonical local inference manifest. This helper does not allowlist a model.
+Report serialization verifies a separately reviewed frozen run identity before writing
+to an already-open text sink; changed corpus/settings/machine/provenance requires a new
+run identity. Transfer checkpoints and atomic-promotion coordination are metadata-only
+until a reviewed cache backend is installed.
+
 Manual entry points accept a reviewed identifier, never a path or URL:
 
 ```sh
@@ -21,6 +29,8 @@ mirror records, exact reviewed MLX dependencies, the independently authored Qwen
 pass/converter and allocation inventory, a bounded source/preprocessing implementation,
 the qualified 60-script consenting-speaker corpus, protected-host evidence preventing
 paging/dumps, real-time runner/watchdog integration, and real M3 Ultra measurements.
+The model conversion dispatcher calls only the reviewed backend's affine 8-bit/group-64
+operation, evaluation and synchronization; no actual MLX backend is installed.
 Transfer tests simulate only lengths/digests/outcomes; they do not verify a real network
 transport or atomic filesystem promotion. Resource tests observe release callbacks;
 they do not establish physical RAM erasure or no-paging on any host.

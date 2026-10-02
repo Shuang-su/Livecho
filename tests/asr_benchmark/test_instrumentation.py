@@ -126,3 +126,51 @@ def test_cancel_after_preparation_still_clears_reservation() -> None:
             overlap_ns=0,
         )
     assert released == ["released"] and budget.live_count == 0
+
+
+def test_allocation_duration_is_bound_to_prefix_and_overlap_before_provider_call() -> None:
+    clock = Clock()
+    budget = Budget()
+    calls = []
+
+    def prepare() -> MemoryInput:
+        calls.append("prepare")
+        return MemoryInput(memoryview(bytearray()), 0, 2 * NS)
+
+    with pytest.raises(BlockedEvidence, match="allocation_mismatch"):
+        instrument_call(
+            provider=MetadataProvider(clock),
+            prefix=Prefix(NS, "final"),
+            allocation=Allocation("metadata", 0, 2 * NS, 1, 0),
+            budget=budget,
+            prepare=prepare,
+            release=lambda: None,
+            clock=clock,
+            guard=MetadataGuard(clock),
+            cancelled=lambda: False,
+            overlap_ns=0,
+        )
+    assert calls == [] and budget.live_count == 0
+
+
+def test_initial_clock_failure_cannot_strand_a_reservation() -> None:
+    clock = Clock()
+    budget = Budget()
+
+    def failed_clock() -> int:
+        raise RuntimeError("private clock diagnostic")
+
+    with pytest.raises(BlockedEvidence, match="invalid_timing"):
+        instrument_call(
+            provider=MetadataProvider(clock),
+            prefix=Prefix(NS, "final"),
+            allocation=Allocation("metadata", 0, NS, 1, 0),
+            budget=budget,
+            prepare=lambda: MemoryInput(memoryview(bytearray()), 0, NS),
+            release=lambda: None,
+            clock=failed_clock,
+            guard=MetadataGuard(clock),
+            cancelled=lambda: False,
+            overlap_ns=0,
+        )
+    assert budget.live_count == 0

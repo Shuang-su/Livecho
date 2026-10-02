@@ -5,10 +5,20 @@ manifests, conversion/provider pins and approvals are still missing. No arbitrar
 path, body, request header or server diagnostic is accepted by this control plane.
 """
 
+from contextlib import suppress
 from dataclasses import dataclass
-from typing import Literal
+from typing import Literal, Protocol
 
-from .contracts import NS, Asset, PreparationManifest, metadata_digest
+from .contracts import (
+    NS,
+    Asset,
+    Closed,
+    Digest,
+    Nonnegative,
+    PreparationManifest,
+    Revision,
+    metadata_digest,
+)
 from .runtime import BlockedEvidence
 
 
@@ -20,6 +30,29 @@ class TransferProgress:
     percent: float
     retry_count: int
     outcome: Literal["partial", "retry", "verified", "stopped"]
+
+
+class TransferCheckpoint(Closed):
+    preparation_sha256: Digest
+    repository_revision: Revision
+    asset_sha256: Digest
+    source_mode: Literal["huggingface", "modelscope"]
+    received: Nonnegative
+    attempts_started: Literal[1, 2, 3]
+
+
+class ModelCacheBackend(Protocol):
+    """Model-only cache outside Git. No network, user paths or audio on this seam."""
+
+    def inspect_partial(self, identity: tuple[str, str, str]) -> tuple[int, str]:
+        """Compute actual complete-file length/SHA-256; never trust checkpoint values."""
+        ...
+
+    def atomic_promote(self, identity: tuple[str, str, str]) -> None:
+        """Promote the same verified inode atomically; forbid symlinks and substitutions."""
+        ...
+
+    def invalidate_partial(self, identity: tuple[str, str, str]) -> None: ...
 
 
 class PreparationTransfer:
@@ -35,6 +68,7 @@ class PreparationTransfer:
         if len(mirrors) != 1 or len(assets) != 1 or now_ns < 0:
             raise BlockedEvidence("preparation_not_allowlisted")
         self.asset: Asset = assets[0]
+        self.mode = mode
         self.identity = (metadata_digest(manifest), mirrors[0].revision, self.asset.sha256)
         self.received = 0
         self.last_progress_ns = now_ns
@@ -42,6 +76,60 @@ class PreparationTransfer:
         self.retry_at_ns: int | None = None
         self.stopped = False
         self.verified = False
+        self.promoted = False
+
+    def checkpoint(self) -> str:
+        if self.stopped or self.verified:
+            raise BlockedEvidence("transfer_closed")
+        record = TransferCheckpoint.model_validate(
+            {
+                "preparation_sha256": self.identity[0],
+                "repository_revision": self.identity[1],
+                "asset_sha256": self.identity[2],
+                "source_mode": self.mode,
+                "received": self.received,
+                "attempts_started": self.attempt,
+            }
+        )
+        return record.model_dump_json()
+
+    def restore_checkpoint(self, text: str, now_ns: int) -> None:
+        """Restore metadata on a fresh controller; retry delay/attempt bounds still apply."""
+        from pydantic import ValidationError
+
+        if self.received or self.attempt != 1 or self.stopped or self.verified:
+            raise BlockedEvidence("transfer_not_fresh")
+        try:
+            record = TransferCheckpoint.model_validate_json(text)
+        except ValidationError:
+            raise BlockedEvidence("checkpoint_invalid") from None
+        identity = (record.preparation_sha256, record.repository_revision, record.asset_sha256)
+        if identity != self.identity or record.source_mode != self.mode:
+            self.stopped = True
+            raise BlockedEvidence("partial_revision_changed")
+        if record.received > self.asset.size or record.attempts_started >= 3 or now_ns < 0:
+            self.stopped = True
+            raise BlockedEvidence("checkpoint_invalid")
+        self.received = record.received
+        self.attempt = record.attempts_started
+        self.last_progress_ns = now_ns
+        self.retry_at_ns = now_ns + self.attempt * NS
+
+    def promote(self, cache: ModelCacheBackend, now_ns: int) -> TransferProgress:
+        """A verified hash is insufficient until same-file atomic promotion succeeds."""
+        self.check(now_ns)
+        try:
+            size, digest = cache.inspect_partial(self.identity)
+            self.verify(size, digest, now_ns)
+            cache.atomic_promote(self.identity)
+            self.promoted = True
+            return self.progress("verified")
+        except BaseException:
+            self.stopped = True
+            self.verified = False
+            with suppress(BaseException):
+                cache.invalidate_partial(self.identity)
+            raise BlockedEvidence("promotion_failed") from None
 
     def progress(
         self, outcome: Literal["partial", "retry", "verified", "stopped"]
