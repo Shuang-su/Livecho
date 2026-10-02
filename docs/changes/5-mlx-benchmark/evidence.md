@@ -105,7 +105,8 @@ does not authorize a model download, hardware run, real worker audio, or public 
 
 - Author: `/root/asr_implementation` (OpenAI Codex), 2026-10-02; assigned independently
   to `tools/asr_benchmark/**`, `benchmarks/asr/**`, benchmark tests and Makefile wiring.
-  Independent post-implementation reviewer: `/root/implementation_review`.
+  Independent post-implementation reviewer: `/root/audio_code_readiness` (assignment
+  corrected before code because the proposed new reviewer could not be allocated).
 - Accepted base: `df9f498ba1c5f2496e2ad69fa5b4ff2fd5c599cd`; owner-authorized artifact
   PR #33 is merged. The historical artifact-stage pending labels above are retained.
 - Inputs viewed: supplied instructions, repository AGENTS, owning Issue #5, all four
