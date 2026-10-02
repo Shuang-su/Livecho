@@ -16,6 +16,15 @@ integrity failure invalidates the partial; deliberate normal close preserves res
 progress. It is callable only as a preparation backend, with no CLI registration or
 network transport. Tests persist original notice text in temporary directories only.
 
+The final-cache reader separately binds the final inference manifest to preparation,
+checks every converted asset before exposing any handle, and shares a locked reader for
+equal-content path aliases. Bounded read-at access checks the held inode and mutation
+metadata before and after reading; no public raw descriptor or local path is supplied.
+The local load boundary checks injected backend pins/unloaded state, requests local-only
+and no remote code, synchronizes, and closes all readers before returning load timestamps.
+Those timestamps do not establish a new process or form a scored `Cold` observation.
+The guard and eager backend are injected contracts; neither has a real registered backend.
+
 Manual entry points accept a reviewed identifier, never a path or URL:
 
 ```sh
@@ -36,8 +45,9 @@ paging/dumps, real-time runner/watchdog integration, and real M3 Ultra measureme
 The model conversion dispatcher calls only the reviewed backend's affine 8-bit/group-64
 operation, evaluation and synchronization; no actual MLX backend is installed.
 Transfer-control tests simulate lengths/digests/outcomes; cache tests exercise local
-filesystem promotion with ordinary text. They do not verify a real network transport,
-model download or cold asset loader. Cache locking assumes cooperating cache clients in
+filesystem promotion and final reads with ordinary text. They do not verify a real network
+transport, model download, converted-asset writer or MLX cold loader. Cache locking assumes
+cooperating cache clients in
 a private operator directory, not protection against a hostile process with the same
 operator privileges. Resource tests observe release callbacks;
 they do not establish physical RAM erasure or no-paging on any host.

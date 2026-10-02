@@ -390,3 +390,44 @@ external sources, model implementation, weights or audio were accessed. Earlier 
 and primary-document exposures above remain applicable; this is not a no-exposure claim.
 Scope is final-manifest-bound read-only handles and injected backend cleanup, not HTTPS,
 converted-asset writing, actual MLX loading, fresh-process proof or scored cold results.
+
+### Reader/load implementation boundary
+
+`FinalModelCache` binds the separate final inference manifest using the existing
+preparation/source/tensor-map/dependency contract, and selects only its converted
+asset digest/length entries. It uses the preparation digest/canonical source revision/
+converted digest namespace. Source cache bytes are eligible only if exactly identical
+to that independently approved converted entry; missing converted assets never fall
+back to source files. This neither manufactures final approval nor registers a model.
+The converted-asset writer remains unimplemented; tests place original ordinary notice
+text at fixed content keys to exercise read semantics, not conversion or tensor loading.
+
+All final files are verified before the backend sees a handle. Duplicate-content path
+labels share one nonblocking lock and read-only descriptor, avoiding self-contention.
+Their borrowed lifetime is shared; the backend must not close individual aliases. Reads
+are offset/count bounded with exact integer types, use a position-independent descriptor
+read, and validate inode, file-name identity, private regular-file status, length and
+mtime/ctime before and after access. No public raw descriptor/path is exposed. Reader
+errors invalidate subsequent use. The cache root must already exist; this read entry
+point does not create an empty model cache and call it verified.
+
+`local_model_load` requires matching provider/dependency pins and unloaded backend
+state, passes only the verified final asset mapping with local-only/no-remote-code
+parameters, and synchronizes before readiness. Its required injected guard contains
+verification, initialization, synchronization, reader cleanup and the ready timestamp.
+Every failure/cancellation/close path attempts all reader and backend cleanup. Retained
+borrowed readers are closed before readiness is yielded; backend lifetime ends on
+context exit. The result is only `LocalLoadBoundaries`; it never constructs a `Cold`,
+process-freshness assertion, scored report or hardware measurement. Backend properties,
+flags and the guard are contracts awaiting independently verified real implementations,
+not proof that arbitrary Python callbacks cannot use the network or retain model state.
+
+Remaining independently writable work: fixed allowlisted HTTPS/range/response handling
+and bounded-transfer integration, model-only converted-output writer with actual digests,
+and process/acquisition/deadline orchestration with failure tests. Real eager model loading
+still needs the exact independently authored MLX operator/weight/feature/token contracts
+and backend. Final model/source/rights approval, no-paging/no-dump host evidence, fresh
+process repetitions, real corpus scoring and the decision ADR remain separate acceptance
+gates. No further code scope is taken in this reader/load batch.
+
+Verification and exact independent review for this batch follow below.

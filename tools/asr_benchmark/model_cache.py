@@ -41,7 +41,7 @@ def _private_file(fd: int) -> os.stat_result:
     return value
 
 
-def _root_fd(root: Path, repository_root: Path) -> int:
+def _root_fd(root: Path, repository_root: Path, *, create: bool = True) -> int:
     if not root.is_absolute() or ".." in root.parts:
         raise BlockedEvidence("cache_root_unsafe")
     if root.resolve().is_relative_to(repository_root.resolve()):
@@ -56,7 +56,7 @@ def _root_fd(root: Path, repository_root: Path) -> int:
                 pass
             else:
                 raise BlockedEvidence("cache_inside_git")
-            if index == len(root.parts) - 2:
+            if create and index == len(root.parts) - 2:
                 with suppress(FileExistsError):
                     os.mkdir(part, mode=0o700, dir_fd=current)
             child = os.open(part, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=current)
