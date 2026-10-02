@@ -456,3 +456,50 @@ readers and backend, with replacement locks available. It reported no remaining
 actionable finding in this bounded scope. It did not repeat old suites or fetch external
 sources, load models/audio, execute a real provider, or claim process/hardware/privacy
 evidence. The author/reviewer quota gates returned exit 0 before/after this batch.
+
+## HTTPS follow-up exposure checkpoint, 2026-10-03
+
+Author `/root/asr_implementation` began a bounded request/response/transfer integration
+assignment after verified code `4df7696` and evidence head `12aa322`. **No product code
+or tests for this HTTPS batch were written before the following exposure, and none have
+been written after it.** The existing reader/cache implementations predate this lookup.
+
+Intended primary documentation opened: [RFC 9110](https://www.rfc-editor.org/rfc/rfc9110.html)
+(including Range, Content-Range and Content-Length section links), Hugging Face
+[model downloads](https://huggingface.co/docs/hub/models-downloading) and
+[file download API](https://huggingface.co/docs/huggingface_hub/package_reference/file_download),
+[Python 3.12 http.client](https://docs.python.org/3.12/library/http.client.html), and
+[ModelScope model download documentation](https://www.modelscope.cn/docs/models/download).
+The ModelScope page returned no readable body. No model/asset endpoint was requested.
+
+A subsequent search was mistakenly not restricted using the tool's domain filter. Its
+result snippets exposed implementation and example expression outside the intended
+primary-documentation scope. The author did not click these results, open repositories,
+copy/execute their examples, fetch weights/audio or use them to write code. Exposure was
+nevertheless real and is not treated as zero. Results included the following sources;
+only provenance locations are recorded here, not their implementation expression:
+
+| Search-result source | Material exposed in the search output |
+| --- | --- |
+| [ModelScope SDK file_download.py](https://github.com/modelscope/modelscope/blob/master/modelscope/hub/file_download.py) | Download-function source/docstring fragment; moving branch, no immutable revision established. |
+| [Third-party ModelScope fork](https://github.com/AiTH-Solutions/platform-llm-modelscope/blob/master/modelscope/hub/file_download.py) | Download/cache source fragment; moving branch, no immutable revision established. |
+| [modelpull platform document](https://github.com/l17728/modelpull/blob/main/docs/v2.0/06-platform-and-ecosystem.md) | Third-party source-driver design and endpoint summary; moving branch, no immutable revision established. |
+| [ModelScope speaker-verification model page](https://www.modelscope.cn/models/damo/speech_campplus_sv_zh-cn_16k-common) | Example API code and audio URL strings, not media contents. |
+| [ModelScope language-recognition model page](https://www.modelscope.cn/models/iic/speech_eres2net_base_lre_en-cn_16k/) | Example API and setup commands, not repository or media contents. |
+| [ModelScope separation model page](https://modelscope.cn/models/iic/speech_flatflocoformer_separation_timefrequency_8k_middle_libri2mix360) | Example API/persistence code and explanatory text, not media contents. |
+| [ModelScope community ComfyUI page](https://community.modelscope.cn/6641a99e8dd48c198fa263a2.html) | Download command examples. |
+| [ModelScope community MistoLine page](https://community.modelscope.cn/6644261a931dbe49ec6c8f64.html) | Download/setup and helper-script examples. |
+| [ModelScope community llamafile page](https://community.modelscope.cn/65bc887128cf1d21b5200a30.html) | Download/execution examples. |
+| [ModelScope issue 592](https://github.com/modelscope/modelscope/issues/592) | Third-party issue code and error text. This is not Livecho Issue #31, which was not accessed. |
+| [ModelScope community SD-WebUI page](https://community.modelscope.cn/6641afca5b9cb1600612c5e1.html) | Download/setup examples. |
+| [ModelScope paraformer model page](https://modelscope.cn/models/zhgqpower/speech_paraformer_large_asr_mtl-16k-common-vocab11666-onnx) | Example API code and source URLs, not repository or media contents. |
+
+The author stopped this module's implementation immediately and reported the event to
+the coordinator without relaying the implementation snippets to the isolated reviewer.
+The coordinator assigned this author no further implementation of the corresponding
+HTTPS/download/transfer modules and will arrange an unexposed replacement author with
+the isolated reviewer unchanged. No exception is requested. No endpoint compatibility,
+legal clearance, new implementation
+or new test result is claimed from this lookup. The existing executable registry remains
+empty and Issue #5 remains incomplete. This exposure-only checkpoint changes no accepted
+intent/spec/plan, code, tests, protocol, model authority or runtime setting.
