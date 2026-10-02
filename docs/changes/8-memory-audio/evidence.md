@@ -131,3 +131,130 @@ Not deployed. No production data, live source, model, worker connection or audio
   must fail closed. Metadata/control doubles can run before that evidence; those runs
   cannot establish decoder or host acceptance, and no actual audio is generated merely
   to make an acceptance test appear green.
+
+## Implementation status (2026-10-03, Asia/Shanghai)
+
+The implementation PR is a draft and does **not** close Issue #8 or authorize audio
+runtime admission. The accepted intent/spec/plan remain unchanged. Runtime code exists
+under `services/backend/src/livecho_backend/audio/`; the approved build and host
+registries in `preflight.py` are deliberately empty. `preflight()` rejects before
+executable probing, process creation, or audio allocation with
+`audio_budget_unverified`. A locally installed broad FFmpeg build or a momentary
+zero-swap observation is not substituted for the missing evidence.
+
+Implemented controls:
+
+- Closed synthetic binding, two exact raw formats, complete 20 ms source frames,
+  exact-next local metadata validation, and explicit EOF; source writers are bounded
+  and revoked after each read. No URL, arbitrary command/options, encoded media,
+  credentials, model, network source, or persisted input interface is introduced.
+- Synchronized per-owner canonical reservations, the 960,000-byte session limit,
+  30,000 ms retained envelope, 4 MiB parent noncanonical and 8 MiB decoder inventory
+  limits, and a shared 16,777,216-byte physical allocation counter. Reservations
+  precede buffers/copies; shared ownership counts once, and copies reserve again.
+  The fixed canonical transport allowance bounds outstanding input to 100 frames.
+- Revocable memory owners and completed segment handles; cleanup clears registered
+  consumer copies as well as ring/scratch/input allocations before teardown awaits.
+  Consumer release is distinct from failure/expiry invalidation. The deadline uses
+  the owner clock, never a consumer-supplied timestamp.
+- Integer energy threshold and sample-clock VAD/segment decisions, 3-frame onset,
+  bounded 200 ms pre-roll, 25-frame silence closure, exact 6-second cap and continuous
+  800 ms context. Ordinary pre-roll cannot rewind an emitted segment end.
+- One serialized asynchronous owner, 500 ms backpressure, a shared 2-second initial
+  output deadline, source stalls, 1-second handle expiry, terminal gate invalidation,
+  two session-wide reconnect delays (250/1,000 ms), and a continuity-break callback.
+  No wire epoch or sequence is generated or changed.
+- Fixed raw-pipe FFmpeg arguments, exact 4,096-byte pipe capacity checks on the gated
+  Linux path, no shell, discarded stderr, stripped environment, disabled core dumps,
+  and an independent watchdog that directly owns the decoder process group.
+  Parent-liveness EOF triggers bounded TERM/KILL/reap. Linux parent-death signaling
+  captures the watchdog identity before fork. Reaping and successful decoding are
+  separate outcomes; EOF final publication waits for clean decoder completion.
+
+### Additional implementation inputs
+
+The implementer read the accepted local protocol metadata codec/state and test
+configuration while writing compatibility tests. Primary documentation viewed during
+implementation was the official [FFmpeg command reference](https://ffmpeg.org/ffmpeg.html),
+[FFmpeg pipe protocol](https://ffmpeg.org/ffmpeg-protocols.html#pipe), Python 3.12
+[subprocess](https://docs.python.org/3.12/library/subprocess.html) and
+[OS vectored I/O](https://docs.python.org/3.12/library/os.html#os.readv) documentation,
+and the Linux man-pages project's
+[PR_SET_PDEATHSIG reference](https://man7.org/linux/man-pages/man2/PR_SET_PDEATHSIG.2const.html).
+These supplied API/option semantics, not an allocation or privacy guarantee. No linked
+vendor source code, upstream reference repository, Issue #31 body, audio/model/dataset,
+or external research memo was opened or downloaded. The parent relayed local FFmpeg
+and swap observations; neither was used as admission evidence.
+
+### Deterministic verification and its limits
+
+`tests/audio/` creates no PCM array, sample fixture, waveform encoding, or audio digest.
+It uses independently specified metadata expectations, scalar threshold arithmetic,
+reservation records, and process/source/buffer doubles that contain only control
+values. The owner-loop tests exercise the real asynchronous pipeline with those
+doubles; they do not execute FFmpeg, resample audio, establish native buffer erasure,
+or prove OS/process-tree behavior.
+
+The unchanged, accepted Issue #3 tests remain part of `make verify`. Their existing
+minimal in-memory binary codec arrays are permitted by that specification; they are
+not new Issue #8 runtime admission, and they do not establish the missing host proof.
+The new overlap checks pass metadata through the unchanged lease/sequence/budget
+validator with its binary parser substituted by validated headers. Existing v1
+fixtures and generated protocol files remain byte-for-byte unchanged. Full audio
+transport integration remains Issue #9's separately accounted responsibility.
+
+| Exact command | Result | Date / scope |
+| --- | --- | --- |
+| `make bootstrap` | Passed; frozen uv/pnpm installation, no audio/decoder/model download | 2026-10-02, implementation worktree |
+| `make audio-check` | Passed, 102 control-only tests; target explicitly reports trusted runtime acceptance pending | 2026-10-03, implementation worktree |
+| `make verify` | Passed: Ruff, mypy, TypeScript, 209 pytest tests, 128 protocol and 63 Railway Vitest tests, artifact/protocol checks and build | 2026-10-03, implementation worktree |
+| `make protocol-check` | Passed; generated protocol artifacts unchanged | 2026-10-03, implementation worktree |
+| `git diff --check` | Passed | 2026-10-03, implementation worktree |
+| `make audio-runtime-check` | **Blocked as required, exit 2:** `audio_budget_unverified`; not a passing or skipped decoder acceptance result | 2026-10-03, implementation worktree |
+
+The first 81-test pass found one strict-literal boolean coercion defect and two test
+attribute typos; all were fixed before the passing runs above. Additional owner-loop
+regressions were added for review findings, rather than treating the initial suite as
+decoder/host acceptance.
+
+### Allocation and privacy evidence still required
+
+The accounting table in the accepted spec is enforced as reservations. It is **not** an
+audited FFmpeg/CPython allocation inventory. No exact executable/version/license and
+dependency inventory has been approved, no audited decoder/resampler allocation bound
+has been supplied, and no supported host proves nonpaging memory and crash-collector
+exclusion. The runtime path therefore remains unavailable on this checkout, including
+the current macOS host. Adding a metadata record without the owner-reviewed supporting
+evidence would not complete acceptance.
+
+Pending trusted checks include actual conversion and sample values for both source
+formats; native buffer/copy erasure; decoder/resampler tails; every real pipe/allocation
+owner; abnormal FFmpeg exit and TERM resistance; parent SIGKILL/backend restart;
+watchdog death and descriptor inheritance; actual process identities and reaping;
+and no-paging/crash behavior. `make audio-runtime-check` intentionally cannot turn any
+of those pending requirements into a successful skip.
+
+Normal and injected metadata-failure owner-loop runs intercept file writes before
+retaining/printing a body, inspect their empty sandbox temporary directory and logs,
+and assert zero remaining buffer owners. No database, object-store, persistent queue,
+or cache adapter is added to this module. These application-level controls do not prove
+kernel swap/dump safety or no-write behavior of an unapproved decoder; those remain
+required trusted evidence. No audio or reversible audio artifact was written.
+
+### Independent review and handoff
+
+Named reviewer `/root/audio_code_readiness` performed read-only review from accepted
+Livecho requirements and this implementation, with metadata-only reproductions. Review
+found pre-first-run cancellation leaking Alpha admission, concurrent close interrupting
+cleanup, incomplete loss/onset metrics, an incorrectly renewed startup deadline, and
+clean/late decoder-exit races, and a producer `close()` cancellation bypassing accounting
+release. The implementation now has dedicated regressions for
+those cases. The reviewer independently reproduced the corrected cancellation cases;
+final review status is recorded after the remaining review pass. No upstream expression
+was supplied by the reviewer or used for fixes.
+
+The completed-segment API is intended for Issue #9 after the pending evidence gates
+pass. It does not provide incremental prefix access, partial-caption timing, a public
+endpoint, a platform adapter, or a production enable switch. Disable/cancel invalidates
+local capabilities immediately; a failed reap retains the Alpha admission fence.
+Rollback has no audio recovery/replay because no audio state is persisted.
