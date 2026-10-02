@@ -98,3 +98,36 @@ No implementation, protocol edit, accepted-artifact rewrite, or production enabl
 ## Release and rollback evidence
 
 Not deployed. No production data, live source, model, worker connection or audio is used.
+
+## Independent implementation assignment (before runtime code)
+
+- Author: `/root/audio_implementation` (OpenAI Codex GUI subagent), 2026-10-02.
+- Assignment: independently implement Issue #8 under
+  `services/backend/src/livecho_backend/audio/`, `tests/audio/`, and the directly
+  required Make/Python configuration and this evidence file. The isolated reviewer is
+  `/root/audio_code_readiness`; the reviewer does not author this implementation.
+- Owner-approved prerequisite: PR #34 merged at
+  `93d8b0a4b3e147ce0b7df903f118060117d56f0a`; the parent supplied the owner's explicit
+  approval/merge authorization. Accepted intent/spec/plan are unchanged.
+- Actual source context before code: the supplied AGENTS.md and local copy; owning
+  Issue #8 body and its comment; every file in `docs/changes/8-memory-audio/`;
+  accepted independent-implementation policy; relevant accepted Issue #2 architecture,
+  audio lifecycle and policy material; accepted Issue #3 protocol specification; local
+  repository Makefile/Python configuration and file inventory. Long combined reads of
+  architecture, lifecycle, Issue #4 and protocol material were truncated; no complete
+  line-by-line review of unrelated infrastructure is claimed.
+- The independent-implementation policy exposed its upstream repository names,
+  revision/path/license metadata and historical author's exposure statements. The
+  owning Issue comment incidentally mentions Issue #31 and Cap's media-cache boundary;
+  neither Issue #31 nor a linked reference, implementation, screenshot, research memo,
+  upstream source/test/fixture/schema/configuration/docs/assets, or expression-bearing
+  upstream summary was opened. No prior upstream contributions are known in this task
+  context. No reference source is an implementation input.
+- Decision: assign a fresh implementation from accepted Livecho requirements and
+  primary standard/vendor documentation only. No external source has been used as of
+  this record. Additional primary references, if needed, will be named below.
+- Runtime limitation already identified: this checkout contains no approved FFmpeg
+  executable/allocation inventory or trusted no-paging/crash evidence. Audio admission
+  must fail closed. Metadata/control doubles can run before that evidence; those runs
+  cannot establish decoder or host acceptance, and no actual audio is generated merely
+  to make an acceptance test appear green.
