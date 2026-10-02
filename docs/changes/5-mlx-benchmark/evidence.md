@@ -916,8 +916,9 @@ Final verification and independent review, recorded 2026-10-03 02:58 UTC+08:00:
   exhaustive inventory. No remaining actionable finding; no new external source read.
 - Root independently supplemented lifecycle/owned-reference review at the same code
   head and found no remaining actionable issue. Root's check was read-only: no test
-  execution, real MLX or hardware proof. The three weakref regressions remain author
-  executions. Neither review claims revocation of escaped raw tensor references.
+  execution, real MLX or hardware proof. The three weakref regressions were run by
+  the author and included in the isolated reviewer's 40-test command; root did not
+  execute them. Neither review claims revocation of escaped raw tensor references.
 - All GUI gate checks before/after these batches returned active. This final record
   changes evidence only; `git diff a98b10cef62b15cd0528c361523b91dda7b78c7c --exit-code -- tools tests benchmarks/asr/README.md`
   and `git diff --check` both passed before the evidence-only commit. No tests were
