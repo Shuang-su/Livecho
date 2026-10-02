@@ -106,6 +106,32 @@ and no remote code, synchronizes, and closes all readers before returning load t
 Those timestamps do not establish a new process or form a scored `Cold` observation.
 The guard and eager backend are injected contracts; neither has a real registered backend.
 
+`PassSupervisor` adds a synchronous, single-use owner of one fresh local process. It
+accepts a strictly revalidated PassPlan plus manifest/corpus selection IDs and invokes
+only the fixed first-party `pass_child.py` with isolated Python, an empty environment,
+bounded nonblocking metadata pipes, and discarded stderr. The fixed child has no
+execution registrations and returns only a blocked control outcome. No module, shell,
+argv, URL, caller path, audio or model object can be supplied to this interface.
+
+The sequential metadata handshake starts operational phase clocks when the parent
+grants permission: cached load 30 seconds, active input progress 2 seconds, provider
+call 10 seconds. Increasing bounded PTS renews only active input; input is explicitly
+paused during a call. Overlapping/repeated/late phases fail. Startup (5 seconds),
+between-phase and terminal-exit waits (2 seconds) are operational limits, separate
+from child-clock Cold/Warm measurements. Partial I/O does not renew a deadline.
+Termination waits one second before kill and another second to reap only the owned
+child. Failed cleanup retains its handle for explicit retry and prevents successful
+return or reuse. Initial process creation and OS calls are not forcibly preemptible;
+late returns are rejected after cleanup. This is cooperative process control, not a
+hostile-code sandbox or an implementation of the callable in-process ExecutionGuard.
+
+Terminal metadata still requires EOF, exit zero, reaping and successful timely cleanup.
+The unscored `control_complete` outcome used by test doubles proves only this handshake,
+not execution of the full PassPlan, a Cold observation, a benchmark report, or a real
+provider hard deadline. Freshness is one spawn per owner, with opaque run-local IDs;
+it does not assume OS PIDs never repeat. Tests run original metadata-only child scripts
+and inject clock/process controls; they execute no model, audio, source or network.
+
 Manual entry points accept a reviewed identifier, never a path or URL:
 
 ```sh

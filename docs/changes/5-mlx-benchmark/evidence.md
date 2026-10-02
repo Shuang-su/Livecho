@@ -1403,7 +1403,7 @@ the error and restoring the pin did not permit another allowlisted output or rec
 commit; both owners closed once and source locks were reusable. This is control evidence,
 not real model serialization or pin-provenance proof.
 
-## Fixed local pass supervisor assignment — 2026-10-03 04:16 +08:00
+## Fixed local pass supervisor assignment — 2026-10-03 04:14 +08:00
 
 Before product code for this batch, author `/root/audio_implementation` refreshed
 AGENTS.md, Issue #5 (including its existing comments), all accepted change artifacts
@@ -1463,3 +1463,48 @@ Frozen implementation contract:
   private monkeypatch seam, never a production arbitrary-execution parameter.
   No real provider/source/MLX, model/audio/network, approval, registry activation,
   public protocol change, or complete benchmark report belongs to this batch.
+
+### Supervisor author implementation checks — 2026-10-03 04:29 +08:00
+
+Implemented the three assigned modules, original metadata-only child fixture and 70
+control cases. The fixed production entry remains empty and blocked. A private test
+spawn replacement exercises successful sequential handshake, bad/empty/extra terminal
+output, nonzero exits, bounded partial reads/writes, hanging children, TERM resistance
+and KILL/reap. No arbitrary executable selection was added to a production interface.
+Parent operational timestamps never enter report/Cold/Warm models.
+
+Before stable review, root and the independent reviewer identified request validation
+after recursive copying/encoding: this now validates bounded raw fields before asdict
+or JSON encoding, with spies proving rejection first. Root separately identified a late
+reap/close return escaping the terminal deadline: the owner now rechecks its original
+deadline after all cleanup, and a real metadata child plus injected clock verifies
+that the late result is incomplete. Root's contribution is static review, not test
+execution. The assignment heading was corrected from an accidentally future 04:16
+to its actual pre-code commit time, 04:14 +08:00; history was not rewritten.
+
+Actual commands in this worktree:
+
+```sh
+uv run ruff check tools/asr_benchmark/pass_control.py tools/asr_benchmark/pass_child.py tools/asr_benchmark/pass_supervisor.py tests/asr_benchmark/test_pass_supervisor.py tests/asr_benchmark/metadata_pass_child.py
+uv run mypy tools/asr_benchmark/pass_control.py tools/asr_benchmark/pass_child.py tools/asr_benchmark/pass_supervisor.py tests/asr_benchmark/test_pass_supervisor.py tests/asr_benchmark/metadata_pass_child.py
+uv run pytest -q tests/asr_benchmark/test_pass_supervisor.py
+make asr-benchmark-check
+uv run ruff format tools/asr_benchmark/pass_control.py tools/asr_benchmark/pass_supervisor.py tests/asr_benchmark/metadata_pass_child.py tests/asr_benchmark/test_pass_supervisor.py
+make asr-benchmark-check
+```
+
+During drafting the first chained lint/type/test command stopped on line-length and
+unused-noqa errors; the next stopped on remaining long lines, and then mypy identified
+literal narrowing/test annotation issues. These were fixed before test execution.
+An initial focused run passed 67 tests in 2.23s; after three additional boundary cases,
+the listed focused command passed 70 in 2.44s, with ruff and mypy (5 files) passing.
+The first `make asr-benchmark-check` stopped only at formatting (4 files). After the
+listed formatter, the repeated full ASR check passed ruff, format and mypy (43 files),
+and 507 tests in 41.36s. Full verification and independent stable review follow below.
+
+All gate checks were active. Inputs were original closed metadata; some tests spawned
+real local Python processes and used OS pipes/signals, while others injected control
+objects/clocks. This is not model/audio/network/MLX/source execution, host no-paging
+proof, arbitrary-code containment, a callable ExecutionGuard implementation, complete
+PassPlan execution or measured hardware acceptance. The current control protocol is
+strictly sequential; overlapping input and provider work remains unimplemented.
