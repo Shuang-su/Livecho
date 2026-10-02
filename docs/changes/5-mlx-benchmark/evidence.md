@@ -604,5 +604,34 @@ Verification before isolated review (local 2026-10-03, UTC+08:00):
   are blocked. Immutable approved model records, actual conversion/MLX implementation,
   consenting corpus, protected-host evidence and measured hardware gates remain open.
 
-Full repository verification and stable-head independent review are recorded below when
-completed. This is internal implementation progress, not Issue #5 acceptance.
+Final verification/review at code head
+`9e39a7191dab96bf50cd5a7397cdd9f16b0f6e08`, 2026-10-03 around 01:57–02:02
+Asia/Shanghai (UTC+08:00):
+
+- `make verify` — exit 0: ruff lint/format (51 files), strict mypy (51 files), workspace
+  lint/typechecks, **357 pytest passed in 37.83s**, **128 protocol Vitest tests**,
+  **63 Railway Vitest tests**, change-artifact checks, protocol-generation check and
+  all builds passed. Existing accepted protocol tests ran unchanged; this is not a
+  new authorization for real audio/model execution. No dependency or lock changed;
+  the earlier recorded `make bootstrap` remains the workspace setup for this batch.
+- Isolated `/root/audio_code_readiness` read the new HTTP/coordinator modules, both
+  new test files, necessary preparation/cache diffs and README/evidence at the exact
+  clean code head above. Independent command
+  `uv run pytest -q tests/asr_benchmark/test_http_transfer.py tests/asr_benchmark/test_model_download.py`
+  — **72 passed in 0.23s**. Independent `git diff --check` — exit 0.
+- The reviewer separately used an in-memory stdin Python probe against original notice
+  doubles: a 503 response with Retry-After 120 made only one attempt, read no body,
+  slept zero times and invalidated/released the entry; a resumed 10-byte partial receiving
+  200 instead of 206 waited its one-second restore delay, made one request at offset 10,
+  read no body and invalidated/released the entry. Both passed without a socket. These
+  supplement the checked-in regressions, not real endpoint acceptance.
+- The reviewer confirmed the earlier Retry-After finding is resolved and reported no
+  remaining actionable finding in this bounded review. Its only new external read was
+  [RFC 9110 section 10.2.3](https://www.rfc-editor.org/rfc/rfc9110.html#section-10.2.3);
+  no SDK/third-party downloader expression or prior exposure snippets were received.
+  The reviewer did not rerun the full suite. `/root` separately reviewed local transport
+  cancellation/deadline control flow at the same head, without edits or repeated tests;
+  this is a read-only supplemental review, not independent TLS/DNS/host evidence.
+
+This batch is internal implementation progress, not Issue #5 acceptance. PR #36 remains
+a draft; no model is selected and no merge, deployment or real benchmark is performed.
