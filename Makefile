@@ -1,4 +1,4 @@
-.PHONY: bootstrap build dev lint test typecheck verify artifacts protocol-generate protocol-check railway-check railway-start-web railway-start-backend railway-run-maintenance railway-migrate
+.PHONY: bootstrap build dev lint test typecheck verify artifacts protocol-generate protocol-check railway-check railway-start-web railway-start-backend railway-run-maintenance railway-migrate asr-benchmark-check
 
 bootstrap:
 	uv sync --all-groups --frozen
@@ -31,6 +31,12 @@ protocol-generate:
 
 protocol-check:
 	uv run python tools/protocol_codegen.py --check
+
+asr-benchmark-check:
+	uv run ruff check tools/asr_benchmark tests/asr_benchmark
+	uv run ruff format --check tools/asr_benchmark tests/asr_benchmark
+	uv run mypy tools/asr_benchmark tests/asr_benchmark
+	uv run pytest -q tests/asr_benchmark
 
 railway-check:
 	pnpm --filter @livecho/railway-config lint
