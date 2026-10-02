@@ -2,10 +2,11 @@
 
 ## Artifact approval
 
-- Artifact PR: Pending draft creation; this artifact does not close #30.
+- Artifact PR: [#32](https://github.com/Shuang-su/Livecho/pull/32) (draft; does not close #30).
 - Status: Proposed; approved by/date: Pending.
 - Authoring base: `67fc6edc6ca2158fe640d73b9d5f8bf674513d6d` (`main`).
 - Branch: `codex/issue-30-requirements-index-spec`.
+- Substantive artifact snapshot: `c1d21ec`.
 - No index, README, roadmap, product code, protocol, provider or approval-state change
   is included in this artifact phase.
 
@@ -53,7 +54,7 @@
   support this proposal.
 - Assignment decision: author this documentation artifact only. A fresh implementer
   exposure/assignment record and named separate reviewer are required before the later
-  documentation implementation. Independent artifact review: pending.
+  documentation implementation. Independent artifact review is recorded below.
 
 ## Read-only Issue snapshot
 
@@ -108,10 +109,13 @@ their implementation or acceptance. #31's body was deliberately not fetched.
 | `make artifacts` | Passed; `change artifacts: ok`. | 2026-10-02 / staged artifact tree |
 | `git diff --check` | Passed; no whitespace errors. | 2026-10-02 / artifact tree |
 | `git diff --cached --check` | Passed; no staged whitespace errors. | 2026-10-02 / staged artifact tree |
-| `git diff --name-only origin/main...HEAD` | Pending. | Artifact branch |
+| `git diff --name-only origin/main...HEAD` | Passed; exactly the four required paths under this Issue's directory. | 2026-10-02 / `c1d21ec` |
 | Artifact scope/format audit below | Passed; four artifact paths, two Issue links, accepted sources unchanged. | 2026-10-02 / staged artifact tree |
+| `make artifacts`; `git diff --check`; `git diff --cached --check` | Passed after the PR/review evidence append. | 2026-10-02 / evidence-only update after `c1d21ec` |
+| `git diff --name-only origin/main` | Passed; exactly the four #30 artifact paths including the evidence append. | 2026-10-02 / evidence-only update after `c1d21ec` |
+| `git diff --quiet c1d21ec -- docs/changes/30-requirements-evidence-index/intent.md docs/changes/30-requirements-evidence-index/spec.md docs/changes/30-requirements-evidence-index/plan.md` | Passed; reviewed intent/spec/plan unchanged. | 2026-10-02 / evidence-only update after `c1d21ec` |
 
-Exact artifact scope/format audit:
+Exact artifact scope/format audit, run before the commit and PR-link append:
 
 ```sh
 uv run python - <<'PY'
@@ -154,7 +158,23 @@ the documents did not need a semantic change.
 - Sequence review: the current roadmap's numeric ordering does not express #7's actual
   dependency on #8; README's status does not explicitly name the merged #3/#4 scope.
   Correction is planned for the separate implementation, not applied in this draft.
-- Independent review: pending. Hardware and provider checks are not required or performed.
+- Independent reviewer: `/root/artifact_review`, OpenAI Codex, 2026-10-02. Read-only
+  artifact design review of `c1d21ec` found no actionable contradiction in scope,
+  evidence/authority separation, source status, or local-synthetic versus production
+  gate handling. The reviewer changed no files and did not rerun tests.
+- Reviewer provenance: repository `AGENTS.md`; Issue #30 and all four proposed #30
+  artifacts; accepted #1 specification in full; relevant visible #2 audio, #3 protocol/
+  source-authority, and #4 offline/default-off specification sections; selected local
+  ADR/lifecycle policy excerpts. In its separately assigned #5 review, the reviewer also
+  read that Issue and its four draft artifacts. The reviewer explicitly reported that
+  long supporting-source output was truncated and did not claim a complete inventory
+  audit. No reference repository, #31 body, generated research report, or external page
+  was accessed; no prior reference-project contribution was known in
+  that review context. The author received only this source-based finding/provenance
+  summary, with no reference expression.
+- The independent result is artifact design review, not implementation, production,
+  source-rights, or owner approval. Hardware and provider checks are neither required
+  nor performed.
 - The final requirement inventory, formal index links/coverage audit, and README/roadmap
   consistency audit remain implementation work after artifact approval.
 
