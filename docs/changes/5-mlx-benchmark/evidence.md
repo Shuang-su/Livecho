@@ -431,3 +431,28 @@ process repetitions, real corpus scoring and the decision ADR remain separate ac
 gates. No further code scope is taken in this reader/load batch.
 
 Verification and exact independent review for this batch follow below.
+
+Pre-code assignment commit: `7b9effb`. Exact reader/load code:
+`4df7696a06faa970a6caa9aa330d6c4ff7a3fca7`. Author verification on 2026-10-03
+Asia/Shanghai:
+
+- `uv run ruff check tools/asr_benchmark/cache_reader.py tools/asr_benchmark/cold_load.py
+  tests/asr_benchmark/test_cache_reader.py` and matching Ruff format/mypy checks passed.
+  `uv run pytest -q tests/asr_benchmark/test_cache_reader.py` passed **49 in 0.28s**.
+- Exact code head `4df7696`: `make asr-benchmark-check` passed all Ruff/format/mypy checks
+  and **178 tests in 38.23s**. `make verify` passed at 01:21 with **285 pytest in
+  41.15s**, **128 protocol Vitest**, **63 Railway Vitest**, all lint/type checks,
+  artifacts/protocol checks and build.
+- `git diff --check` passed; no accepted intent/spec/plan or protocol file changed.
+
+Independent reviewer `/root/audio_code_readiness` reviewed exact `4df7696`, both new
+modules and all new tests, the minimal `_root_fd(create=False)` change, and README/
+evidence. Its independent `uv run pytest -q tests/asr_benchmark/test_cache_reader.py`
+passed **49 tests in 0.27s**. Additional ordinary-notice temporary-directory reproductions
+confirmed: corruption in the last physical asset prevents every backend initialize call
+and releases all earlier locks; equal-content aliases can alternate tail/prefix reads
+without cursor drift; and cancellation at the ready-clock after loading closes retained
+readers and backend, with replacement locks available. It reported no remaining
+actionable finding in this bounded scope. It did not repeat old suites or fetch external
+sources, load models/audio, execute a real provider, or claim process/hardware/privacy
+evidence. The author/reviewer quota gates returned exit 0 before/after this batch.
