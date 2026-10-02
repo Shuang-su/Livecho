@@ -13,8 +13,21 @@ run identity. The POSIX model-only cache uses private directory descriptors, non
 per-asset locks, fixed identity-derived names, actual file offsets, metadata checkpoints,
 bounded SHA-256 reads and mutation-checked atomic promotion. Context cancellation or an
 integrity failure invalidates the partial; deliberate normal close preserves resumable
-progress. It is callable only as a preparation backend, with no CLI registration or
-network transport. Tests persist original notice text in temporary directories only.
+progress. The download coordinator preserves cancellation progress only with an explicit
+checkpoint matching actual length, identity and started-attempt count. Tests persist
+original notice text in temporary directories only.
+
+The internal preparation transport derives HTTPS requests from immutable manifest assets
+on the fixed Hugging Face authority. It verifies TLS and accepts only exact-length,
+identity-encoded initial responses or exact suffix Range responses. Redirects and the
+unverified ModelScope endpoint remain blocked; there is no source fallback or credential,
+proxy, arbitrary URL or header integration. Three attempts and fixed 1/2-second delays
+share a 60-second no-progress deadline across connect, headers and body within each
+attempt. Authentication, integrity, unsupported responses and server cooldowns terminate.
+Cancellation revokes IO before releasing the cache entry. Complete interrupted files can
+be locally verified/promoted without a request beyond EOF, including after attempt three.
+Synchronous cache fsync/hash work is bounded in chunk size but cannot be preempted by the
+async network deadline. This transport has no CLI registration or live-network evidence.
 
 The final-cache reader separately binds the final inference manifest to preparation,
 checks every converted asset before exposing any handle, and shares a locked reader for
@@ -45,8 +58,9 @@ paging/dumps, real-time runner/watchdog integration, and real M3 Ultra measureme
 The model conversion dispatcher calls only the reviewed backend's affine 8-bit/group-64
 operation, evaluation and synchronization; no actual MLX backend is installed.
 Transfer-control tests simulate lengths/digests/outcomes; cache tests exercise local
-filesystem promotion and final reads with ordinary text. They do not verify a real network
-transport, model download, converted-asset writer or MLX cold loader. Cache locking assumes
+filesystem promotion and final reads with ordinary text. HTTP/control tests inject streams
+and responses without opening sockets. They do not establish live endpoint/CDN support,
+model downloads, a converted-asset writer or an MLX cold loader. Cache locking assumes
 cooperating cache clients in
 a private operator directory, not protection against a hostile process with the same
 operator privileges. Resource tests observe release callbacks;

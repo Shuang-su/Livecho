@@ -538,3 +538,71 @@ intent/spec/plan, code, tests, protocol, model authority or runtime setting.
   registry remains empty. No real model, audio, converter, MLX provider or benchmark
   execution is authorized by this assignment. Tests use original ordinary text and
   transport/control doubles only. This record is committed before new module code.
+
+## Independent HTTPS and preparation integration, 2026-10-03 (Asia/Shanghai)
+
+Author `/root/audio_implementation` wrote this batch after assignment commit
+`f85f21e98249777a9f1ee78f2f33ced9dc31b97a`. Reviewer remains
+`/root/audio_code_readiness`; the coordinator additionally reads transport cancellation
+and deadline ownership. The prior exposed author supplied no module code or advice.
+No accepted intent/spec/plan or public protocol is changed.
+
+Actual new external reads were direct primary documentation only:
+
+- [HTTP semantics, RFC 9110](https://www.rfc-editor.org/rfc/rfc9110.html), Range and
+  Content-Range sections: status, inclusive range offsets and representation length.
+- [Hugging Face model downloads](https://huggingface.co/docs/hub/models-downloading)
+  and [file-download API documentation](https://huggingface.co/docs/huggingface_hub/package_reference/file_download),
+  including `hf_hub_url`'s documented resolve-path example and immutable revision
+  parameter. The pages also displayed API usage examples and cache/CDN descriptions;
+  no linked SDK source, repository implementation or third-party example was opened.
+- [Python 3.12 asyncio streams](https://docs.python.org/3.12/library/asyncio-stream.html),
+  including TLS connection parameters, bounded reads, stream limits and shutdown APIs.
+  Inline official TCP/HTTP/socket examples were visible. No example was copied.
+- The reviewer supplied RFC 9110's Retry-After interpretation and section location,
+  with no third-party implementation expression. The local client conservatively stops
+  when a temporary error includes this header rather than ignoring a server cooldown.
+
+No search was performed by the replacement author. No link from the exposure incident,
+Issue #31 body, reference repository, external implementation memo or source snippet was
+read. These primary descriptions and accepted local requirements inform original code;
+this disclosure does not claim absence of all context or legal clearance.
+
+Implemented scope:
+
+- `http_transfer.py`: manifest-selected immutable repository/revision/asset requests,
+  escaped path segments, fixed HTTPS authority, certificate/hostname verification,
+  bounded headers/reads, exact initial/suffix status/length/range/identity validation.
+  No credential/proxy/environment URL support, redirects or mirror fallback. A server
+  response never supplies new request authority. Unsupported ModelScope endpoint
+  authority is explicitly `download_endpoint_unverified` before opening a cache entry.
+- `model_download.py`: one asset per explicit call, response revocation before retry,
+  shared remaining 60-second network no-progress deadline and late-result rejection,
+  maximum three attempts with 1/2-second waits, terminal authentication/permission/
+  integrity/cooldown failures, bounded body appends and actual SHA verification before
+  existing same-inode atomic promotion. Started attempts are persisted before requests.
+- Actual offsets must agree with an explicit checkpoint to resume. Missing/stale
+  nonempty partial metadata cannot reset the attempt budget. Complete interrupted
+  partials, even after attempt three, are locally verified without a fourth request or
+  a Range starting at EOF. Cancellation retains only an already committed matching
+  checkpoint; half-finished writes/checkpoint failures invalidate the partial.
+- Synchronous response abort and entry cleanup cannot be abandoned by a second task
+  cancellation. Start/read operations that suppress cancellation cannot commit late
+  results; a connection that returns late is aborted before request emission. Cache
+  fsync/hash operations are synchronous bounded-chunk work: the async deadline bounds
+  network waits and rejects late network results, not preemptive disk/hash latency.
+
+Verification before isolated review (local 2026-10-03, UTC+08:00):
+
+- `make asr-benchmark-check` — passed: ruff lint/format, strict mypy (29 files),
+  **250 passed in 36.32s**. The 72 added cases cover original HTTP metadata and original
+  notice text with transport/stream doubles, resume/retry/cancel/deadline/cache faults.
+- `git diff --check` — passed. GUI gates before/after tool batches returned active.
+- No socket, model request, model/audio download, model/MLX execution, converted writer
+  or hardware benchmark was performed. The executable registry remains empty. The
+  transport's real endpoint/TLS/CDN compatibility is unmeasured; redirects and ModelScope
+  are blocked. Immutable approved model records, actual conversion/MLX implementation,
+  consenting corpus, protected-host evidence and measured hardware gates remain open.
+
+Full repository verification and stable-head independent review are recorded below when
+completed. This is internal implementation progress, not Issue #5 acceptance.

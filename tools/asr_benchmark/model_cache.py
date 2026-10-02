@@ -344,14 +344,24 @@ class ModelCacheEntry:
         return record
 
     def load_checkpoint(self) -> str:
+        text = self.checkpoint_if_present()
+        if text is None:
+            raise BlockedEvidence("checkpoint_invalid")
+        return text
+
+    def checkpoint_if_present(self) -> str | None:
+        """Only absence is optional; unsafe, stale or malformed metadata still fails."""
         self._require(self.identity)
         fd = -1
         try:
-            fd = os.open(
-                self._name("checkpoint"),
-                os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK,
-                dir_fd=self._directory,
-            )
+            try:
+                fd = os.open(
+                    self._name("checkpoint"),
+                    os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK,
+                    dir_fd=self._directory,
+                )
+            except FileNotFoundError:
+                return None
             if _private_file(fd).st_size > 4096:
                 raise BlockedEvidence("checkpoint_size")
             text = os.read(fd, 4097).decode("ascii")

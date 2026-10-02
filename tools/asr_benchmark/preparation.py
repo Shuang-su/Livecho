@@ -1,6 +1,6 @@
 """Model-only transfer control plane, tested using metadata doubles.
 
-The transport and CLI cache registration are intentionally not installed: immutable source
+The CLI cache registration is intentionally not installed: immutable source
 manifests, conversion/provider pins and approvals are still missing. No arbitrary URL,
 path, body, request header or server diagnostic is accepted by this control plane.
 """
@@ -107,13 +107,20 @@ class PreparationTransfer:
         if identity != self.identity or record.source_mode != self.mode:
             self.stopped = True
             raise BlockedEvidence("partial_revision_changed")
-        if record.received > self.asset.size or record.attempts_started >= 3 or now_ns < 0:
+        complete = record.received == self.asset.size
+        if (
+            record.received > self.asset.size
+            or (record.attempts_started >= 3 and not complete)
+            or now_ns < 0
+        ):
             self.stopped = True
             raise BlockedEvidence("checkpoint_invalid")
         self.received = record.received
         self.attempt = record.attempts_started
         self.last_progress_ns = now_ns
-        self.retry_at_ns = now_ns + self.attempt * NS
+        # A complete interrupted file needs local verification only, never a fourth
+        # request or an unsatisfiable Range starting at EOF.
+        self.retry_at_ns = None if complete else now_ns + self.attempt * NS
 
     def promote(self, cache: ModelCacheBackend, now_ns: int) -> TransferProgress:
         """A verified hash is insufficient until same-file atomic promotion succeeds."""
