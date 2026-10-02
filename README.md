@@ -4,9 +4,22 @@ Livecho is an experimental, distributed real-time captioning system for public l
 streams. A trusted cloud service ingests one stream, while invited community workers
 perform speech recognition and a public web client renders the resulting timeline.
 
-The repository currently contains its engineering foundation, an accepted Alpha boundary
-specification, and proposed supporting design records. It does not yet contain runtime
-product code or accept production traffic.
+At the 2026-10-02 source baseline, the merged repository contains the engineering
+foundation (#1), Alpha boundary specification and supporting records (#2), protocol v1
+with deterministic Python/TypeScript compatibility verification (#3), and an offline,
+fail-closed Railway skeleton (#4). The business runtime chain and live provider
+environments are not established. Production traffic remains disabled.
+
+The next product path is controlled memory-only synthetic audio (#8), a synthetic
+single-worker path (#5/#6), the short local caption integration (#9), and its
+caption/session-status Web companion (#11). Platform ingest (#7) follows the audio
+pipeline; danmaku/Super Chat display has its own #10/#29 path. Each implementation
+needs its accepted artifacts and scoped verification. Merged #5/#8 specifications
+do not establish a running benchmark or audio pipeline.
+
+See the [requirements and evidence index](docs/requirements-index.md) for source
+authority, current evidence and capability-specific blockers, and the
+[roadmap](docs/roadmap.md) for the dated direct dependency graph.
 
 ## Alpha boundaries
 
@@ -17,7 +30,7 @@ product code or accept production traffic.
 - Captions, danmaku, Super Chat, and live-status events are restricted by default and may
   be retained only after the source-specific policy and Issue 16 deletion gates pass;
   audio is never persisted.
-- CUDA is contract-only during Alpha. Mac native UI and historical crawling are later
+- CUDA is mock/contract-only during Alpha. Mac native UI and historical crawling are later
   milestones.
 
 Public availability does not grant redistribution rights. Production ingest remains
