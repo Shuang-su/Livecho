@@ -1291,3 +1291,114 @@ Author pre-review commands:
   **43 passed in 0.86s**; final expanded focused matrix **51 passed in 1.03s**. Inputs are
   original ordinary text with real local filesystem I/O and opaque tokens/control doubles,
   not a real serializer, network, model/audio, MLX or inference run.
+
+Final verification and review, recorded 2026-10-03 04:00 UTC+08:00:
+
+- Reviewed code head: `afbe5f42f079e2a4fac4d3641e008368dad3829b`.
+- Author executed `make asr-benchmark-check && make verify` at that head. Specialized
+  checks passed ruff/format/mypy (38 files) and **437 tests in 41.73s**. Full verification
+  passed ruff/format/mypy (60 files), **544 pytest in 41.14s**, **128 protocol Vitest**,
+  **63 Railway Vitest**, workspace scripts, change artifacts, generated protocol checks
+  and builds; exit 0. Existing accepted in-memory codec-test scope is unchanged.
+- Isolated reviewer `/root/audio_code_readiness` confirmed the same clean head before
+  and after `uv run pytest -q tests/asr_benchmark/test_serialization_session.py`:
+  **51 passed in 0.98s**, including the shared-object and retained-traceback regressions;
+  `git diff --check` passed. The reviewer read the new module/tests and README/evidence,
+  focusing on strict admission, actual local inputs, auxiliary capabilities, fresh state,
+  sticky errors, expiring borrows and lack of inference authority. No remaining actionable
+  finding, and no new external source read. The author and reviewer executed the same
+  51-case selection at different recorded times; these are separate runs.
+- Root independently confirmed lifecycle/cleanup-before-commit, shared-object ownership
+  and local-reference cleanup at that code head with no remaining actionable finding.
+  Root's review was static only; root did not execute tests or the independent probe.
+- Tests/probe use original ordinary text and opaque tokens with real local temporary-file
+  I/O. They do not execute a real model/audio source, network, model serializer, MLX or
+  inference. There is no claimed model format/quantization correctness, real pin provenance,
+  hard synchronous deadline, raw-reference erasure, host or power-loss durability proof.
+- GUI gates remained active throughout. The final addition is evidence only;
+  `git diff afbe5f42f079e2a4fac4d3641e008368dad3829b --exit-code -- tools tests benchmarks/asr/README.md`
+  and `git diff --check` passed before the evidence-only commit. No tests were rerun for
+  this documentation addition. The next process-runner suggestion has not been implemented.
+
+The reviewer executed this exact supplementary probe command once from
+`/Users/szmg/.codex/worktrees/livecho-5-asr-impl/Livecho`:
+
+```sh
+uv run python - < /Users/szmg/.codex/monitors/livecho-20261002/reviews/serializer-mid-chunk-pin-afbe5f4.py
+```
+
+Saved script SHA-256:
+`93d762c8951550659131b2a1d4c909bfd985064eaffb64734f65a5570531ff11`.
+The author read and checked the saved script's hash without re-executing it. Its exact
+stdin contents are:
+
+```python
+from pathlib import Path
+from tempfile import TemporaryDirectory
+from unittest.mock import patch
+
+from tools.asr_benchmark.converted_store import ConversionStaging
+from tools.asr_benchmark.model_cache import ModelOnlyCache
+from tools.asr_benchmark.runtime import BlockedEvidence
+from tests.asr_benchmark.test_conversion_session import Backend, manifest, populate
+from tests.asr_benchmark.test_converted_store import TEXTS
+from tests.asr_benchmark.test_serialization_session import (
+    Serializer,
+    assert_cleanup,
+    assert_no_receipt,
+    run,
+)
+
+with TemporaryDirectory() as temporary:
+    base = Path(temporary).resolve()
+    with ModelOnlyCache(base / 'sources', base / 'repo', manifest(), 'huggingface') as cache:
+        populate(cache)
+        converter, serializer = Backend(), Serializer()
+        observed = []
+        commits = []
+
+        def emit(writer, output_plan):
+            original_pin = serializer.converter_revision
+
+            def chunks():
+                yield TEXTS[0][:5]
+                serializer.converter_revision = 'f' * 40
+                yield TEXTS[0][5:]
+
+            try:
+                writer.write_output(output_plan.outputs[0].path, chunks())
+            except BlockedEvidence as error:
+                observed.append(str(error))
+            finally:
+                serializer.converter_revision = original_pin
+            try:
+                writer.write_output(output_plan.outputs[1].path, (TEXTS[1],))
+            except BlockedEvidence as error:
+                observed.append(str(error))
+
+        def forbidden_commit(store):
+            commits.append(True)
+            raise AssertionError('caught pin drift reached receipt commit')
+
+        serializer.emit = emit
+        with patch.object(ConversionStaging, 'commit', forbidden_commit):
+            try:
+                run(base, cache, converter, serializer)
+            except BlockedEvidence as error:
+                assert str(error) == 'serialization_failed', str(error)
+            else:
+                raise AssertionError('caught and restored pin drift returned success')
+        assert observed == ['serialization_backend_mismatch', 'serialization_failed'], observed
+        assert serializer.converter_revision == manifest().converter_revision
+        assert serializer.serialize_calls == 1 and serializer.fresh is False
+        assert commits == []
+        assert_cleanup(base, cache, converter, serializer)
+        assert_no_receipt(base)
+        print('mid-chunk pin drift rejected; caught error and restored pin cannot resume output or reach commit; both owners closed once and source locks reusable')
+```
+
+Actual result: exit 0 in 0.050s, output equal to the script's final print text. After the
+first ordinary-text chunk, a pin change before the second chunk was rejected. Catching
+the error and restoring the pin did not permit another allowlisted output or receipt
+commit; both owners closed once and source locks were reusable. This is control evidence,
+not real model serialization or pin-provenance proof.
