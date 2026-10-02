@@ -476,3 +476,11 @@ definitions, runtime code, protocol output, configuration, CI and dependencies r
 unchanged. No deployment, provider or hardware action, audio/model download, risk approval
 or production activation occurred. The implementation ends at a draft PR for owner
 review; this agent does not merge it.
+
+Implementation PR: [#35](https://github.com/Shuang-su/Livecho/pull/35), draft.
+Substantive documentation commit: `97d480b`, following exposure commit `c2c936f`.
+After the evidence append, `python3 /tmp/livecho-issue30-index-audit.py` passed with
+556 local-link occurrences and the same ID/ownership/scope counts; `make artifacts`,
+`git diff --check` and `git diff --cached --check` passed. After commit,
+`git diff --name-only origin/main...HEAD` listed exactly the approved four paths.
+Push succeeded. Remote CI is pending at PR creation; it is not reported as passed here.
