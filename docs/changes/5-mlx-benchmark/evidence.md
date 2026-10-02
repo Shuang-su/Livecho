@@ -991,3 +991,59 @@ without yielding a mapping or requesting transport; backend/readers closed and c
 locks were reusable. Input consisted solely of original notice text and opaque control
 tokens. This is no evidence for model serialization, actual MLX compatibility, fresh
 processes, protected hosts or scored hardware results; those acceptance gaps stay open.
+
+## Converted storage assignment before code, 2026-10-03 (UTC+08:00)
+
+- Author `/root/audio_implementation`; isolated reviewer `/root/audio_code_readiness`;
+  root supplements read-only transaction/lifecycle review. This assignment follows
+  `f1c9b75f939c968e07420944ffb8fd207180ede6` in the same Issue #5 draft PR/worktree.
+- Exposure is not zero: the prior records of accepted local requirements, local code,
+  policy/reference-name/license metadata and permitted primary API/standard reads remain
+  applicable. For this batch the author refreshed Issue #5 (including its existing
+  review-question comment), AGENTS, all four accepted change artifacts (focusing on
+  added evidence), independent-implementation policy and existing cache/reader/contracts/
+  conversion code/tests. No new external documentation, reference implementation or
+  excluded incident expression was read. The original exposed author is not consulted.
+- Scope: `tools/asr_benchmark/converted_store.py`, original ordinary-text/control tests,
+  README and evidence only, except a minimal existing cache boundary correction if
+  demonstrated necessary. No actual model serialization, tensor bytes, audio, network,
+  MLX, inference approval, public protocol or registry change. No source asset SHA is
+  invented to open an output transaction.
+
+The pre-code storage contract is:
+
+- A closed output plan binds the exact preparation digest, converter revision and lock
+  digest. Its unique model-only output labels declare path/kind and per-file byte caps,
+  with a total byte cap and complete weights/tokenizer/config/notice kinds. Internal
+  resource ceilings are 256 labels, 64 GiB per file and 128 GiB total; the plan declares
+  equal or smaller caps. These are storage admission ceilings, not measured model sizes
+  or an expansion of any audio allocation limit. Path validation follows existing model
+  asset rules. Every label must finish once; unknown/duplicate/missing output fails.
+- `ConversionStaging` is a synchronous preparation-only context. Each `open_output`
+  lends a sequential bounded-chunk sink without exposing paths or file descriptors.
+  Actual size/hash come from the private held regular-file fd after writing, with
+  nofollow, link-count, same-inode/fingerprint checks and fsync. Cooperative cancellation
+  is checked around bounded I/O; synchronous syscalls have no claimed hard deadline.
+- The Git-external private cache uses a preparation-scoped single-writer lock and a
+  private uniquely named transaction staging directory. Published content uses the exact
+  existing `FinalModelCache` identity `(preparation_sha256, canonical source_revision,
+  actual_output_sha256)` and per-asset lock naming, never a selected mirror revision.
+  Equal content aliases share one physical asset; existing assets must pass actual
+  size/hash verification and are never overwritten, repaired or deleted by this layer.
+- The authoritative **complete-set publication point is one atomic receipt rename**,
+  followed by directory fsync, after every output asset is validated and durable. Per-file
+  renames are not an atomic set. The closed receipt contains actual asset metadata and
+  plan/preparation/converter/lock bindings, explicitly marked unapproved; it contains no
+  Approval or inference authority. It is not accepted as an InferenceManifest.
+- Before that commit point, a failure/crash can leave already published immutable model
+  assets without a receipt. They confer no complete-set authority, are retained and may
+  be reused only after fresh hash verification. Cleanup removes only this transaction's
+  staging. Crash-abandoned UUID stages are not automatically adopted/deleted. After a
+  receipt rename but failed fsync/return, outcome is uncertain: preserve the receipt and
+  assets and require a reopen that validates the full set. Never report successful
+  completion before fsync. Retry with identical receipt is idempotent; a conflicting
+  receipt is terminal and cannot replace prior output.
+- Reopening checks receipt identity/inventory/caps and hashes all referenced assets under
+  their existing locks. This proves stored bytes and metadata only, not serializer format,
+  quantization semantics, rights, MLX compatibility or owner approval. This batch does not
+  wire a serializer or authorize inference. Tests persist only original ordinary text.
