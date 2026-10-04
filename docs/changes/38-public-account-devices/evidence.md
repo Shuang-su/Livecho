@@ -4,7 +4,8 @@
 
 - Owning Issue: [#38](https://github.com/Shuang-su/Livecho/issues/38).
 - Status: **Draft / proposed; repository-owner decision pending**.
-- Artifact PR: Pending independent review and creation.
+- Artifact PR: Independent review complete; draft creation follows this record.
+  The PR is linked from owning Issue #38; no merge or owner decision is recorded here.
 - Approval date: None. No existing invitation, history, role, ingest or runtime rule is
   superseded by creating this proposal.
 - Base: `93d8b0a4b3e147ce0b7df903f118060117d56f0a`, confirmed against remote main on
@@ -58,14 +59,70 @@ from a reference product or asserted to be vendor limits, measured capacity or l
 
 ## Automated verification
 
-Pending the completed documentation snapshot. This batch changes documents only;
-verification will use artifact lifecycle, whitespace/path/link checks and independent
-review. No runtime, hardware, account, email, device or platform test result is claimed.
+Author checks on 2026-10-05 Asia/Shanghai (2026-10-04 UTC), including the final content
+snapshot `f508c415ab1e15cdd75af1127b6dd44fe8c9eb03`:
+
+| Command / check | Actual result |
+| --- | --- |
+| `uv run python tools/check_change_artifacts.py` | Exit 0, `change artifacts: ok`, on the initial snapshot and after both review corrections. |
+| `git diff --check`; `git diff --cached --check` | Exit 0, no whitespace errors before each content commit. |
+| `git diff --check origin/main` | Exit 0 for the complete proposal including this evidence update. |
+| `git diff --name-only origin/main...HEAD` | Exactly the five Issue #38 Markdown artifacts; no product code or existing authoritative documents. |
+| `git status -sb`; `git rev-parse HEAD` | Clean at final content snapshot `f508c415ab1e15cdd75af1127b6dd44fe8c9eb03`. |
+| Relative-link/file-inventory script below | Exit 0: `Document scope and relative links: 5 files, 9 local links passed` after the corrections (8 local links before the policy provenance row). |
+| `/usr/bin/python3 /Users/szmg/.codex/monitors/livecho-20261005/gui_gate.py` | Separately checked before/after batches and at review boundaries; all observed exits 0, `work_allowed: true`, `reason: active`. |
+| `git ls-remote origin refs/heads/main` | Still `93d8b0a4b3e147ce0b7df903f118060117d56f0a` before draft publication. |
+
+Exact relative-link/file-inventory command, run from the worktree:
+
+```sh
+python3 - <<'PY'
+from pathlib import Path
+import re
+root = Path('docs/changes/38-public-account-devices')
+files = sorted(root.glob('*.md'))
+links = 0
+for file in files:
+    for target in re.findall(r'\[[^\]]+\]\(([^)]+)\)', file.read_text()):
+        if target.startswith(('https://', 'http://', '#')):
+            continue
+        assert (file.parent / target.split('#', 1)[0]).is_file(), (file, target)
+        links += 1
+assert {file.name for file in files} == {'intent.md', 'spec.md', 'plan.md', 'evidence.md', 'adr-proposal.md'}
+print(f'Document scope and relative links: {len(files)} files, {links} local links passed')
+PY
+```
+
+This batch changes documents only. No unchanged-code `make bootstrap` / `make verify`
+rerun was requested or performed. No runtime, hardware, account, email, device or platform
+test result is claimed. Later implementation Issues retain their full verification gates.
 
 ## Manual evidence and review findings
 
-Pending. Source isolation and scope were checked before assignment; this is not a
-license/legal clearance or a reference-expression similarity review.
+- Independent reviewer `/root/audio_code_readiness` reviewed all five proposal documents
+  at `53b949811a95812f9e35cb9a3c921856a58f3670`, comparing the allowed accepted local
+  requirements and original #12/#13/#17 bodies. No external reference browsing, file edits
+  or product tests were performed. Reviewer independently ran artifact validation
+  (exit 0), initial relative links (5 documents / 8 links), full-PR whitespace check
+  (exit 0), and verified the five-file-only scope.
+- Two documentation findings were corrected: clarify that every active verified role
+  retains its own-account/device baseline while operator cross-account administration
+  is denied; and map both existing invited-history clauses plus the retained
+  `BILI-RIGHT-WORKER` requirement. Operator positive/negative scenarios and separate
+  future worker-population rights/policy approval are now explicit.
+- Reviewer confirmed the entire four-document correction delta at
+  `f508c415ab1e15cdd75af1127b6dd44fe8c9eb03` with no remaining actionable finding in this
+  bounded scope. Exact final reviewer checks: `git status --short` (empty),
+  `git rev-parse HEAD`,
+  `git diff 53b949811a95812f9e35cb9a3c921856a58f3670..f508c415ab1e15cdd75af1127b6dd44fe8c9eb03 -- docs/changes/38-public-account-devices`
+  (all delta read), and
+  `git diff --check 53b949811a95812f9e35cb9a3c921856a58f3670..f508c415ab1e15cdd75af1127b6dd44fe8c9eb03`
+  (exit 0). Reviewer gate before/after both returned exit 0 / active. Final 9-link check
+  belongs to the author, not the reviewer.
+- Source isolation and scope were checked before assignment. This is a local-source
+  document-contract review, not runtime verification, reference-expression similarity
+  review, or license/legal clearance. These evidence-only additions do not change the
+  reviewed intent/spec/plan/ADR content.
 
 ## Deviations
 
