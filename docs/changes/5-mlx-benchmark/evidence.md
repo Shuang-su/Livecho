@@ -1928,3 +1928,35 @@ review. Failure to retrieve documentation is not evidence that an interface does
 exist. Even sufficient facts would only support a proposed later code scope, not
 implementation in this audit. Verify documentation with `make artifacts` and
 `git diff --check`; do not rerun the existing 673-test product suite.
+
+## ModelScope audit resumption record — 2026-10-05 00:15 +08:00
+
+The user authorized a new GUI work round. The October 2 monitoring round remains
+completed; this resumption uses only the new October 5 gate. Author remains
+`/root/audio_implementation`, independent read-only reviewer remains
+`/root/audio_code_readiness`, and root coordinates/static-reviews the bounded audit.
+Local starting head is `ba0e8b4ad10f28c378042eb2fd0c934d0c75e4c4`; its only difference
+from the last delivered head `65cde696` is the preceding 35-line audit assignment.
+AGENTS.md, the owning Issue body, unchanged intent/spec/plan, and the latest evidence
+were refreshed. Earlier complete evidence/source readings remain disclosed above;
+this record does not claim a fresh zero-exposure author.
+
+At the October 3 stop boundary the old gate returned exit 2 (`monitor_disallows_work`).
+The author's tool orchestration mistakenly continued two already queued documentation
+opens instead of short-circuiting on that result. They were
+`https://www.modelscope.cn/docs/models/download` (title `模型的下载`) and
+`https://www.modelscope.cn/docs` (title `文档中心 - ModelScope 魔搭社区`). Each returned
+text/html with zero extracted lines, no body, and no observed links. No SDK, source
+implementation, model asset endpoint or asset content was accessed. The author reported
+the mistake immediately and stopped: no further research, edits, tests or push occurred
+in that round. The worktree remained clean at the assignment commit. No matrix or
+independent audit review had been completed.
+
+The new gate was run separately and inspected as exit 0 before resumed work. Subsequent
+gates are separate invocations: any nonzero exit stops research before another operation.
+The original ceiling remains four distinct official documentation pages total and one
+rendered fallback on those pages, across both rounds. Two pages have been attempted;
+at most two further observed official documentation links and the unused rendered
+fallback remain. This record precedes those resumed reads. No adapter or other product
+code is in scope. The author will commit a facts/gaps result for independent review,
+without pushing until that review is complete.
