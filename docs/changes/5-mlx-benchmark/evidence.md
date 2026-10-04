@@ -1960,3 +1960,94 @@ at most two further observed official documentation links and the unused rendere
 fallback remain. This record precedes those resumed reads. No adapter or other product
 code is in scope. The author will commit a facts/gaps result for independent review,
 without pushing until that review is complete.
+
+## ModelScope primary HTTP audit result — 2026-10-05
+
+Outcome: the bounded audit ended with an access-limited documentation gap. A ModelScope
+immutable-file HTTP adapter is not supported by the facts obtained here. Its acquisition
+path remains blocked; this is not a finding that ModelScope lacks such an interface.
+No adapter, request, redirect policy, registry entry or approved manifest was added.
+
+### Actual documentation access and exposure
+
+The prior two direct official entry-point attempts remain the only distinct pages in
+this audit: [model download documentation](https://www.modelscope.cn/docs/models/download)
+and [documentation center](https://www.modelscope.cn/docs). Web extraction returned
+their titles and zero lines, without body or links. Titles establish the returned page
+labels only, not any immutable-download or response guarantee. No successful vendor
+HTTP-contract body was obtained or read. These attempts are historical October 3
+observations, not a claim that the pages were refetched on October 5.
+
+On October 5 the author used the single allowed rendered fallback on the same download
+documentation, with the exact CUA call
+`await cua.createBrowserTab("iab", "https://www.modelscope.cn/docs/models/download", {visible:false});`.
+It returned `Browser is not available: iab`. The subsequent capability inventory
+`await cua.listBrowsers();` returned `[]`. No rendered page, DOM, documentation body
+or further documentation URL was returned. The fallback could not run in this tool
+environment. This result is not a ModelScope site error or proof of a site-side block.
+No app installation, login, native-browser workaround or bundle/source inspection was
+attempted. Without observed documentation links, the remaining two-page allowance was
+left unused instead of inventing paths or repeating an empty extraction/search.
+
+This batch used no search and read no new external prose, API example or implementation
+expression. There was no SDK, repository/source implementation, third-party page,
+model card, model-asset endpoint, token, model download, network workload, audio or MLX
+execution. Prior primary-source and source-metadata exposure remains as disclosed; no
+new HTTP standard was opened because a generic HTTP definition would not establish
+ModelScope's endpoint-specific behavior. Local contract checks used the accepted spec
+and existing `http_transfer.py`, `preparation.py`, `model_download.py` and README.
+
+### Fact / requirement / gap matrix
+
+The vendor column below describes only this audit's findings. Local requirements and
+existing Hugging Face response rejection rules are not ModelScope behavior guarantees.
+
+| Subject | Accepted local requirement / current implementation | ModelScope fact established here | Required contract still unestablished |
+| --- | --- | --- | --- |
+| Repository, revision and file addressing | Explicit selected mirror; approved first-party repository, full immutable revision, allowlisted asset path/size/SHA, mirror parity; no automatic host fallback. | No addressing contract body was available. A local Mirror record is not vendor addressability evidence. | Official HTTPS request authority/method and exact repository, immutable-revision and file encoding/selection semantics, including how an immutable revision is addressed without substituting a mutable branch. |
+| Authentication and permissions | Authentication/permission failures stop preparation. Existing local HTTP rules classify 401/403 terminal and do not accept caller credentials or arbitrary headers. | No endpoint-specific authentication/error contract was read. | Official eligibility/authentication requirements and permission/error semantics for the immutable-file operation. Do not infer public access, required tokens, or an error shape from SDK behavior. |
+| Redirect and CDN authority | The current transport has a fixed authority and rejects all redirects; there is no inferred CDN allowlist or fallback. | No redirect or CDN authority contract was read. | Official direct-response or redirect behavior and authorized destination constraints. A black-box Location value or SDK-followed redirect would not grant destination authority. |
+| Range and resumption | Resume uses actual partial length and a matching revision-bound checkpoint. Existing local rules require 200 at offset zero, exact 206 suffix Content-Range on resume, and reject ignored/mismatched ranges. | No ModelScope Range support or failure behavior was established. | Official byte-range semantics for the same immutable object, response behavior when Range is accepted/rejected, and the length/range information needed to validate a resumed suffix. |
+| Response representation and verification | Manifest length and locally computed complete SHA are mandatory before promotion. Existing local rules reject compression, chunked framing, ambiguous/mismatched lengths, redirects, 429 and unsupported Retry-After responses. | No ModelScope status/header/representation contract was read. | Official status, representation/encoding, length and range response semantics sufficient for a closed parser. A server digest, if offered, would not replace the approved manifest's expected digest or local full-file verification. |
+
+The 60-second no-progress limit, three-attempt budget, 1/2-second retry delays and
+terminal integrity policy remain local accepted requirements. They are not statements
+that ModelScope promises those retry timings, statuses or response encodings. A future
+implementation must not relabel the existing HF wire construction as ModelScope, infer
+an endpoint from a high-level SDK call, or relax the accepted source/authority boundary.
+
+### Stop point and next prerequisite
+
+There is no justified adapter-code batch from this audit. The next useful action is an
+owner-provided readable official HTTP contract/documentation entry, or an available
+rendered documentation surface under a separately bounded follow-up. It must resolve
+the five gaps above before an independent adapter can freeze request/response tests.
+This is an access/contract evidence blocker, not a claim that unrelated authorized
+Issue #5 implementation work is exhausted. Do not repeat this same empty-doc audit or
+add a wrapper while waiting for that input.
+
+The existing `model_request` rejects `modelscope` with `download_endpoint_unverified`.
+Complete source assets may still be read from the verified local cache using the
+explicit selected mirror identity; that existing cache behavior does not enable a
+missing-asset network path or prove HTTP compatibility. Approved source/mirror records,
+actual MLX provider/serializer compatibility, protected-host guarantees and trusted
+measurements remain separate missing evidence. Nothing here grants inference authority,
+constructs PrivacyEvidence, proves hardware acceptance or completes Issue #5.
+
+### Author verification and review handoff
+
+Working directory for these commands was
+`/Users/szmg/.codex/worktrees/livecho-5-asr-impl/Livecho`:
+
+- `make artifacts` — exit 0; ran `uv run python tools/check_change_artifacts.py`,
+  output `change artifacts: ok`.
+- `git diff --check` — exit 0, no output.
+- `git diff --exit-code 65cde696c3c7fdeb2d24130f8fca1b41309919ab -- . ':(exclude)docs/changes/5-mlx-benchmark/evidence.md'`
+  — exit 0, no output: all non-evidence files remain byte-identical to the delivered
+  implementation, including product code, tests, README and accepted intent/spec/plan.
+
+No product tests, prior probe or full verify were rerun for this documentation-only
+audit. All separately invoked October 5 gate checks so far returned exit 0 / active;
+the historical October 3 failure is explicitly recorded above rather than included
+in that statement. The author commits this stable documentation for the isolated
+reviewer; independent review and any push remain pending at this checkpoint.
