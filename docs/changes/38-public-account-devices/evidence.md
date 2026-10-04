@@ -39,6 +39,22 @@
   branch `codex/issue-38-public-account-device-artifacts`. The main and ASR worktrees are
   preserved.
 
+## Local requirement register
+
+| Input | Role in this proposal |
+| --- | --- |
+| User direction, 2026-10-05, recorded in [Issue #38](https://github.com/Shuang-su/Livecho/issues/38) | Public unified site accounts and own-device self-service, with platform acquisition authorization separate. Drafting only; no decision or rollout approval inferred. |
+| [Issue #12 original body](https://github.com/Shuang-su/Livecho/issues/12) | Existing invited email, magic-link/session, roles, non-enumeration, idempotency and secret constraints. No comments read. |
+| [Issue #13 original body](https://github.com/Shuang-su/Livecho/issues/13) | Existing administrator enrollment, key proof, revocation, manifests and non-financial own aggregates. No comments read. |
+| [Issue #17 original body](https://github.com/Shuang-su/Livecho/issues/17) | Existing history, own-statistics, privileged controls, raw isolation and accessibility boundaries. No comments read. |
+| [Issue #2 specification](../2-architecture-risk-boundaries/spec.md), [ADR 0001](../../architecture/adr/0001-alpha-modular-monolith.md) | Existing authority, role, no-secret, worker/ingest and recovery constraints; invitation clauses are mapped rather than rewritten. |
+| [Threat model](../../security/alpha-threat-model.md), [data lifecycle](../../security/data-lifecycle-and-deletion.md) | Default-deny access, identity/devices, scoped revocation/deletion, audit and restore obligations. |
+| [Independent-implementation policy](../../policy/independent-implementation.md) | Source restrictions and author/reviewer separation. |
+
+The quota numbers, 10-minute enrollment lifetime, recent-auth bound and recommended
+independent-history grant are explicitly local proposed choices. They are not extracted
+from a reference product or asserted to be vendor limits, measured capacity or legal rules.
+
 ## Automated verification
 
 Pending the completed documentation snapshot. This batch changes documents only;
