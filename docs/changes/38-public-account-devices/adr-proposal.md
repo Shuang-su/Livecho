@@ -26,7 +26,10 @@ revocation and rights evidence; the existence of a Livecho account implies none 
 ## Proposed permission matrix
 
 All rows are proposals. Every permission also requires current source, safety, data and
-recovery policy. Deny by default; an absent permission is not inherited implicitly.
+recovery policy. Every still-active, verified account retains the own-account/device
+baseline, including accounts labeled contributor, operator or admin. A role adds only
+its explicitly named capabilities; it does not itself add a history grant. Deny other
+permissions by default. Suspension/revocation still removes the affected authority.
 
 | Actor/state | Proposed account/device/history permissions | Powers not created by this state |
 | --- | --- | --- |
@@ -34,7 +37,7 @@ recovery policy. Deny by default; an absent permission is not inherited implicit
 | Verified active account without history grant | Own account/session controls; fresh-auth own-key enrollment; own devices/reservations/revocation and own aggregates. | Normalized history, another account's devices/stats, operator/admin powers. |
 | Explicit viewer/history grant | Source-authorized normalized history in addition to the account's own baseline capabilities. | Raw access or new device/room/global authority. |
 | Contributor label | Describes participation/own aggregates; does not automatically grant viewer. | Trusted-worker status, quota increases, public rankings, financial value. |
-| Operator | Existing eligible-room control and emergency tightening actions. | Role/device administration, account takeover, relaxed platform restrictions. |
+| Operator | Own-account/device baseline plus existing eligible-room control and emergency tightening actions. | Role administration, cross-account device administration, account takeover, relaxed platform restrictions. |
 | Admin | Existing audited privileged controls plus subject-independent device/history-grant management. | Owner governance/risk bypass, untracked raw disclosure, new platform permission. |
 | Worker device | Own current key challenge and, independently, only an admissible lease. | Browser account session, platform/database/email/archive credentials. |
 
@@ -51,13 +54,18 @@ Historic accepted Issue #2 intent/spec/plan remain immutable records.
 | #13 administrator-issued 24-hour enrollment token; contributor barred from issuance | Fresh-auth account issues a 10-minute, own-account/key-bound reservation within quotas; admin retains emergency controls. | #13 |
 | Issue #2 admin-only device management; lifecycle DATA-WORKER-DEVICE | Subject may list/revoke its own devices; admin retains broader audited control; same deletion/recovery guarantees. | #13/#17 |
 | #17 invited history and admin invitation screens | Account/no-history-grant/own-device states; remove invitation dependency only after approval; retain restricted historical data and existing privileged boundaries. | #17 |
+| ADR 0001 `FLOW-ALLOW-002`; lifecycle `DATA-NORMALIZED-EVENT` invited-history wording | Explicit viewer/history grant replaces the invitation dependency; source/field publication, retention and deletion gates remain. | #12/#17 and canonical adoption |
 | ADR 0001 FLOW-ALLOW-010 / Resend invited-address description; lifecycle account identity | Minimum verified-or-verifying contact address and one-time proof within bounded public flow; no general address publication. | #12 |
 | ADR 0001 and threat model identified invited real-audio worker wording | Enrollment source may become self-service only after explicit amendment; real-audio disclosure risk/rights scope must be reviewed for that population, with no automatic acceptance. | #13 plus existing rights/risk governance |
+| Bilibili public-ingest policy `BILI-RIGHT-WORKER` and its identified-invited-worker prerequisite | Retained. Self-service registration does not satisfy this current real-PCM prerequisite. Any future expansion to that worker population requires a separate explicit rights/policy amendment and risk decision. | Existing rights/risk governance; outside this public-account adoption |
 | Issue #2 account/device checkpoints and restore, public anonymous ingest, worker no-secret flows | Retained; no amendment to their authority, ordering, scope or enablement prerequisites. | Existing owning Issues |
 
 Canonical targets after approval are ADR 0001, the Alpha threat model's actors/entry
-points/role/control/risk rows, and data-lifecycle account/device/counter provisions.
-The platform public-ingest policy and protocol remain unchanged. An audit/operations
+points/role/control/risk rows, and data-lifecycle account/device/counter and normalized
+history-access provisions. The platform public-ingest policy and protocol remain
+unchanged by this account/device adoption, including the retained real-PCM prerequisite
+above. The operator-selected free anonymous acquisition limit remains unchanged even
+if a later worker-population amendment is proposed. An audit/operations
 cross-reference update may explain new issuance stops but cannot redefine global/room
 safety or recovery sequencing. Exact adoption diff must be reviewed separately from this
 proposed text; no existing authoritative file is modified here.

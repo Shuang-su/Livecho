@@ -59,6 +59,7 @@ For this document-only proposal:
 | New email proof request; matching existing/suspended/nonexistent address | Same well-formed-request response; no role/history/device authority before valid proof. |
 | Two confirmations of the same proof or two redemptions of the same enrollment race | One account/consumption/association; no duplicate session or quota slot from replay. |
 | Verified account without viewer attempts history; contributor attempts another account's statistics | Denied without exposing restricted metadata; device activity grants neither permission. |
+| Active verified operator enrolls/revokes own device, then targets another account's device | Own baseline action may pass its independent gates; cross-account administration is denied. Operator role alone supplies no history grant. |
 | Three occupied slots; concurrent reserve/expire/revoke/redemption | At most three registered non-revoked devices plus pending reservations; no early revocation refund. |
 | Mail failure/unknown delivery, repeated operation identity, changed operation identity | Original reserved cost remains; same operation sends no duplicate; new operation observes every limit. |
 | Limit equality/window edge; counter unavailable or clock rolled back | Exact boundary semantics; affected issuance fails closed without account enumeration. |

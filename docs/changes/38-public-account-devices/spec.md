@@ -107,6 +107,9 @@ executable ownership/privacy evidence remain prerequisites. Replacing the word i
 must not silently accept the risk for a larger worker population. Platform acquisition
 remains limited to the currently approved operator-selected, free, anonymous channel;
 an account, device or contribution cannot supply platform acquisition authority.
+The current `BILI-RIGHT-WORKER` identified-invited-worker requirement is retained:
+self-service enrollment alone does not satisfy it. Enabling real PCM for a different
+worker population requires a separate explicit rights/policy amendment and risk decision.
 
 ## Proposed quotas and exact admission semantics
 
@@ -216,6 +219,8 @@ explicit data basis; neither can invent an indefinite undeclared identity denyli
   confirmations yield no duplicate account/session or self-granted role.
 - [ ] Registered/no-grant, viewer-granted, own contributor, operator and admin cases have
   positive and cross-role/cross-account negative authorization tables in #12/#13/#17.
+- [ ] An active verified operator retains own-device enrollment/revocation but cannot
+  administer another account's devices; a role alone never supplies a history grant.
 - [ ] Registration or contribution does not reveal normalized history or raw data; grant
   revocation, source restriction and room/session deletion independently deny access.
 - [ ] Every quota tests just below/at/above the limit and exact window expiry, concurrency,

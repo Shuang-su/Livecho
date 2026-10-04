@@ -49,6 +49,7 @@
 | [Issue #17 original body](https://github.com/Shuang-su/Livecho/issues/17) | Existing history, own-statistics, privileged controls, raw isolation and accessibility boundaries. No comments read. |
 | [Issue #2 specification](../2-architecture-risk-boundaries/spec.md), [ADR 0001](../../architecture/adr/0001-alpha-modular-monolith.md) | Existing authority, role, no-secret, worker/ingest and recovery constraints; invitation clauses are mapped rather than rewritten. |
 | [Threat model](../../security/alpha-threat-model.md), [data lifecycle](../../security/data-lifecycle-and-deletion.md) | Default-deny access, identity/devices, scoped revocation/deletion, audit and restore obligations. |
+| [Bilibili public-ingest policy](../../policy/bilibili-public-ingest.md) | On 2026-10-05 Asia/Shanghai, read only the local `BILI-RIGHT-WORKER` / identified-invited-worker matching lines to resolve independent-review mapping feedback. No external links were followed; this requirement remains in force. |
 | [Independent-implementation policy](../../policy/independent-implementation.md) | Source restrictions and author/reviewer separation. |
 
 The quota numbers, 10-minute enrollment lifetime, recent-auth bound and recommended
