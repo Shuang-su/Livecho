@@ -157,6 +157,85 @@ test result is claimed. Later implementation Issues retain their full verificati
   review, or license/legal clearance. These evidence-only additions do not change the
   reviewed intent/spec/plan/ADR content.
 
+## 2026-10-23 revision verification and publication state
+
+Source/assignment commit: `7c640f8`. The author then revised only the original intent,
+spec, plan, ADR proposal and this evidence. The content revision clarifies staging and
+retained goals; it does not adopt any pending architecture decision. No product code,
+authoritative policy, model, audio or protocol changed.
+
+| Command / check | Actual result on the local revision |
+| --- | --- |
+| `/usr/bin/python3 -B /Users/szmg/.codex/monitors/livecho-20261023/gui_gate.py` | Run separately before/after work batches and at review boundaries; every observed result so far is exit 0, `work_allowed: true`, `reason: active`. |
+| `make artifacts` | Exit 0, `change artifacts: ok`. |
+| `git diff --check 445425757507c6a427f69c87c94042f3e86ff725` | Exit 0; no whitespace errors. |
+| Relative-link/file-inventory command above | Exit 0: `Document scope and relative links: 5 files, 9 local links passed`. |
+| Boundary/scope comparison below | Exit 0: `Unchanged boundary sections: 6 passed`; changed paths equal the five original Issue #38 files. |
+
+Exact boundary/scope comparison, run from this worktree:
+
+```sh
+python3 - <<'PY'
+from pathlib import Path
+import subprocess
+root = Path('docs/changes/38-public-account-devices')
+base = '445425757507c6a427f69c87c94042f3e86ff725'
+protected = {
+    'spec.md': [
+        ('## Proposed quotas and exact admission semantics', '## Interfaces and compatibility'),
+        ('## Failure modes and disable path', '## Acceptance criteria'),
+        ('### DEV-38-001:', '### DEV-38-002:'),
+        ('Registration establishes ownership.', '## Proposed quotas and exact admission semantics'),
+        ('### AUTH-38-002:', '### DEV-38-001:'),
+    ],
+    'adr-proposal.md': [
+        ('## Proposed permission matrix', '## Alternatives and consequences'),
+    ],
+}
+count = 0
+for name, ranges in protected.items():
+    path = root / name
+    old = subprocess.check_output(['git', 'show', f'{base}:{path}'], text=True)
+    new = path.read_text()
+    for start, end in ranges:
+        assert old.split(start, 1)[1].split(end, 1)[0] == new.split(start, 1)[1].split(end, 1)[0], (name, start)
+        count += 1
+changed = subprocess.check_output(['git', 'diff', '--name-only', base], text=True).splitlines()
+assert set(changed) == {str(file) for file in root.glob('*.md')}, changed
+print(f'Unchanged boundary sections: {count} passed')
+PY
+```
+
+The first local checks passed before the review handoff. Independent exact-commit review
+of this revision is pending; the 2026-10-05 review above does not cover this delta. No
+runtime, provider, account, worker, capacity or real-audio verification is claimed, and
+no unrelated `make verify` run was performed for these document-only changes.
+
+### Prepared PR #39 update draft — not published
+
+Proposed title: `docs(issue-38): clarify public-account stages and retained identity goals`
+
+Proposed body:
+
+> Proposes public Livecho accounts and self-service own-device management for Issue #38.
+> Email verification is the first account phase; Google, GitHub and Bilibili identity
+> entry remain explicit long-term goals with separate reviewed contracts. Site identity,
+> platform acquisition authorization and device identity remain independent, and history
+> keeps the recommended separate grant.
+>
+> Personal devices and private contribution feedback precede a voluntary public
+> leaderboard. The first subtitle loop has no dependency on public-account rollout,
+> new platform acquisition authorization or rankings. Existing quotas, revocation,
+> safety, invitation and anonymous-ingest rules remain unchanged by this pending proposal.
+>
+> Validation: `make artifacts`, whitespace, relative-link/five-file scope and six
+> unchanged-boundary checks passed locally. Independent review of this revision is
+> pending. No product code or runtime capability changed; no rollout is authorized.
+
+This is a local publication draft. The reported HTTP 403 account suspension prevents
+current Issue #38/PR #39 status verification; no remote update, push, merge or deployment
+was attempted in this revision.
+
 ## Deviations
 
 The supplementary ADR draft stays inside this Issue's artifact directory so the existing

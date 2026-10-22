@@ -3,6 +3,11 @@
 **Draft / proposed; pending repository-owner approval.** This plan is documentation
 work followed by separately gated adoption and implementation. It starts no runtime.
 
+The sequence below is the account/device proposal's sequence. The first subtitle loop
+can proceed independently under its own approved artifacts and existing source/audio
+gates; it does not wait for public accounts, new platform acquisition authorization or
+rankings. Email first is a delivery stage, not a reduction of the identity roadmap.
+
 ## Order of work
 
 1. Commit the actual author exposure/assignment and separate reviewer before drafting.
@@ -25,7 +30,8 @@ work followed by separately gated adoption and implementation. It starts no runt
 6. #12 first owns an approved public-email account/session/history-grant artifact and
    implementation: canonicalization, proof confirmation, exact endpoints, request/email
    admission and idempotency, suspension/deletion/restore, zero self-elevation and the
-   ownership tests. Do not infer platform login support from the email design.
+   ownership tests. Retain Google/GitHub/Bilibili identity entry on #12's later roadmap;
+   do not infer provider login support or platform acquisition rights from email design.
 7. #13 then owns an approved self-service enrollment artifact and implementation: own
    account/key binding, current private-key proof, exact challenge/token contract,
    atomic reservations/slot limits, individual revocation, contribution authorization
@@ -33,13 +39,28 @@ work followed by separately gated adoption and implementation. It starts no runt
    compatibility evidence. The reviewed real-audio risk/rights scope remains a gate.
 8. #17 owns approved account/no-history-grant/own-device interfaces alongside existing
    operator/admin surfaces. Prove cross-role/ownership denial, no raw-cache exposure,
-   accessible states and safe destructive controls. It cannot grant what #12/#13 deny.
+   accessible states and safe destructive controls. Deliver personal device management
+   and own contribution feedback before any voluntary public leaderboard. It cannot
+   grant what #12/#13 deny.
 9. Before enablement, record the actual deployment's limits, mail budget, abuse response,
    privacy/recovery evidence and any named residual-risk decisions. Inventory any existing
    identities/devices before defining a migration; never assume existing elevated roles
    can be discarded or that old invitation tokens may become public enrollment tokens.
 10. Enable only the individually completed account/device capability under a bounded
     rollout. All ingest, model, real-audio, retention and source gates remain independent.
+
+## Retained goals and follow-on decisions
+
+| Goal / stage | Owning work | Required decision before implementation |
+| --- | --- | --- |
+| First account/device phase: public email accounts, self-service own devices and private own-contribution feedback | #12 accounts; #13 devices/aggregates; #17 interfaces | Owner adoption of #38 and each owning artifact, with the unchanged security, quota, history and revocation rules. |
+| Later Google, GitHub and Bilibili identity entry | #12 identity contracts; #17 account interfaces | Supported provider mechanisms and evidence, binding/linking, recovery and revocation; no provider or OAuth capability is presumed. |
+| Later voluntary public leaderboard, after personal device and contribution feedback | #13 contribution contract; #17 publication interface | Explicit opt-in, publication scope, privacy and withdrawal; no automatic publication, authority, financial value or quota increase. |
+| Any future platform acquisition authorization outside the current anonymous channel | Existing rights/policy governance; a separate scoped Issue is required before expansion | Supported authorization and rights evidence plus explicit policy adoption. Site login, identity linking, self-service enrollment and this roadmap supply no such authorization. |
+
+These rows retain product goals without creating an empty Issue, login/Cookie/OAuth
+contract or implementation approval. Provider feasibility and the later leaderboard's
+publication contract remain open; the first email/device phase does not depend on them.
 
 ## Verification
 
@@ -56,6 +77,9 @@ For this document-only proposal:
 
 | Documentation scenario | Required unambiguous outcome |
 | --- | --- |
+| Reader treats email-first scope as removal of Google/GitHub/Bilibili identity entry | All three remain explicit later goals, owned by #12/#17, with provider contracts and approval still pending. |
+| Reader treats a future provider login as platform permission or worker identity | Site identity, acquisition authorization and device key proof remain separate; no current anonymous-ingest or worker-rights rule changes. |
+| Personal device/feedback delivery, voluntary leaderboard and first subtitle loop are sequenced | Own-device/feedback work precedes public ranking; the subtitle loop has no public-account, new platform-authorization or ranking prerequisite. |
 | New email proof request; matching existing/suspended/nonexistent address | Same well-formed-request response; no role/history/device authority before valid proof. |
 | Two confirmations of the same proof or two redemptions of the same enrollment race | One account/consumption/association; no duplicate session or quota slot from replay. |
 | Verified account without viewer attempts history; contributor attempts another account's statistics | Denied without exposing restricted metadata; device activity grants neither permission. |
@@ -86,3 +110,6 @@ grant; numeric limits are explicit proposals, not placeholders. Any different hi
 choice or limit set must be recorded before adoption. Endpoint, canonicalization,
 challenge and migration details belong to the named owning artifacts and must be fixed
 there before code; they are not licenses for an implementer to improvise new authority.
+Later provider identity and voluntary-publication contracts remain pending in the
+owning work above. Authorization to revise this proposal approves none of those contracts
+and does not approve deployment or amend current invitation or anonymous-ingest rules.

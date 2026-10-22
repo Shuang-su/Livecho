@@ -20,19 +20,29 @@ also expand history access and device authority without a reviewed decision.
 Propose an explicit amendment separating email-verified account ownership, normalized
 history authorization, ownership of a worker device, device authentication, task
 eligibility and platform acquisition permission. Public email verification is the first
-phase. Social/platform login is a future separate contract, not a claimed integration.
+phase of the public-account goal. Google, GitHub and Bilibili identity entry remain
+explicit long-term goals, each requiring a separately reviewed supported contract;
+email-first staging does not cancel them or claim that an integration is available.
 
 A verified account may register and revoke only its own devices within published bounds.
 Independent history authorization is the recommended default. Operator/admin powers,
 platform selection, protocol/model admission and real-audio disclosure gates stay
 separate. No new infrastructure or second application authority is needed.
 
-## Non-goals
+Personal device management and private feedback on one's own contribution come before
+any voluntary public leaderboard. Public ranking remains a later proposal requiring
+separate consent, privacy and publication decisions. The first subtitle loop does not
+depend on public-account rollout, new platform acquisition authorization or rankings;
+its existing source, worker and audio gates remain applicable.
+
+## Non-goals of this document revision and first account/device phase
 
 - Product code, schema/API/protocol changes, deployments, live registration or migration.
 - Immediate replacement of accepted documents or invitation/role behavior by this draft.
-- Platform OAuth or credential acquisition, a changed anonymous-ingest policy, public
-  room submissions, public contribution rankings or financial rewards.
+- Implementing Google/GitHub/Bilibili identity entry, platform OAuth, credential or
+  Cookie synchronization, a changed anonymous-ingest policy, public room submissions,
+  public contribution rankings or financial rewards. Deferral of identity entry and a
+  voluntary leaderboard is phase scope, not removal from the long-term roadmap.
 - New ASR/subtitle behavior, model download/transfer or real-audio worker enablement.
 
 ## Constraints and data impact

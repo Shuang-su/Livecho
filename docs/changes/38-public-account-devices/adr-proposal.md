@@ -19,9 +19,20 @@ and revoke its own devices under bounded reservations. Device challenge authenti
 model/protocol acceptance, lease eligibility and real-audio rights/privacy gates are
 separate. The existing modular monolith remains the sole online application authority.
 
-Email magic links reuse an existing accepted authentication direction. A new social or
-platform login must supply its own supported identity contract, scopes, binding, recovery,
-revocation and rights evidence; the existence of a Livecho account implies none of them.
+Email magic links reuse an existing accepted authentication direction for the first
+phase. Google, GitHub and Bilibili identity entry remain explicit long-term goals under
+#12/#17. Each must supply its own supported identity contract, scopes, binding, recovery
+and revocation evidence before implementation. Site identity, platform acquisition
+authorization and device identity remain separate; provider identity establishes neither
+acquisition rights nor device key possession. No provider availability, OAuth or Cookie
+synchronization mechanism is defined or assumed here.
+
+Personal device management and private own-contribution feedback under #13/#17 precede
+a later voluntary public leaderboard. Publication consent, privacy and withdrawal still
+need their own reviewed contract; the contributor state below grants no publication.
+The first subtitle loop does not depend on public accounts, new platform acquisition
+authorization or rankings, and retains its existing source/worker/audio gates. These
+stages preserve the product goals without changing any current authoritative boundary.
 
 ## Proposed permission matrix
 
@@ -88,9 +99,10 @@ proposed text; no existing authoritative file is modified here.
 
 | Decision | Recommendation | Owner alternatives / approval state |
 | --- | --- | --- |
-| PUB-ACCOUNT-001 | Public email-verified accounts with no invitation prerequisite; retain existing magic-link/session controls. | Pending owner adoption. Social/platform auth is a future separate contract. |
+| PUB-ACCOUNT-001 | Public email-verified accounts with no invitation prerequisite as the first account phase; retain existing magic-link/session controls. | Pending owner adoption. Google/GitHub/Bilibili identity entry remains on the later #12/#17 roadmap with separate reviewed contracts. |
 | HIST-GRANT-001 | Independent explicit viewer/history grant. | Owner may choose automatic viewer for every verified account only with an explicit authorization/source-risk amendment; currently pending. |
 | DEVICE-SELF-001 | Verified active account may enroll/revoke only its own devices with key proof and independent task gates. | Pending owner adoption; this is not real-audio risk acceptance. |
+| ROADMAP-38-001 | Personal devices and private own-contribution feedback before a voluntary public leaderboard; the first subtitle loop is independent of public accounts, new platform authorization and rankings. | Staging clarification only; later #13/#17 publication consent/privacy/withdrawal contracts and any platform rights amendment remain pending. |
 | LIMIT-38-001 | Adopt the exact initial rolling limits, slot accounting and failure semantics in spec.md. | Owner may review different explicit values before approval; no implicit production capacity claim. |
 | ADOPT-38-001 | Perform the bounded canonical amendments and approve owning artifacts before implementation/enablement. | Pending; new named/high residual decisions and operational evidence remain required. |
 

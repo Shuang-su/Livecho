@@ -9,9 +9,10 @@ No runtime capability is enabled by this document.
 
 ### AUTH-38-001: One site account, separate permission decisions
 
-Livecho assigns an opaque immutable account identifier when email ownership is first
-verified. The contact email is an authentication address, not a platform identity,
-device identity or authorization role. Only the backend resolves their associations.
+In the email-first phase, Livecho assigns an opaque immutable account identifier when
+email ownership is first verified. The contact email is an authentication address, not
+a platform identity, device identity or authorization role. Only the backend resolves
+their associations.
 One address cannot concurrently create multiple active accounts. Issue #12 must define
 one address-canonicalization contract shared by lookup, proof binding and abuse counters;
 provider-specific dot/plus rewriting is excluded from this first phase.
@@ -39,10 +40,17 @@ viewer/history grant; this explicitly changes the old contributor-inherits-viewe
 No submitted role, owner identifier, capability claim or linked platform identifier can
 grant authority. Existing elevated roles must never be recomputed from public signup.
 
-Social login, platform login, account linking, changing the authentication address and
-lost-email recovery require separate reviewed contracts before implementation. No platform
-OAuth availability, entitlement or permission is assumed. None is necessary to deliver
-the first public-email phase.
+Google, GitHub and Bilibili identity entry remain long-term goals owned by #12, with
+account UI adoption in #17. Their supported mechanisms, account linking, changing the
+authentication address and lost-email recovery require separate reviewed contracts
+before implementation. No provider login/OAuth availability, entitlement, credential or
+Cookie synchronization contract is assumed. None is necessary to deliver the first
+public-email phase; postponement is not cancellation of these identity goals.
+
+A future provider identity proves only what its approved site-authentication contract
+establishes. It does not grant platform acquisition authorization or authenticate a
+worker device. Platform acquisition and device key proof retain their own authorities,
+revocation and admission gates even if their records are associated with one site account.
 
 ### AUTH-38-002: History remains independently authorized
 
@@ -93,7 +101,11 @@ remains available without making admin invitation the normal registration prereq
 An account may list and revoke only its own registered devices, cancel its own pending
 reservations and see only its own existing aggregate contribution metrics. Those metrics
 remain online duration, processed duration, success rate, RTF and recent health; no
-rankings, transferable points, payments or proof of trusted output are introduced.
+rankings, transferable points, payments or proof of trusted output are introduced in
+this phase. Personal device management and own contribution feedback take priority.
+A voluntary public leaderboard is retained as a later goal for #13/#17; it requires
+separate consent, publication/privacy and withdrawal decisions before implementation.
+An account, contributor label or contribution total never opts a person into publication.
 
 Registration establishes ownership. Fresh challenge authentication establishes only
 current possession of the registered key. Separately, an admissible Hello requires the
@@ -169,6 +181,12 @@ contracts; #17 owns account, no-history-access, own-device and existing privileg
 Each needs owner-merged artifacts before its implementation. Anonymous live remains
 compatible; no existing public or worker protocol is changed by this proposal.
 
+The first subtitle loop remains separately deliverable under its existing approved
+contracts; public accounts, new platform acquisition authorization and rankings are
+not prerequisites. This staging does not waive any current source, model, worker,
+real-audio, privacy or safety gate. The email-first account phase and the later identity
+and voluntary-ranking goals must not become new dependencies of that loop.
+
 If #13 requires any change to existing worker protocol compatibility fields or messages,
 it must first obtain the owning protocol artifact and golden/backward-compatibility
 evidence. This architecture cannot authorize such a change by implication.
@@ -215,6 +233,11 @@ explicit data basis; neither can invent an indefinite undeclared identity denyli
 ## Acceptance criteria
 
 - [ ] Draft/approval/adoption/enablement states are explicit and current rules unchanged.
+- [ ] Email-first staging explicitly retains Google/GitHub/Bilibili identity goals;
+  site identity, platform acquisition authorization and device identity remain separate.
+- [ ] Own-device and own-contribution feedback precede any voluntary public leaderboard;
+  no public-account, new platform-authorization or ranking prerequisite is added to the
+  first subtitle loop.
 - [ ] Public proof redemption needs no invitation, yet duplicate/replayed/concurrent
   confirmations yield no duplicate account/session or self-granted role.
 - [ ] Registered/no-grant, viewer-granted, own contributor, operator and admin cases have
