@@ -75,6 +75,12 @@ PY
 No full runtime suite, model/audio, MLX or hardware check ran. Future plan commands are
 requirements, not run evidence.
 
+The 2026-10-23 review-record follow-up reran `make artifacts && git diff --check`
+(exit 0, `change artifacts: ok`) and
+`git diff --cached --check && git diff --cached --name-only`
+(exit 0; only this evidence file). The Oct23 GUI gate exited 0 before
+and after the batch. No specification or runtime change was made in this follow-up.
+
 ## Requirement source map
 
 | Requirement | Allowed source and limit |
@@ -104,7 +110,13 @@ registry stays closed. Text-only contracts cannot establish working inference.
   sequence/PTS before checking cancellation/expiry/generation. The proposal now requires
   one-owner atomic precommit revalidation and confirmed actual audio release, plus
   held-completion metadata race cases. Failed checks keep admission closed with no
-  commit/ack/output. Revised-head confirmation is pending.
+  commit/ack/output.
+- Reviewer confirmed clean revised head `a740c10e18f039173b7d934817f6aa6e24057e2f`:
+  read the complete `32b7e30..a740c10` spec/plan/evidence delta and ran
+  `git diff --check 32b7e30..a740c10` (exit 0). The P2 is resolved with no remaining
+  actionable documentation finding. GUI gate checks passed before/after review.
+  No tests were run; this confirmation does not replace executable compatibility or
+  actual audio-ownership evidence.
 - No direct irreconcilable v1 conflict was identified by static review. The explicit
   executable compatibility/actual ownership gate remains before real inference;
   document review is not runtime evidence. Reviewer made no edits and ran no tests.
