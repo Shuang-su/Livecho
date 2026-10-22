@@ -113,7 +113,14 @@ account, platform input or production run has been executed for this artifact.
   browser-entry packaging/adapters with unchanged Node API, strict parsing, JCS,
   sequencing/revision and golden results; no independent drift-prone UI validator.
 - Author read the current validator imports and package exports to verify the finding.
-  Reviewer made no edits or tests. Revised-head confirmation remains pending.
+  Reviewer made no edits or tests.
+- Reviewer confirmed exact revised head `38a035c3343f66427a749c0e1de78434022f5367`:
+  both findings resolved and no remaining actionable documentation finding. The
+  read-only review checked status/head, the complete revision delta and
+  `git diff --check 56664e1..38a035c` (exit 0), without rerunning the author's artifact,
+  link or runtime tests. GUI gates passed before/after reviewer batches. Browser hash
+  candidates must obey the specified bounded input path and reject old-generation
+  completions during implementation; this is not current runtime evidence.
 
 ## Deviations
 
