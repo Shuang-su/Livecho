@@ -2295,3 +2295,69 @@ executions, distinct from the reviewer's separate probe above.
 - `git diff --check` — exit 0 before the stable correction commit. The separately
   checked GUI gate after the long full verification again returned exit 0 / active.
   Exact corrected-head independent review remains pending at this author checkpoint.
+
+### Corrected coordinator independent review and final handoff — 2026-10-23
+
+Independent reviewer `/root/coordinator_review_20261023` confirmed the P2 correction
+at exact clean head `491c0bb8fb1931e57b116ee5561f734a630eb61a`, with no new confirmed
+actionable issue. It read only the four-path delta from `7b1e165` for this follow-up,
+using the previously disclosed local sources; no new external source was accessed.
+Its separately invoked GUI gates before and after review each returned exit 0.
+
+Actual reviewer command from this worktree:
+`uv run pytest -q --tb=short tests/asr_benchmark/test_pass_coordinator.py -k earliest`
+returned exit 0: **7 passed, 35 deselected in 0.27s**. `git diff --check` returned exit
+0; head and clean worktree were unchanged before and after review. The reviewer did
+not rerun the full suite, older modules, or the author's 42-case selection, and made
+no code edits. The author's existing **715 pytest / 128 protocol / 63 Railway** full
+verification remains the actual full-suite result for code head `491c0bb`.
+
+The reviewer separately ran the same original 600 ms silence stimulus against the
+corrected code with corrected rejection expectations. This was a new independent
+stdin execution, not a rerun of the old-code acceptance probe. Exact command:
+
+```sh
+uv run python -B - <<'PY'
+import asyncio
+from tools.asr_benchmark.contracts import Corpus, CharacterTime
+from tools.asr_benchmark.pass_coordinator import PassCoordinator, PassExecutionFailure
+from tests.asr_benchmark.test_pass_coordinator import setup, Guard, assert_closed
+from tests.asr_benchmark.factories import corpus
+plan, clock, provider, factory = setup(6)
+record = corpus()
+script = record.scripts[0]
+times = (CharacterTime(start_ns=0, end_ns=100_000_000), CharacterTime(start_ns=700_000_000, end_ns=800_000_000), CharacterTime(start_ns=800_000_000, end_ns=900_000_000), *script.character_times[3:])
+script = script.model_copy(update={'character_times': times})
+record = Corpus.model_validate(record.model_copy(update={'scripts': (script, *record.scripts[1:])}).model_dump())
+factory.abort_after = 1
+try:
+    asyncio.run(PassCoordinator().run(plan, record, provider, factory, guard=Guard(clock), clock=clock))
+except PassExecutionFailure as error:
+    assert str(error) == 'segment_schedule_invalid', str(error)
+    assert error.completed_scripts == 0, error.completed_scripts
+    assert provider.calls == [] and len(factory.opened) == 1
+    assert_closed(factory, provider)
+    print({'reason': str(error), 'completed_scripts': error.completed_scripts, 'provider_calls': len(provider.calls), 'provider_closed': provider.closed, 'source_closed': [s.closed for s in factory.opened]})
+else:
+    raise AssertionError('invalid full-window schedule unexpectedly completed')
+PY
+```
+
+Actual result: exit 0 in 0.130710292s. Output was
+`{'reason': 'segment_schedule_invalid', 'completed_scripts': 0, 'provider_calls': 0, 'provider_closed': 1, 'source_closed': [1]}`.
+The reviewer did not save a script file; this transcript preserves its supplied command.
+The author did not re-execute it. No provider call or score escaped the invalid schedule,
+and the owned source/provider closed. This proves the metadata rejection and cleanup
+path only, not real audio, models, networking, MLX, hardware or full Issue #5 acceptance.
+
+The remaining real-source, provider, guard, leading-silence, process/host/privacy and
+complete-report gates remain as documented. The local PR #36 draft records this actual
+review outcome; no push, merge, deployment, duplicate PR or new implementation batch
+is part of this documentation-only handoff.
+
+Author documentation checks: `git diff --check` and `make artifacts` each exited 0
+(`change artifacts: ok`). The command
+`git diff --exit-code 491c0bb8fb1931e57b116ee5561f734a630eb61a -- . ':(exclude)docs/changes/5-mlx-benchmark/evidence.md'`
+exited 0 without output, confirming all non-evidence files, including code, tests,
+README and accepted intent/spec/plan, retain the independently reviewed bytes. No
+product test, full verification or probe was rerun for this final evidence-only change.
