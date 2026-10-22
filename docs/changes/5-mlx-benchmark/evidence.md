@@ -2204,3 +2204,94 @@ hardware benchmark, protected-host proof or complete report was produced. This i
 verification, not hosted CI. Independent stable-head review is pending at this checkpoint.
 PR #36 remains the existing draft; a local update draft is retained outside Git while
 GitHub access is suspended. There is no push, merge, deployment or Issue #5 completion.
+
+### Independent coordinator review and earliest-close correction — 2026-10-23
+
+The actual stable-code reviewer for this round is `/root/coordinator_review_20261023`,
+separately assigned by `/root`; `/root/audio_code_readiness` had supplied early accepted-
+spec boundary notes, not stable-code approval. The new reviewer inspected initial clean
+head `7b1e1656c44ec338e8e1e2da18022173df86eba1`, all six changed paths and the new tests,
+AGENTS, the independent-implementation policy, all four Issue #5 artifacts, the single
+historical 2026-09-26 Issue #5 JSON snapshot, and the necessary local runner/timing/
+instrumentation/runtime/pass-control/contracts and original metadata factories. It also
+read memory guidance about GUI-only execution, quota/owner gates and source isolation.
+Policy/evidence reference names, revisions, licenses and historical exposure categories
+were local metadata only. No external link, Issue #31 body, other research file,
+SDK/reference implementation or product expression was read. The reviewer made no edits,
+download, audio/model/MLX/hardware run, and did not repeat any author suite/full verify.
+Its independently invoked GUI gate checks all returned exit 0.
+
+The reviewer confirmed one P2: the schedule validator accepted full-window or EOF closure
+without checking whether an internal or trailing 500 ms silence should have closed the
+segment earlier. Its independent original metadata probe changed the first character's
+end to 100 ms and resumed the next character at 700 ms, while preserving strict Corpus
+validity. The existing six-second schedule completed and scored the first script even
+though its first closure should have been 600 ms; only an intentional EOF on the next
+source made the pass incomplete. Final initial-boundary review found no other confirmed
+actionable issue. This is a failed initial review, not an approval of `7b1e165`.
+
+Actual reviewer probe command, executed once from the Issue #5 worktree at `7b1e165`:
+
+```sh
+uv run python -B - <<'PY'
+import asyncio
+from tools.asr_benchmark.contracts import Corpus, CharacterTime, NS
+from tools.asr_benchmark.pass_coordinator import PassCoordinator, PassExecutionFailure
+from tests.asr_benchmark.test_pass_coordinator import setup, Guard
+from tests.asr_benchmark.factories import corpus
+plan, clock, provider, factory = setup(6)
+record = corpus()
+script = record.scripts[0]
+times = (CharacterTime(start_ns=0, end_ns=100_000_000), CharacterTime(start_ns=700_000_000, end_ns=800_000_000), CharacterTime(start_ns=800_000_000, end_ns=900_000_000), *script.character_times[3:])
+script = script.model_copy(update={'character_times': times})
+record = Corpus.model_validate(record.model_copy(update={'scripts': (script, *record.scripts[1:])}).model_dump())
+factory.abort_after = 1
+try:
+    asyncio.run(PassCoordinator().run(plan, record, provider, factory, guard=Guard(clock), clock=clock))
+except PassExecutionFailure as error:
+    assert str(error) == 'incomplete_source', str(error)
+    assert error.completed_scripts == 1, error.completed_scripts
+    print({'accepted_internal_silence_ns': times[1].start_ns - times[0].end_ns, 'required_first_close_ns': times[0].end_ns + 500_000_000, 'actual_first_final_end_ns': next(call[2] for call in provider.calls if call[3] == 'final'), 'completed_scored_scripts_before_intentional_abort': error.completed_scripts, 'provider_closed': provider.closed, 'source_closed': [s.closed for s in factory.opened]})
+else:
+    raise AssertionError('deliberately incomplete pass unexpectedly completed')
+PY
+```
+
+Actual result: exit 0 in 0.108s. Printed metadata was
+`{'accepted_internal_silence_ns': 600000000, 'required_first_close_ns': 600000000, 'actual_first_final_end_ns': 6000000000, 'completed_scored_scripts_before_intentional_abort': 1, 'provider_closed': 1, 'source_closed': [1, 1]}`.
+The reviewer ran this via stdin without saving a script file. The command above was
+transcribed from its supplied execution record; the author did not rerun that old-code
+probe or imply that a later saved file existed at execution time.
+
+Author `/root/asr_coordinator_20261023` corrected only this metadata validator and its
+tests/README/evidence after another separately successful October 23 gate. Before
+accepting a scored span, it scans the approved character intervals from the span start
+and requires the earliest of window, 500 ms silence or EOF. Internal speech after a
+pause cannot erase that earlier close, and trailing silence is checked even for a full
+window/EOF endpoint. The existing leading-silence representation boundary still fails
+explicitly; the correction does not invent VAD, source acquisition, audio or MLX logic.
+
+Seven original author-written cases cover internal 600 ms and exactly 500 ms pauses,
+trailing silence before a full window and before EOF, a just-under-500 ms gap, a window/
+silence tie, and EOF before the silence deadline. All modified corpora strictly revalidate.
+Negative cases require zero completed scripts and no provider call; positive boundaries
+still score the first script before the intentional next-source abort. These are author
+executions, distinct from the reviewer's separate probe above.
+
+- Before the code fix, `uv run pytest -q --tb=line tests/asr_benchmark/test_pass_coordinator.py -k earliest`
+  produced **4 failed, 3 passed, 35 deselected in 0.31s**, reproducing the defect.
+- After the fix, `uv run ruff check tools/asr_benchmark/pass_coordinator.py tests/asr_benchmark/test_pass_coordinator.py`
+  and `uv run mypy tools/asr_benchmark/pass_coordinator.py tests/asr_benchmark/test_pass_coordinator.py`
+  passed; `uv run pytest -q --tb=short tests/asr_benchmark/test_pass_coordinator.py`
+  passed **42 in 7.71s**. Full verification and exact-head re-review follow below.
+
+- `make verify` after this code correction — exit 0 at approximately 00:58 +08:00:
+  Ruff/format/mypy (69 Python files), workspace/TypeScript checks, **715 pytest passed
+  in 64.77s**, **128 protocol Vitest**, **63 Railway Vitest**, artifact/protocol-
+  generation checks and builds passed. The focused 42-case run above and this required
+  full verification cover the changed code; the older 601-case ASR run was not presented
+  as a post-fix result or repeated separately. No dependency, registry, transport,
+  source acquisition, model/audio/MLX or host-acceptance scope was added.
+- `git diff --check` — exit 0 before the stable correction commit. The separately
+  checked GUI gate after the long full verification again returned exit 0 / active.
+  Exact corrected-head independent review remains pending at this author checkpoint.

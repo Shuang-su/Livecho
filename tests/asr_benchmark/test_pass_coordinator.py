@@ -6,7 +6,15 @@ from threading import Event, RLock
 import pytest
 
 from tools.asr_benchmark import pass_coordinator as coordinator
-from tools.asr_benchmark.contracts import NS, InferenceManifest, Script, Settings, Window
+from tools.asr_benchmark.contracts import (
+    NS,
+    CharacterTime,
+    Corpus,
+    InferenceManifest,
+    Script,
+    Settings,
+    Window,
+)
 from tools.asr_benchmark.pass_coordinator import (
     PassCoordinator,
     PassExecutionFailure,
@@ -394,6 +402,81 @@ def test_segment_schedule_rejected_before_provider(malformed: str) -> None:
     with pytest.raises(PassExecutionFailure):
         run(plan, clock, provider, factory)
     assert provider.calls == []
+    assert_closed(factory, provider)
+
+
+@pytest.mark.parametrize(
+    "case,rejected",
+    [
+        ("internal", True),
+        ("internal_exact", True),
+        ("window_tail", True),
+        ("eof_tail", True),
+        ("internal_short", False),
+        ("window_tie", False),
+        ("eof_first", False),
+    ],
+)
+def test_schedule_uses_earliest_window_silence_or_eof(case: str, rejected: bool) -> None:
+    plan, clock, provider, factory = setup(6)
+    record = corpus()
+    script = record.scripts[0]
+    if case.startswith("internal"):
+        gap = {
+            "internal": 600_000_000,
+            "internal_exact": 500_000_000,
+            "internal_short": 499_999_999,
+        }[case]
+        times = (
+            CharacterTime(start_ns=0, end_ns=100_000_000),
+            CharacterTime(start_ns=100_000_000 + gap, end_ns=800_000_000),
+            CharacterTime(start_ns=800_000_000, end_ns=900_000_000),
+            *script.character_times[3:],
+        )
+    elif case.startswith("window"):
+        step = 250_000_000 if case == "window_tail" else 275_000_000
+        times = (
+            tuple(CharacterTime(start_ns=k * step, end_ns=(k + 1) * step) for k in range(20))
+            + script.character_times[20:]
+        )
+    else:
+        step = 275_000_000 if case == "eof_tail" else 290_000_000
+        times = tuple(CharacterTime(start_ns=k * step, end_ns=(k + 1) * step) for k in range(40))
+    script = script.model_copy(update={"character_times": times})
+    record = Corpus.model_validate(
+        record.model_copy(update={"scripts": (script, *record.scripts[1:])}).model_dump()
+    )
+
+    def set_speech_ends(source: Source) -> None:
+        if source.request.script is None:
+            return
+        source.segments = tuple(
+            replace(
+                span,
+                speech_end_ns=min(
+                    span.end_ns,
+                    max(
+                        timing.end_ns
+                        for timing in source.request.script.character_times
+                        if timing.start_ns < span.end_ns and timing.end_ns > span.start_ns
+                    ),
+                ),
+            )
+            for span in source.segments
+        )
+
+    factory.schedule_change = set_speech_ends
+    factory.abort_after = 1
+    reason = "segment_schedule_invalid" if rejected else "incomplete_source"
+    with pytest.raises(PassExecutionFailure, match=f"^{reason}$") as failure:
+        asyncio.run(
+            PassCoordinator().run(plan, record, provider, factory, guard=Guard(clock), clock=clock)
+        )
+    assert failure.value.completed_scripts == (0 if rejected else 1)
+    if rejected:
+        assert provider.calls == [] and len(factory.opened) == 1
+    else:
+        assert [call[2] for call in provider.calls if call[3] == "final"] == [6 * NS, 12 * NS]
     assert_closed(factory, provider)
 
 

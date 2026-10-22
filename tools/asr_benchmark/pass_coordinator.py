@@ -178,6 +178,19 @@ def _schedule(request: ReplayRequest, source: ReplaySource) -> tuple[SegmentSpan
                 raise BlockedEvidence("speech_onset_unsupported")
             if span.speech_end_ns != min(speech[-1].end_ns, span.end_ns):
                 raise BlockedEvidence("segment_schedule_invalid")
+            # A window/EOF endpoint cannot bypass an earlier annotated silence.
+            # Inspect the next speech interval too: using only the supplied span's
+            # last speech end would overlook an internal pause followed by speech.
+            limit = min(span.start_ns + request.window_ns, request.duration_ns)
+            speech_end = span.start_ns
+            for timing in request.script.character_times:
+                if timing.end_ns <= span.start_ns:
+                    continue
+                if timing.start_ns >= min(limit, speech_end + 500_000_000):
+                    break
+                speech_end = min(limit, timing.end_ns)
+            if span.end_ns != min(limit, speech_end + 500_000_000):
+                raise BlockedEvidence("segment_schedule_invalid")
         if (
             span.end_ns != request.duration_ns
             and span.end_ns - span.start_ns != request.window_ns

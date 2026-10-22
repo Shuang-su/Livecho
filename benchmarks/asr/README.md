@@ -151,8 +151,10 @@ the source retires consumed input while retaining the specified continuous-speec
 The source must support concurrent progress and immutable borrowed call inputs; no real
 source/noise/VAD/preprocessing implementation is supplied by this interface.
 
-Segment schedules must cover the entire requested duration, bind speech end to reference
-annotations and obey window/500 ms silence/EOF closure. The current timing/score models
+Segment schedules must cover the entire requested duration. Scored segments bind speech
+end to reference annotations and close at the earliest window/500 ms silence/EOF boundary;
+a full window or EOF cannot bypass an earlier internal or trailing silence. The current
+timing/score models
 cannot represent leading silence before a segment's first new speech sample; those shapes
 fail with `speech_onset_unsupported`, rather than reporting a false t0. The internal event
 ceiling is 131072 source progress records per session. Source sessions are reacquired for
