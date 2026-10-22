@@ -98,7 +98,16 @@ registry stays closed. Text-only contracts cannot establish working inference.
 
 ## Review findings
 
-Pending independent review of a stable commit.
+- Independent read-only reviewer `/root/audio_code_readiness` reviewed stable
+  `32b7e30c1151e4b55d34bac0145461b9be05a84e` and the relevant accepted terminal code.
+  One P2 gap was identified: a late inference completion must not commit terminal
+  sequence/PTS before checking cancellation/expiry/generation. The proposal now requires
+  one-owner atomic precommit revalidation and confirmed actual audio release, plus
+  held-completion metadata race cases. Failed checks keep admission closed with no
+  commit/ack/output. Revised-head confirmation is pending.
+- No direct irreconcilable v1 conflict was identified by static review. The explicit
+  executable compatibility/actual ownership gate remains before real inference;
+  document review is not runtime evidence. Reviewer made no edits and ran no tests.
 
 ## Deviations
 

@@ -95,10 +95,16 @@ an explicit owning artifact decision before implementation.
 
 Keep the terminal frame as an uncommitted, validated candidate while the complete
 segment is processed in one bounded end-of-segment transaction. The provider sees only
-reserved memory views. The final acceptance transition commits the exact expected
-input position and clears every segment audio allocation; only validated text remains
-eligible for output after rechecking lease/epoch/expiry/cancellation. A timeout or
-cancel during processing aborts the candidate and clears audio without publishing.
+reserved memory views. Before any terminal commit/ack, the same state owner atomically
+revalidates the current run generation, same active lease/epoch, exact expected input
+position, unexpired lease and absence of cancellation/closing. Every segment audio
+allocation must also be proved released before that commit. A failed recheck or release
+aborts the candidate with no sequence/PTS commit or output and keeps admission closed.
+An old completion cannot resurrect cleared state or reopen a restarted generation.
+Only then may the owner commit the terminal input position and stage validated text;
+recheck the same binding/expiry/cancellation guard immediately before sending output.
+A timeout or cancel during processing aborts the candidate and clears audio without
+publishing.
 Never acknowledge terminal acceptance then retain that segment as a background job.
 
 This transaction is a proposed integration interpretation, not permission to alter v1.
@@ -171,5 +177,8 @@ Conforming-host cleanup does not prove a hostile community host erased disclosed
   precede actual inference; all real allocations remain charged until release.
 - [ ] Slow provider/input, overflow, cancellation, expiry, disconnect, native failure
   and teardown prevent late output and satisfy bounded cleanup without persistence.
+- [ ] Held provider completion across expiry, cancellation, disconnect and restart
+  changes no input sequence/PTS or new generation state; failed release cannot commit
+  or acknowledge a terminal candidate and the worker remains closed.
 - [ ] Manual real MLX evidence is separate from doubles, uses owner-approved #5 model
   decision and host/source evidence, and records measured outcomes without CUDA claims.

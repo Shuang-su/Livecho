@@ -16,6 +16,9 @@
    do not patch protocol meaning or treat metadata counters as cleared RAM.
 5. Implement reservation-before-allocation, bounded segment assembly, output sequencing,
    heartbeat responsiveness, final-only transcript construction and idempotent teardown.
+   Hold provider completions across expiry/cancel/disconnect/restart in metadata tests;
+   prove atomic precommit revalidation and actual release before any terminal ack, with
+   no old-generation sequence/PTS mutation or reopening.
    Test with in-process generated synthetic samples only when host audio preflight is
    authorized; text-only tests remain separate and cannot claim these runs passed.
 6. Integrate only the independently authored and reviewed #5 MLX provider, approved final
