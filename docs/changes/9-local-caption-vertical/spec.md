@@ -90,8 +90,10 @@ every fixture partial/final revision. Publication preserves validated text, lang
 confidence and source start/end; no speculative correction or overlap-text stitcher
 is added. Final context duplication, if any, is recorded as a limitation and cannot be
 hidden in quality measurements. No later revision may mutate a finalized timeline
-object. The viewer seq allocator is separate from worker output; backend assigns both
-domains without copying or rewriting one into the other.
+object. The backend supplies `LeaseV1.output_start_seq`; the worker alone advances the
+single output allocator shared by heartbeat, stats and transcript messages. The backend
+validates those worker sequences and never assigns or rewrites individual worker-output
+positions. It separately owns and advances the viewer timeline sequence allocator.
 
 ### Local endpoints and permission boundary
 
@@ -124,8 +126,18 @@ either per-viewer cap or a 500 ms send deadline, remove that viewer from fan-out
 clear its queue and close its socket. If a bounded error can be sent without waiting,
 use the existing `resync_required`; otherwise socket closure is sufficient. No new
 wire code, retry store or replay database is introduced. Browser reconnect makes the
-gap visible under #11. Terminal status/disable never waits behind transcript queues:
-clear unsent text, send current safe status if possible, and close on send failure.
+gap visible under #11. Terminal status/disable never waits behind transcript queues.
+Under the same state owner, remove the viewer from ordinary fan-out and inspect its
+fully transmitted prefix before discarding queued bodies. A terminal timeline event
+may be sent only if its sequence is exactly the next position after that prefix, no
+earlier event is queued or partially in flight, and sending it requires no wait behind
+old text. Otherwise clear queued text and immediately close/abort the transport;
+#11 hides content on disconnection. Never send a terminal event across a discarded
+position, renumber it, finish flushing old text to reach it, or assume the browser will
+bypass sequence validation for a status. If a write is partially in flight, cancel it
+and abort the transport rather than append another frame. A failed terminal send also
+closes the connection. For example, dropping queued sequences 10/11 cannot make
+terminal sequence 12 valid for a viewer expecting 10; that viewer must be closed.
 
 Backend viewer ordering uses a session/epoch timeline position and each admitted
 connection's existing v1 sequence/revision state. Retain the required 256 JSON identity
@@ -153,8 +165,42 @@ skips a gap. A fresh subscription receives a newly sequenced current session sta
 not a fabricated historical transcript snapshot. Allocate that status on the shared
 timeline and fan it out to every currently admitted viewer, so sending it to the new
 viewer cannot create an unexplained gap for existing viewers. Its ready cursor is the
-position immediately preceding that newly issued status. Session/epoch replacement clears old
-domains, partials and queues. #27 owns any broader lifecycle/replay design.
+position immediately preceding that newly issued status. Fresh admission is also
+subject to the fixture boundary below; it is not safe to join midway through revisions
+of an unknown mutable object. Session/epoch replacement clears old domains, partials
+and queues. #27 owns any broader lifecycle/replay design.
+
+### Fixture partials and compatible fresh admission
+
+The real final-only path creates each transcript event at revision 1, so a fresh viewer
+may join at any current-position boundary. Fixture mode may have at most one mutable
+transcript event at a time. A fresh/no-cursor subscription, including one after refused
+resume, is admitted only when no mutable event is open. It must receive `ViewerReadyV1`
+and the newly sequenced status atomically under the publication owner before the next
+mutable event's revision 1 can be issued. Every later event identity it receives starts
+at revision 1; the backend cannot deliver a previously unseen revision 2 or higher.
+
+While a fixture partial is open, do not issue a fresh ready cursor or create a new
+revision domain. Reject the subscribe using existing `resync_required` with
+`retryable: true` and close; the client retries through its bounded reconnect policy.
+Do not queue subscriptions or retain/replay partial bodies for them. An exact resumed
+cursor whose retained domain already accepted that partial may resume under the normal
+rules, provided all current-position and state checks pass.
+
+The fixture schedule must finalize its sole mutable object within 1,000 ms of revision
+1, then leave at least 2,000 ms with no mutable object before starting another. This
+is a locally fixed test-stream restriction, not a wire timing rule or a real-ASR
+promise. New final-only revision-1 objects and safe status events may still publish
+during that admission interval. If a fixture misses its planned final deadline, fail
+that fixture session and close affected viewers; do not fabricate final text or leave
+a permanently closed admission window. No historical revision body store is introduced.
+
+For example, A receives E revision 1 partial. B's fresh subscribe before E final is
+refused. A may receive E revision 2 final; B subsequently joins after that final with a
+fresh current cursor and receives no E revisions. B can then accept the next new
+event at revision 1. The same rule applies when B must fresh-resync between E partial
+and final. Do not reset E's revision, change E's identity, skip its sequence for an
+already admitted viewer, or claim that B received the omitted subtitle.
 
 ### Session status and lifecycle
 
@@ -183,8 +229,9 @@ worker deadline and lease time. Publish an accepted final before emitting `stopp
 once stopping is emitted no new transcript may become visible. Operator stop, disable,
 deletion or failure instead closes publication/audio immediately with no final drain.
 Cancellation clears every pending segment, protocol queue and source handle; revoke the
-lease using existing `LeaseCancelV1`. Send current status to reachable viewers before
-closing them; disconnection itself causes #11 to hide stale text.
+lease using existing `LeaseCancelV1`. Send current status before closure only where
+the exact-next clear-send condition above holds; otherwise close/abort immediately.
+Disconnection itself causes #11 to hide stale text.
 
 Worker loss always cancels this local session. No transparent worker replacement or
 automatic fresh-epoch continuation is attempted. #8 source retry similarly invalidates
@@ -248,6 +295,12 @@ device information is collected, stored or displayed.
   stalled; per-viewer/aggregate peaks stay bounded and fast clients continue in order.
 - [ ] Exact zero-loss resume, lost-event/fresh resync, metadata expiry, 20-domain limit,
   new session/epoch and 4,096-existing/4,097-new revision cases retain v1 outcomes.
+- [ ] Fresh and fresh-resync attempts between fixture partial/final are refused until
+  the bounded admission interval; an eligible existing-domain resume succeeds without
+  an unknown-object revision gap, body replay, revised identity or skipped sequence.
+- [ ] Terminal status sends only at an exact-next clear send boundary; queued 10/11
+  followed by terminal 12, a partially written frame and send failure all close the
+  viewer without flushing/reordering text or bypassing validation.
 - [ ] Operator stop, disable, deletion, EOF drain, worker loss, source retry and expiry
   clear audio and pending publication with no late transcript or stale viewer partial.
 - [ ] Evidence separates all clock domains, actual/unavailable partials, fixture versus

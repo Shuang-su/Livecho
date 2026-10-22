@@ -10,6 +10,9 @@
    reducers first. A blocked `synthetic_mlx` request must not silently start fixtures.
 3. Add the fixed loopback viewer route, same-origin restrictions, current status
    mapping, 20-domain bound, independent fan-out queues and explicit fresh-resync path.
+   Implement the fixed fixture admission boundary: at most one mutable event, final
+   within 1,000 ms, then at least 2,000 ms without a mutable event; fresh/resync during
+   an open partial is refused without issuing a cursor or storing a body replay.
    Test ordering and saturation with synthetic text only, without model/worker audio.
 4. Once #6/#8 implementations and their relevant accepted contracts are ready, connect
    one bounded segment handle to the existing binary sender and one local worker.
@@ -19,12 +22,16 @@
 5. Connect trusted start/stop/disable/delete to atomic admission closure, publication
    suppression, existing lease cancellation and #8 cleanup. Test every race with source
    retry, worker loss, final arrival and viewer backpressure; invalidation precedes await.
+   Send terminal status only when it remains exact-next with no queued/partial write;
+   otherwise abort that viewer immediately. Never flush or renumber discarded text.
 6. Add stage observations, per-clock interval calculation and reports that explicitly
    mark missing partial and cross-clock values. Test counts/percentiles with metadata
    cases. Separate fixture traffic and measured audio paths in output and evidence.
 7. Integrate #11's accepted page using `/api/viewer/ws` and the exact reason mapping.
    Run 20 fast/slow fixture clients for 60 seconds; test fresh/current cursor outcomes,
    drop/close, final-only labels and clear-on-terminal at maximum presentation delay.
+   Cover A receiving partial E, B fresh/fresh-resync before final, eligible A-domain
+   resume, and B admission only after E final; all newly observed identities start at 1.
 8. Only with separate execution authorization, approved producer/host/decoder/provider,
    actual #5 report/model ADR and final manifest, run the short synthetic-speech MLX
    demonstration. Record exact commands/revisions, actual timing/quality/cleanup results
@@ -40,6 +47,10 @@ Future implementation adds `make local-vertical-check` and runs `make protocol-c
 `make verify` and `git diff --check`. Include exact v1 boundary/no-state-change results,
 queue bytes/counts and send deadlines, simultaneous cancellation, clean-EOF last final,
 source-retry refusal, no-worker start timeout, disconnected-domain expiry and capacity.
+Verify worker-owned shared output sequencing versus backend-owned timeline sequencing,
+fixture admission/deadline boundaries, and dropped queued 10/11 before terminal 12.
+Include partially in-flight send and terminal-send failure, proving close without any
+new sequence assignment or retained replay body.
 New target names here are planned, not evidence of existing commands or passing tests.
 
 Authorized audio checks additionally prove each #8 ownership/persistence/host requirement,

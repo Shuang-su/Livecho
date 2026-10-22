@@ -73,6 +73,14 @@ PY
 No full runtime suite, browser/worker, model/audio, host or end-to-end check was run.
 Future plan commands are requirements, not run evidence.
 
+For the 2026-10-23 P2 revision,
+`make artifacts && git diff --check && git diff --name-only`
+exited 0 (`change artifacts: ok`; only spec/plan/evidence changed).
+The exact local link check above was rerun: 5 local links, 0 broken. After staging,
+`git diff --cached --check && git diff --cached --name-only` exited 0 and again listed
+only spec/plan/evidence. Oct23 GUI gate checks passed before and after the batch.
+These results check documentation only; the new acceptance scenarios have not run.
+
 ## Requirement source map
 
 | Requirement | Allowed source and limit |
@@ -97,7 +105,22 @@ registry stays closed. Synthetic text fan-out cannot establish working audio/ASR
 
 ## Review findings
 
-Pending independent review of a stable commit.
+- Independent read-only reviewer `/root/audio_code_readiness` reviewed clean
+  `53b570ee0c8dfa36d4be144e0f75f4b20e0e6660` and found three P2 documentation gaps.
+  No edits or tests were performed; Oct23 gates passed before/after review.
+- Worker output sequencing is clarified: backend supplies the lease start position,
+  worker alone advances its shared heartbeat/stats/transcript sequence, and backend
+  validates while separately advancing viewer timeline sequences.
+- A new viewer cannot accept an unknown event's revision 2 after joining between its
+  partial/final. The fixture now has one bounded mutable object, a fixed final deadline
+  and admission interval; fresh/resync is refused until the current object finalizes.
+  No cursor is prematurely issued and no old body, identity or revision is rewritten.
+- Dropping queued text cannot make a later terminal status exact-next. Terminal sends
+  now require a clear exact-next send boundary; any dropped-position gap or partially
+  written message instead closes/aborts the viewer for #11's disconnect clearing.
+  Planned metadata cases explicitly cover all three findings.
+- Revised-head independent confirmation remains pending. These are documentation fixes,
+  not executable compatibility, UI or actual audio evidence.
 
 ## Deviations
 
