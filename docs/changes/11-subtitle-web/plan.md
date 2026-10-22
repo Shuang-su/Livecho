@@ -7,10 +7,14 @@
    integration, require accepted #9 endpoint and public-reason contracts; fixture-only
    UI work may proceed after this artifact is accepted without model/platform execution.
 2. Create `apps/web/` with the repository's pinned React/TypeScript/Vite toolchain and
-   import the accepted protocol validator/types. Add focused unit/E2E scripts and
+   types. Refactor only the shared protocol package's environment adapters/schema
+   packaging to expose the browser-safe entry defined in the spec; preserve the Node
+   API, one validation implementation and all existing golden outcomes. Add focused
+   browser/Node parity and bundle checks, plus unit/E2E scripts and
    `make web-check`; retain Node 22/pnpm 11 and existing workspace conventions.
 3. Implement the pure connection/protocol reducer first. Test integer-safe identities,
-   sequence/revision precedence, exact cursor resume, fresh resync and terminal clearing
+   sequence/revision precedence, full-capacity existing updates/duplicates versus new
+   identity rejection, exact cursor resume, fresh resync and terminal clearing
    using independently authored synthetic text/metadata, with no audio fixture.
 4. Implement the bounded presentation scheduler with a controlled monotonic test clock.
    Separate receive/protocol state from due display mutations; verify delay changes,

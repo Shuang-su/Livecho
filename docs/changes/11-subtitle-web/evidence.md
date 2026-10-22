@@ -104,11 +104,38 @@ account, platform input or production run has been executed for this artifact.
 
 ## Review findings
 
-Pending independent review of a stable commit.
+- Independent reviewer `/root/audio_code_readiness` read stable draft
+  `56664e17d2b04ae71e0ca1d6bec6a6943126bf52` and found two P2 documentation issues.
+  Corrected the capacity rule: existing identity updates/duplicates remain valid at
+  4,096; only new identity 4,097 rejects before a fresh visible resync.
+- Corrected browser integration scope: current protocol validator imports Node
+  built-ins and cannot be imported as-is in Vite. #11 now includes minimum shared
+  browser-entry packaging/adapters with unchanged Node API, strict parsing, JCS,
+  sequencing/revision and golden results; no independent drift-prone UI validator.
+- Author read the current validator imports and package exports to verify the finding.
+  Reviewer made no edits or tests. Revised-head confirmation remains pending.
 
 ## Deviations
 
 GitHub unavailable: prepare a local commit and a local PR title/body draft only.
+
+## Unpublished PR draft
+
+Title: `docs: propose subtitle companion Web/PWA for Issue #11`
+
+Body:
+
+> Proposes the intent, spec, plan and evidence for one room's subtitle/status companion
+> page. Defines final-only disclosure, exact cursor/revision handling, visible gaps,
+> bounded session-only display delay and static-shell-only offline caching. Includes
+> the minimum browser-safe shared-validator packaging work without changing protocol
+> semantics or golden outcomes. Danmaku/SC, public accounts and platform ingest stay
+> outside this scope.
+>
+> Documentation only; artifact and whitespace/local-link checks passed as recorded in
+> evidence. No UI, model, audio, hardware or production acceptance is claimed. GitHub
+> 403 prevents current Issue-body verification; the permitted historical body was used.
+> Requests owner artifact review; does not close #11 or authorize production execution.
 
 ## Release and rollback evidence
 

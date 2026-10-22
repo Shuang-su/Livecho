@@ -45,7 +45,8 @@ if a whole accepted row cannot fit, clear the view and show the local overflow g
 Connect to the backend viewer endpoint owned by #9 with `livecho.viewer.v1`, minor 0,
 and a compatible client version. Consume only `ViewerReadyV1`, `TimelineEventV1`, and
 the existing bounded ack/error responses. Import the generated types and validator
-from the accepted protocol package. Reject binary input, unknown fields, invalid JSON,
+from the protocol package's browser-safe shared entry specified below. Reject binary
+input, unknown fields, invalid JSON,
 wrong binding, incompatible version and oversized frames before they affect display.
 No frontend-only field is sent in a wire message and no backend error body is echoed.
 
@@ -63,8 +64,11 @@ Reject a conflict/gap without advancing the receive cursor or changing text. A h
 epoch timeline event is not authority to change epoch; obtain a new valid handshake.
 Never insert guessed events or advance over a sequence gap. Keep the receive cursor
 as the next accepted sequence, independently of when the accepted text is displayed.
-Reaching protocol revision capacity stops this view and requests resynchronization;
-it does not reset counters in place. #27 owns future long-stream lifecycle changes.
+At 4,096 revision identities, existing identities still accept valid updates and
+duplicates under v1. Only a new 4,097th identity triggers `revision_capacity_exceeded`
+without consuming sequence or altering state; then stop the view and obtain a fresh
+no-cursor handshake with a visible gap. Never stop merely because capacity was reached
+or reset counters in place. #27 owns future long-stream lifecycle changes.
 
 ### Session-only display delay
 
@@ -148,7 +152,18 @@ a claim that the backend can recall text already seen by a viewer.
 
 ## Interfaces and compatibility
 
-#11 owns `apps/web/`, its static PWA shell and frontend checks; #9 owns the backend
+#11 owns `apps/web/`, its static PWA shell, frontend checks and the minimum browser-safe
+packaging refactor in `packages/protocol/`. The current validator imports `node:buffer`,
+`node:crypto` and `node:fs` and reads schemas at runtime, so its existing root entry
+cannot be imported directly in a browser bundle. Add a shared browser entry with
+build-bundled generated schemas and browser-compatible byte/hash adapters; keep the
+existing Node entry/API working. Reuse one strict parser, JCS projection and ordering/
+revision implementation rather than creating a second frontend validator. Preserve
+validation order even if browser hashing is asynchronous by serializing acceptance in
+the same bounded input path; no message may overtake an earlier candidate. Browser and
+Node runners must retain every existing golden outcome and exact schema bytes. This
+packaging work is part of #11 implementation, not a new approval or runtime gate, and
+does not authorize protocol semantics/schema/fixture changes. #9 owns the backend
 endpoint, publication policy, concurrency and status-reason mapping. Before implementation
 the two owner-merged artifacts must agree on the same-origin route and the reason
 mapping. This draft does not treat an unmerged #9 proposal as accepted authority.
@@ -179,6 +194,10 @@ can read raw archives or connect to a worker.
   keyboard delay control, readable statuses and distinct partial/final presentation.
 - [ ] Revision replacement, final immutability, duplicate no-ops, exact-next cursor,
   rejected gaps/conflicts and old/unknown epochs follow unchanged v1 golden outcomes.
+- [ ] At 4,096 identities an existing valid update/duplicate still succeeds; only a new
+  4,097th identity rejects and triggers the visible fresh-resync path without state change.
+- [ ] Browser and Node shared validation agree on every existing golden result; the
+  production browser bundle has no Node built-ins or runtime filesystem/schema read.
 - [ ] Same-binding resume, refused/out-of-window cursor, new epoch/session and cleared
   undisplayed text each show the correct continuity/gap claim and clear old partials.
 - [ ] Delay 0/5,000 ms, step/range validation, increase/decrease, coalescing, foreground
