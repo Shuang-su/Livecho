@@ -2070,3 +2070,40 @@ not rerun the author's `make artifacts`. Root separately reviewed the documentat
 diff statically and agreed; root did not execute the author's checks. This final change
 adds only this review record and retains all reviewed non-evidence bytes. It does not
 resolve any of the five HTTP-contract gaps or enable ModelScope acquisition.
+
+## Bounded pass coordinator assignment before code — 2026-10-23 (UTC+08:00)
+
+- Author: `/root/asr_coordinator_20261023`, an independent Codex GUI subagent.
+  Scope is one bounded in-process PassPlan coordinator, its original metadata/text
+  tests, README and this evidence. Independent reviewer: `/root/audio_code_readiness`;
+  `/root` supplies read-only scope/lifecycle review. Starting clean code/evidence head
+  is `a7194a831613494e3375a820bb5508d014c54771`, on the existing Issue #5 PR #36 branch.
+- Actual inputs before code: repository AGENTS, independent-implementation policy,
+  all four Issue #5 artifacts, the existing Livecho runner/runtime/instrumentation/
+  timing interfaces, and the parent's bounded assignment. The Issue body was read
+  from the historical 2026-09-26 local `issue-snapshots/5.json`; GitHub account access
+  is currently reported suspended, so this is not a fresh Issue-status verification.
+  The existing evidence records owner-merged artifact PR #33 before implementation.
+- Context includes memory guidance about GUI-only work, quota/owner gates, source
+  separation and the local evidence's reference names/revisions/license metadata and
+  historical exposure categories. No reference product expression, Issue #31 body,
+  SDK/third-party implementation, research product report or linked incident material
+  was read. No upstream prior contribution is known in this author context. Links in
+  local evidence were read as citations only; no new external page has been opened.
+- Assignment decision: author independently from the accepted Livecho requirements
+  and existing original interfaces, with standard Python documentation only if needed.
+  No copying exception is requested. This source/assignment record is committed before
+  coordinator code. Each work batch is guarded by the separately invoked October 23
+  GUI gate; a nonzero result stops new work.
+- The coordinator must preserve 60 sorted scripts and separate clean/noise conditions,
+  first-script cold observation before three unscored shape-matched warmups, and all
+  warm scripts. Source progress must continue while provider work is in flight; final
+  priority, coalescing, input stalls, cancellation, ownership and complete coverage must
+  be tested with original metadata/text doubles and empty opaque borrowed views.
+  Missing/failed/interrupted work cannot manufacture a complete report.
+- No HTTPS/download/transfer, generalized cache, ModelScope adapter, real model/audio,
+  MLX, registry activation, hard native deadline, protected-host claim, merge, deploy
+  or push is authorized. The existing sequential subprocess supervisor is not claimed
+  to implement concurrent source/provider supervision. This batch does not become a
+  prerequisite for drafting Issues #6/#9/#11. PR #36 update text stays local until access
+  recovers; no duplicate PR is created.
