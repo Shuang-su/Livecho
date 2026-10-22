@@ -2107,3 +2107,28 @@ resolve any of the five HTTP-contract gaps or enable ModelScope acquisition.
   to implement concurrent source/provider supervision. This batch does not become a
   prerequisite for drafting Issues #6/#9/#11. PR #36 update text stays local until access
   recovers; no duplicate PR is created.
+
+The internal source boundary for this batch is a cooperative, injected replay session.
+It declares a bounded metadata segment schedule, advances source PTS asynchronously on
+the one runner clock, and supplies reservation metadata plus preparation/release hooks
+for one selected prefix. Preparation must borrow immutable input while source progress
+continues; source storage and provider storage share the existing budget. Consumed
+source intervals are retired after final completion. No acquisition, signal processing,
+noise generation, VAD, tensor layout or source rights are implemented by this seam.
+Schedules must cover the requested duration and bind speech-end observations to the
+approved character annotations; early closure must match the 500 ms silence rule.
+The existing timing/score contracts cannot represent a segment whose new audio begins
+before its first speech sample, so that unsupported shape must fail explicitly instead
+of inventing a t0 or scoring delayed source audio as speech. Warmup/silence observations
+are unscored, with exactly three full-window warmup calls and sixty seconds of silence.
+
+A single owned worker executes synchronous instrumentation while the async source
+continues. No worker queue of audio snapshots is introduced. Cancellation signals the
+cooperative operation and waits for actual completion before releasing its source or
+provider; cancelling a future or timing out a thread is not termination. An injected
+ExecutionGuard retains its existing terminate-before-return obligation. No real guard
+or source implementation is registered, and callbacks/threads cannot be forcibly
+preempted here. A source/provider that fails to cooperate can prevent lifecycle
+convergence; that never permits a completed result or a hard-deadline claim. Returned
+observations lack process/load/hardware/privacy authority and cannot construct a full
+Repetition or Report by themselves.
