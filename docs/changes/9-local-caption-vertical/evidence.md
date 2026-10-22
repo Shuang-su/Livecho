@@ -81,6 +81,12 @@ The exact local link check above was rerun: 5 local links, 0 broken. After stagi
 only spec/plan/evidence. Oct23 GUI gate checks passed before and after the batch.
 These results check documentation only; the new acceptance scenarios have not run.
 
+The final review-record follow-up on 2026-10-23 ran `make artifacts`,
+`git diff --check`, and `git diff --cached --check && git diff --cached --name-only`:
+all exited 0, artifacts reported `change artifacts: ok`, and only this evidence file
+was staged. Oct23 gate checks before/after returned exit 0, `work_allowed: true`.
+No specification, other Issue artifact, product code or runtime verification changed.
+
 ## Requirement source map
 
 | Requirement | Allowed source and limit |
@@ -119,8 +125,25 @@ registry stays closed. Synthetic text fan-out cannot establish working audio/ASR
   now require a clear exact-next send boundary; any dropped-position gap or partially
   written message instead closes/aborts the viewer for #11's disconnect clearing.
   Planned metadata cases explicitly cover all three findings.
-- Revised-head independent confirmation remains pending. These are documentation fixes,
-  not executable compatibility, UI or actual audio evidence.
+- Reviewer confirmed clean exact head `240570eb855a8ba237eef7fc4a812b9cb4890d90`:
+  read the complete `53b570e..240570e` spec/plan/evidence delta and ran
+  `git diff --check 53b570e..240570e` (exit 0). All three P2 findings are resolved,
+  with no remaining actionable documentation finding. Oct23 gates passed before/after
+  review. The reviewer made no edits, external queries or test runs and did not rerun
+  the author's artifact/link checks.
+- Additional static review covered the accepted #3 handshake/error models and
+  `negotiate_viewer`, plus #11 head `ff060d0` reconnect/fresh-resync/clear-on-disconnect
+  rules. After valid viewer negotiation, existing `resync_required` with
+  `retryable: true` can reject local admission before any ready message or new domain;
+  no protocol field or meaning is added. #11's clear-and-no-cursor retry is compatible.
+  The fixture's 1,000 ms mutable limit and 2,000 ms admission interval restrict its
+  schedule; they do not guarantee that a client's retry succeeds.
+- Implementation verification must cover error followed by close scheduling only one
+  retry, without resetting the five-retries-per-outage budget, and the same-owner
+  interleaving of final publication, a new partial and fresh admission. These refine
+  acceptance of the existing contracts; they add no wire fields or runtime authority.
+- This confirmation establishes documentation review only, not executable compatibility,
+  UI behavior, model/host acceptance or actual audio ownership evidence.
 
 ## Deviations
 
@@ -143,6 +166,10 @@ Body:
 > is enabled. Current Issue #9 body is unverified because GitHub authentication is
 > blocked with HTTP 403. Requests artifact review; does not close #9 or claim real
 > end-to-end acceptance.
+>
+> Independent documentation review of `240570e` resolved all three reported P2
+> findings with no remaining actionable documentation finding. Owner artifact approval
+> and implementation/runtime evidence remain pending.
 
 ## Release and rollback evidence
 
