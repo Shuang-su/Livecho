@@ -206,10 +206,33 @@ print(f'Unchanged boundary sections: {count} passed')
 PY
 ```
 
-The first local checks passed before the review handoff. Independent exact-commit review
-of this revision is pending; the 2026-10-05 review above does not cover this delta. No
-runtime, provider, account, worker, capacity or real-audio verification is claimed, and
-no unrelated `make verify` run was performed for these document-only changes.
+The first local checks passed before the review handoff. On 2026-10-23 Asia/Shanghai,
+independent reviewer `/root/audio_code_readiness` reviewed the complete five-file delta
+from `445425757507c6a427f69c87c94042f3e86ff725` to clean content commit
+`72699849adfe76ad3fd98be9506fb372ec2d5dbf` and reported no actionable finding.
+The review confirmed retained provider-identity goals without capability claims, the
+site/acquisition/device separation, private feedback before voluntary publication with
+separate consent/withdrawal, and no added account/platform-authorization/ranking
+dependency for the first subtitle loop. It found no change to the existing independent
+history, quota, revocation, adoption, invitation or anonymous-ingest boundaries.
+
+The reviewer's actual commands were `git rev-parse HEAD`, `git status --short` (empty),
+`git diff 445425757507c6a427f69c87c94042f3e86ff725..72699849adfe76ad3fd98be9506fb372ec2d5dbf -- docs/changes/38-public-account-devices`
+(complete delta read in batches),
+`git diff --name-only 445425757507c6a427f69c87c94042f3e86ff725..72699849adfe76ad3fd98be9506fb372ec2d5dbf`
+(only the original five files), and
+`git diff --check 445425757507c6a427f69c87c94042f3e86ff725..72699849adfe76ad3fd98be9506fb372ec2d5dbf`
+(exit 0). Separate October 23 gate calls before/after review batches returned exit 0.
+The reviewer did not rerun the author's artifact/link/six-section checks, run product
+tests, edit files, make external requests or inspect reference material. Those checks
+remain attributed to the author. This evidence-only follow-up changes no reviewed
+intent/spec/plan/ADR content; the author reran `make artifacts`, `git diff --check` and
+`git diff --cached --check`, all exit 0, before committing it.
+
+No runtime, provider, account, worker, capacity, real-audio or legal-clearance result is
+claimed, and no unrelated `make verify` run was performed for these document-only
+changes. Independent document review does not establish current remote PR status or
+approve owner adoption, implementation or rollout.
 
 ### Prepared PR #39 update draft — not published
 
@@ -229,8 +252,10 @@ Proposed body:
 > safety, invitation and anonymous-ingest rules remain unchanged by this pending proposal.
 >
 > Validation: `make artifacts`, whitespace, relative-link/five-file scope and six
-> unchanged-boundary checks passed locally. Independent review of this revision is
-> pending. No product code or runtime capability changed; no rollout is authorized.
+> unchanged-boundary checks passed locally. Independent review of content commit
+> `72699849adfe76ad3fd98be9506fb372ec2d5dbf` found no actionable issue; the reviewer
+> separately verified the complete five-file delta and whitespace. No product code or
+> runtime capability changed; owner adoption remains pending and no rollout is authorized.
 
 This is a local publication draft. The reported HTTP 403 account suspension prevents
 current Issue #38/PR #39 status verification; no remote update, push, merge or deployment
