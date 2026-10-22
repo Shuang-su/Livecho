@@ -40,6 +40,39 @@
   branch `codex/issue-38-public-account-device-artifacts`. The main and ASR worktrees are
   preserved.
 
+## 2026-10-23 revision source declaration and assignment
+
+- Author: `/root/account_roadmap_20261023`, independent document author assigned by
+  `/root` on 2026-10-23 Asia/Shanghai. Scope is clarification of staging, retained
+  roadmap goals, owning Issues and open decisions in these five Issue #38 files only.
+  This declaration is committed before the content revision.
+- Independent reviewer: `/root/audio_code_readiness`. `/root` coordinates and may
+  review read-only; it does not supply reference-product expression to this author.
+- Inputs read for this revision: AGENTS.md, the local independent-implementation policy,
+  all five existing Issue #38 artifacts at
+  `445425757507c6a427f69c87c94042f3e86ff725`, and the user's revision direction relayed
+  in this assignment. The local Makefile was read only to select document checks.
+- Actual exposure: the policy and existing evidence contain upstream names, revision,
+  path/license metadata and prior authors' exposure records. This author has not read
+  reference-product source, UI, screenshots, layouts, research reports, Issue #31
+  expression or the coordinator's research. None is an input to this revision. No
+  external source, model, audio, download or execution contract is introduced.
+- Assignment decision: proceed with this isolated document scope using the approved
+  user goals and existing project requirements. New reference-only expression would
+  stop the affected authorship. This is not implementation or license/legal clearance.
+- User direction: retain public accounts and self-service devices; email first is a
+  stage, while Google/GitHub/Bilibili identity entry remains a long-term goal. Separate
+  site identity, platform acquisition authorization and device identity. Prioritize
+  personal devices and own contribution feedback before a voluntary public leaderboard;
+  keep history independently authorized. The first subtitle loop does not depend on
+  public accounts, platform authorization or rankings. Preserve every existing safety,
+  capacity, revocation and current anonymous-ingest/invitation rule; document revision
+  authorization is not owner adoption or enablement approval.
+- Remote limitation reported by the coordinator: GitHub authentication currently returns
+  HTTP 403 for a suspended account. This author did not re-query Issue #38 or PR #39;
+  their current remote state is unverified. Work is local and reviewable only, with no
+  push, merge, deployment or inference of owner approval.
+
 ## Local requirement register
 
 | Input | Role in this proposal |
