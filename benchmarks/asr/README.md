@@ -132,6 +132,45 @@ provider hard deadline. Freshness is one spawn per owner, with opaque run-local 
 it does not assume OS PIDs never repeat. Tests run original metadata-only child scripts
 and inject clock/process controls; they execute no model, audio, source or network.
 
+The separate internal `PassCoordinator` connects the original prefix scheduler, source
+progress watch, call instrumentation and script scorer for one validated PassPlan. It
+collects the first sorted script in the clean condition before exactly three unscored
+full-window warmup calls, then all sixty sorted scripts in each clean/noise condition
+and sixty seconds of silence. Cold and warm score populations stay separate. Missing
+partials and token-limit failures remain in scored segments; failed or interrupted
+execution returns only a stable reason and completed-script count, never partial success.
+
+A cooperative injected replay source declares at most 256 segment metadata records,
+advances increasing PTS asynchronously on the runner clock, and supplies only allocation
+metadata/preparation/release hooks for the chosen prefix. A single worker runs synchronous
+provider instrumentation while source progress and its two-second stall watch continue.
+Pending prefixes coalesce, a closed segment's final takes priority, and dispatch that
+has not started preparation by closure is discarded. There is no queued audio snapshot.
+Source and call allocations share serialized budget accounting. After a completed final,
+the source retires consumed input while retaining the specified continuous-speech overlap.
+The source must support concurrent progress and immutable borrowed call inputs; no real
+source/noise/VAD/preprocessing implementation is supplied by this interface.
+
+Segment schedules must cover the entire requested duration, bind speech end to reference
+annotations and obey window/500 ms silence/EOF closure. The current timing/score models
+cannot represent leading silence before a segment's first new speech sample; those shapes
+fail with `speech_onset_unsupported`, rather than reporting a false t0. The internal event
+ceiling is 131072 source progress records per session. Source sessions are reacquired for
+every request and released before the next; storage ceilings remain the existing budget.
+
+Cancellation signals cooperative work, cancels and joins the source advance, and waits for
+the actual worker completion before source/provider teardown. `Future.cancel()` or a
+thread timeout is never treated as provider termination. A source/guard/provider that
+does not cooperate can prevent convergence indefinitely: this is not a hard deadline or
+a forced-reclamation guarantee. The injected ExecutionGuard still owes termination before
+return. All current tests use original metadata/text and empty borrowed views only.
+
+The returned `PassObservations` contains reduced local scores/counts and accounting peaks.
+It does not load a model or construct Cold/Repetition/Report, process freshness, load
+timings, physical footprint, write-sink, paging, or protected-host evidence. The sequential
+subprocess supervisor above is unchanged and is not wired to this concurrent coordinator.
+Real sources, providers and guards remain absent and the execution registry remains empty.
+
 `MachineInventoryCollector` separately collects four bounded point-in-time observations:
 total/max physical CPU cores (`hw.physicalcpu_max`, not currently enabled/logical
 cores), dynamic RAM bytes (`hw.memsize`), macOS build (`sw_vers --buildVersion`) and

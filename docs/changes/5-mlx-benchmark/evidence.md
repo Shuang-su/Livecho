@@ -2132,3 +2132,75 @@ preempted here. A source/provider that fails to cooperate can prevent lifecycle
 convergence; that never permits a completed result or a hard-deadline claim. Returned
 observations lack process/load/hardware/privacy authority and cannot construct a full
 Repetition or Report by themselves.
+
+### Coordinator implementation and author checks — 2026-10-23 (UTC+08:00)
+
+Author `/root/asr_coordinator_20261023` implemented this bounded batch after source
+assignment `a3f7d3c7b5f88bc702017ccca2b017bd4ac32ae3` and interface record
+`aeae154`. No additional external source, reference expression or dependency was read
+or installed. Product scope is `pass_coordinator.py` and two minimal existing-interface
+changes; tests and README describe the same boundary. The shared budget subclass only
+serializes existing accounting across the source and one call worker. There is no new
+cache, downloader, HTTPS transport, ModelScope support or subprocess handshake change.
+
+`validate_plan` exposes the existing strict validation without duplicating its rules.
+`PrefixScheduler.close_segment` now excludes a pending tick exactly at an early segment
+close from missed provisional opportunities: the accepted timing model counts ticks
+strictly before closure. The coordinator needs this when a source closes before the
+nominal window; the independent original regression closes a 6-second scheduler at
+1 second and requires exactly three missed ticks (250/500/750 ms), then final. No wider
+scheduler redesign or accepted specification change was made.
+
+The coordinator returns separate first-clean-script and full clean/noise score sets,
+exactly three full-window unscored warmups, silence counts and budget peaks. Scored
+missing partials and output-limit samples remain failed metric rows. An output limit
+during unscored warmup/silence terminates the pass, since those phases have no failed
+score row to carry it. Every request has a fresh source session; actual EOF, duration
+coverage and successful cleanup are required before it contributes completion. A failed
+pass raises a stable reason plus the count of already completed scored scripts, including
+the separately scored first script; it cannot return partial PassObservations.
+
+The source schedule remains an injected metadata contract, not a real VAD/acquisition/
+preprocessing implementation. Leading-silence shapes are explicitly unsupported by the
+existing score/timing interface. Worker dispatch that has not begun preparation before
+closure is abandoned. Source PTS and the 2-second stall check continue while an already
+running call finishes. No future cancellation or worker timeout is used as proof of
+termination. Cleanup waits for actual completion and may wait indefinitely for a
+noncooperating injected implementation. Real source/provider/ExecutionGuard registration
+remains absent. These observations cannot supply Cold/process/load/physical-memory/
+write-sink/paging/host evidence or select a model.
+
+Actual author commands from the Issue #5 worktree:
+
+- `uv run ruff check tools/asr_benchmark/pass_coordinator.py tools/asr_benchmark/pass_control.py tools/asr_benchmark/runtime.py`
+  and `uv run mypy tools/asr_benchmark/pass_coordinator.py tools/asr_benchmark/pass_control.py tools/asr_benchmark/runtime.py`
+  first found routine unused-import/format/generic typing issues. They passed after
+  correction; no failing check was represented as a successful one.
+- `uv run pytest -q tests/asr_benchmark/test_pass_coordinator.py` initially had 5 failed
+  and 23 passed cases: the test double incorrectly asserted that a retired source
+  allocation must still be live during later call preparation. The assertion now checks
+  the actual call reservation. The same suite with `--tb=short` passed 28 in 4.32s;
+  subsequent expanded focused runs passed 31 in 4.49s and 33 in 5.03s. A later test
+  wrapper's mypy export annotation was corrected before rerunning tests.
+- `uv run ruff format tools/asr_benchmark/pass_coordinator.py tests/asr_benchmark/test_pass_coordinator.py`
+  followed by `make asr-benchmark-check` — exit 0, Ruff/format/mypy (47 Python files),
+  **601 passed in 57.09s**, including all **35 new coordinator cases**. Original tests
+  cover both 1/6-second complete passes, separate cold/warm populations, overlap release,
+  silence hallucination counts, busy coalescing/final priority, live input stalls, late
+  provider rejection, reservation/fault cleanup, schedule/coverage rejection, missing
+  partial/output-limit rows, repeated cancellation, and cancellation during cleanup.
+- `make verify` — exit 0: Ruff/format/mypy (69 Python files), TypeScript/workspace
+  checks, **708 pytest passed in 59.09s**, **128 protocol Vitest**, **63 Railway
+  Vitest**, artifact/protocol-generation checks and all builds passed. Existing accepted
+  in-memory protocol codec tests are unchanged. Dependencies/lockfiles did not change;
+  the earlier recorded workspace bootstrap remains in use.
+- `git diff --check` — exit 0. GUI gates were invoked separately before/after work and
+  long tool boundaries; every October 23 check in this batch returned exit 0 / active.
+
+New tests use original metadata/text and zero-length opaque borrowed views, with one
+real local worker thread and deterministic clock/control doubles. They generate, store,
+download and execute no audio/model/MLX content. No real source, network, model load,
+hardware benchmark, protected-host proof or complete report was produced. This is local
+verification, not hosted CI. Independent stable-head review is pending at this checkpoint.
+PR #36 remains the existing draft; a local update draft is retained outside Git while
+GitHub access is suspended. There is no push, merge, deployment or Issue #5 completion.

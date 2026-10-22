@@ -116,7 +116,7 @@ class PrefixScheduler:
         if self.closed or not self.latest_ns:
             raise BlockedEvidence("invalid_timing")
         self.closed = True
-        if self.pending is not None:
+        if self.pending is not None and self.pending.new_duration_ns < self.latest_ns:
             self.missed_opportunities += 1
         self.pending = Prefix(self.latest_ns, "final")
 

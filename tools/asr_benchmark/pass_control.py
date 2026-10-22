@@ -102,6 +102,13 @@ def _plan(value: object) -> PassPlan:
     )
 
 
+def validate_plan(plan: PassPlan) -> PassPlan:
+    """Revalidate bounded raw fields before recursive copying or dispatch."""
+    if type(plan) is not PassPlan:
+        raise PassFailure("pass_plan_invalid")
+    return _plan({name: getattr(plan, name) for name in PassPlan.__dataclass_fields__})
+
+
 @dataclass(frozen=True)
 class PassRequest:
     manifest_id: str
@@ -111,11 +118,7 @@ class PassRequest:
 
     def wire(self) -> bytes:
         # Validate bounded raw fields before recursive copying/JSON allocation.
-        if type(self.plan) is not PassPlan:
-            raise PassFailure("pass_plan_invalid")
-        validated = _plan(
-            {name: getattr(self.plan, name) for name in PassPlan.__dataclass_fields__}
-        )
+        validated = validate_plan(self.plan)
         if (
             not _identifier(self.manifest_id)
             or not _identifier(self.corpus_id)
