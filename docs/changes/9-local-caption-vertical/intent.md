@@ -5,7 +5,8 @@
 - GitHub Issue: [#9](https://github.com/Shuang-su/Livecho/issues/9).
 - Human owner: @Shuang-su.
 - Stage/area/risk: `stage:m1`, backend orchestration, high audio/privacy risk.
-- Current remote Issue body is unavailable; [evidence](evidence.md) records the gap.
+- Remote Issue reread on 2026-10-25; [evidence](evidence.md) records publication
+  reconciliation and remaining approval/acceptance limits.
 
 ## Problem
 
