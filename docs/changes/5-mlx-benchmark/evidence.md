@@ -1,5 +1,63 @@
 # Evidence: M3 Ultra MLX benchmark requirements
 
+## Publication reconciliation — 2026-10-25
+
+The user authorized publishing the preserved local delivery `b70cab7738627cae837141d41ce3dc022e92ce9b` as a draft.
+GitHub access is restored: the current owning Issue was read through the official
+GitHub connector, and remote main remains `93d8b0a4b3e147ce0b7df903f118060117d56f0a`.
+Earlier HTTP 403/unavailable statements below are historical records of October 23,
+not a current access blocker. Original verification and independent reviews remain
+attributed to their recorded authors and exact revisions.
+
+Publication coordinator: Codex GUI `/root`, limited to repository/Issue status,
+publication bookkeeping and recording unresolved scope. The coordinator retains its
+prior reference-exposed role and makes no product implementation or requirement-design
+changes. No reference expression, local quota logs, credentials or model/audio data
+is introduced; existing independent author/reviewer assignments are unchanged.
+
+Existing draft PR #36 is open at `a7194a831613494e3375a820bb5508d014c54771`,
+with no discussion/review entries returned. Its previous CI success is not evidence
+for the unpublished coordinator commits. The reviewed coordinator code remains
+`491c0bb8fb1931e57b116ee5561f734a630eb61a`; this publication adds documentation only.
+Actual model/host measurements, approved model selection and complete Issue #5
+acceptance remain outstanding. No source/provider execution or registry enablement occurs.
+
+### Local publication verification
+
+The following exact command ran from this Issue's worktree on 2026-10-25 and exited 0:
+
+```sh
+make artifacts && git diff --check && /usr/bin/python3 -B - <<'PY'
+from pathlib import Path
+import re
+import subprocess
+root = Path('docs/changes/5-mlx-benchmark')
+links = 0
+for file in sorted(root.glob('*.md')):
+    for target in re.findall(r'\]\(([^)]+)\)', file.read_text()):
+        if '://' in target or target.startswith('#'):
+            continue
+        assert (file.parent / target.split('#', 1)[0]).resolve().is_file(), (file, target)
+        links += 1
+allowed = {str(root / 'evidence.md')}
+changed = set(subprocess.check_output(['git', 'diff', '--name-only', 'b70cab7738627cae837141d41ce3dc022e92ce9b'], text=True).splitlines())
+assert changed == allowed, changed
+subprocess.run(['git', 'diff', '--exit-code', 'b70cab7738627cae837141d41ce3dc022e92ce9b', '--', str(root / 'spec.md'), str(root / 'plan.md')], check=True)
+print(f'Publication check: {links} local links; exact documentation scope; spec/plan unchanged')
+PY
+```
+
+Observed output: `change artifacts: ok`; `Publication check: 0 local links; exact documentation scope; spec/plan unchanged`.
+Only publication evidence and, for the new proposals, the Issue-access status in
+intent were edited. Product code, tests and reviewed spec/plan bytes are unchanged;
+no product suite or hardware/model/audio check was rerun for this bookkeeping batch.
+The previous exact-code validation remains historical evidence. New-head hosted CI
+will be read separately after publication.
+
+Draft publication does not grant owner approval or authorize merge,
+deployment, model/audio execution or a new quota-monitor round.
+
+
 ## Artifact approval
 
 - Artifact PR: [#33](https://github.com/Shuang-su/Livecho/pull/33); draft,
