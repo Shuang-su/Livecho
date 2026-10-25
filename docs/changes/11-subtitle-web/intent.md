@@ -5,8 +5,8 @@
 - GitHub Issue: [#11](https://github.com/Shuang-su/Livecho/issues/11).
 - Human owner: @Shuang-su.
 - Stage/area/risk: `stage:m1`, browser/PWA, normalized-content visibility risk.
-- Source limitation: the authorized 2026-09-26 Issue snapshot was read; current remote
-  text and comments are unavailable, as recorded in [evidence](evidence.md).
+- Remote Issue reread on 2026-10-25; [evidence](evidence.md) records publication
+  reconciliation and remaining approval/acceptance limits.
 
 ## Problem
 

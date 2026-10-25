@@ -1,9 +1,67 @@
 # Evidence: Subtitle companion Web/PWA
 
+## Publication reconciliation — 2026-10-25
+
+The user authorized publishing the preserved local delivery `ff060d0ffec19d89b8528ba02991299f5c5118ff` as a draft.
+GitHub access is restored: the current owning Issue was read through the official
+GitHub connector, and remote main remains `93d8b0a4b3e147ce0b7df903f118060117d56f0a`.
+Earlier HTTP 403/unavailable statements below are historical records of October 23,
+not a current access blocker. Original verification and independent reviews remain
+attributed to their recorded authors and exact revisions.
+
+Publication coordinator: Codex GUI `/root`, limited to repository/Issue status,
+publication bookkeeping and recording unresolved scope. The coordinator retains its
+prior reference-exposed role and makes no product implementation or requirement-design
+changes. No reference expression, local quota logs, credentials or model/audio data
+is introduced; existing independent author/reviewer assignments are unchanged.
+
+Current Issue #11 still requires the independent subtitle/status companion, bounded
+session display delay, current-protocol recovery with explicit gaps, shell-only offline
+caching and fast/slow viewer verification. The current proposal retains partial/final
+UI behavior and discloses a final-only upstream demo. Upstream #6/#9 scope decisions
+remain pending and cannot establish working model inference, browser acceptance or
+Issue #11 completion. No UI or protocol code changes in this publication.
+
+### Local publication verification
+
+The following exact command ran from this Issue's worktree on 2026-10-25 and exited 0:
+
+```sh
+make artifacts && git diff --check && /usr/bin/python3 -B - <<'PY'
+from pathlib import Path
+import re
+import subprocess
+root = Path('docs/changes/11-subtitle-web')
+links = 0
+for file in sorted(root.glob('*.md')):
+    for target in re.findall(r'\]\(([^)]+)\)', file.read_text()):
+        if '://' in target or target.startswith('#'):
+            continue
+        assert (file.parent / target.split('#', 1)[0]).resolve().is_file(), (file, target)
+        links += 1
+allowed = {str(root / 'evidence.md'), str(root / 'intent.md')}
+changed = set(subprocess.check_output(['git', 'diff', '--name-only', 'ff060d0ffec19d89b8528ba02991299f5c5118ff'], text=True).splitlines())
+assert changed == allowed, changed
+subprocess.run(['git', 'diff', '--exit-code', 'ff060d0ffec19d89b8528ba02991299f5c5118ff', '--', str(root / 'spec.md'), str(root / 'plan.md')], check=True)
+print(f'Publication check: {links} local links; exact documentation scope; spec/plan unchanged')
+PY
+```
+
+Observed output: `change artifacts: ok`; `Publication check: 4 local links; exact documentation scope; spec/plan unchanged`.
+Only publication evidence and, for the new proposals, the Issue-access status in
+intent were edited. Product code, tests and reviewed spec/plan bytes are unchanged;
+no product suite or hardware/model/audio check was rerun for this bookkeeping batch.
+The previous exact-code validation remains historical evidence. New-head hosted CI
+will be read separately after publication.
+
+Draft publication does not grant owner approval or authorize merge,
+deployment, model/audio execution or a new quota-monitor round.
+
+
 ## Artifact approval
 
 - Owning Issue: [#11](https://github.com/Shuang-su/Livecho/issues/11).
-- Artifact PR: Not created; GitHub read failed with HTTP 403 account suspended.
+- Artifact PR: Draft proposal on this branch; owner approval remains pending.
 - Approved by/date: Pending @Shuang-su review and owner merge.
 - Base: `93d8b0a4b3e147ce0b7df903f118060117d56f0a` (`origin/main`, local ref).
 - Scope: Proposed documentation only; no product implementation or enablement.
@@ -126,7 +184,10 @@ account, platform input or production run has been executed for this artifact.
 
 GitHub unavailable: prepare a local commit and a local PR title/body draft only.
 
-## Unpublished PR draft
+## Historical unpublished PR draft — 2026-10-23
+
+Superseded by the restored-access publication record above and the current GitHub PR
+description. The following text preserves the original handoff and its access limits.
 
 Title: `docs: propose subtitle companion Web/PWA for Issue #11`
 
