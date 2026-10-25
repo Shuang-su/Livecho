@@ -1,11 +1,68 @@
 # Evidence: Public accounts and self-service device boundaries
 
+## Publication reconciliation — 2026-10-25
+
+The user authorized publishing the preserved local delivery `b8f643a6dc2e000242d4401ccd8a929e6dc5c4b3` as a draft.
+GitHub access is restored: the current owning Issue was read through the official
+GitHub connector, and remote main remains `93d8b0a4b3e147ce0b7df903f118060117d56f0a`.
+Earlier HTTP 403/unavailable statements below are historical records of October 23,
+not a current access blocker. Original verification and independent reviews remain
+attributed to their recorded authors and exact revisions.
+
+Publication coordinator: Codex GUI `/root`, limited to repository/Issue status,
+publication bookkeeping and recording unresolved scope. The coordinator retains its
+prior reference-exposed role and makes no product implementation or requirement-design
+changes. No reference expression, local quota logs, credentials or model/audio data
+is introduced; existing independent author/reviewer assignments are unchanged.
+
+Existing draft PR #39 is open at `445425757507c6a427f69c87c94042f3e86ff725`,
+with no discussion/review entries returned. Current Issue #38 remains a proposed
+architecture change. The revised account staging and retained identity-provider goals
+are still proposals; history, quotas and adoption require owner decisions. The prior
+independent content review at `72699849adfe76ad3fd98be9506fb372ec2d5dbf` is preserved.
+
+### Local publication verification
+
+The following exact command ran from this Issue's worktree on 2026-10-25 and exited 0:
+
+```sh
+make artifacts && git diff --check && /usr/bin/python3 -B - <<'PY'
+from pathlib import Path
+import re
+import subprocess
+root = Path('docs/changes/38-public-account-devices')
+links = 0
+for file in sorted(root.glob('*.md')):
+    for target in re.findall(r'\]\(([^)]+)\)', file.read_text()):
+        if '://' in target or target.startswith('#'):
+            continue
+        assert (file.parent / target.split('#', 1)[0]).resolve().is_file(), (file, target)
+        links += 1
+allowed = {str(root / 'evidence.md')}
+changed = set(subprocess.check_output(['git', 'diff', '--name-only', 'b8f643a6dc2e000242d4401ccd8a929e6dc5c4b3'], text=True).splitlines())
+assert changed == allowed, changed
+subprocess.run(['git', 'diff', '--exit-code', 'b8f643a6dc2e000242d4401ccd8a929e6dc5c4b3', '--', str(root / 'spec.md'), str(root / 'plan.md')], check=True)
+print(f'Publication check: {links} local links; exact documentation scope; spec/plan unchanged')
+PY
+```
+
+Observed output: `change artifacts: ok`; `Publication check: 9 local links; exact documentation scope; spec/plan unchanged`.
+Only publication evidence and, for the new proposals, the Issue-access status in
+intent were edited. Product code, tests and reviewed spec/plan bytes are unchanged;
+no product suite or hardware/model/audio check was rerun for this bookkeeping batch.
+The previous exact-code validation remains historical evidence. New-head hosted CI
+will be read separately after publication.
+
+Draft publication does not grant owner approval or authorize merge,
+deployment, model/audio execution or a new quota-monitor round.
+
+
 ## Artifact approval
 
 - Owning Issue: [#38](https://github.com/Shuang-su/Livecho/issues/38).
 - Status: **Draft / proposed; repository-owner decision pending**.
-- Artifact PR: Independent review complete; draft creation follows this record.
-  The PR is linked from owning Issue #38; no merge or owner decision is recorded here.
+- Artifact PR: [#39](https://github.com/Shuang-su/Livecho/pull/39), open draft;
+  no merge or owner adoption is recorded here.
 - Approval date: None. No existing invitation, history, role, ingest or runtime rule is
   superseded by creating this proposal.
 - Base: `93d8b0a4b3e147ce0b7df903f118060117d56f0a`, confirmed against remote main on
@@ -234,7 +291,9 @@ claimed, and no unrelated `make verify` run was performed for these document-onl
 changes. Independent document review does not establish current remote PR status or
 approve owner adoption, implementation or rollout.
 
-### Prepared PR #39 update draft — not published
+### Historical prepared PR #39 update draft — 2026-10-23
+
+The publication reconciliation above supersedes this draft's access-status statements.
 
 Proposed title: `docs(issue-38): clarify public-account stages and retained identity goals`
 
