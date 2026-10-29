@@ -46,6 +46,34 @@ Commands run in this worktree on 2026-10-30:
 The local link check used the existing exact Python check in Automated verification
 below. Documentation-only checks do not establish UI, E2E, MLX or production acceptance.
 
+### Independent scope review — 2026-10-30
+
+- Reviewer: `/root/subtitle_reviewer_terra_20261029`, independent read-only
+  specification reviewer; reviewed content head
+  `9ba89ef4eb3ab07f0000364dfebd861d93bb0080` and reported PASS.
+- Exposure declaration: read AGENTS, independent-implementation policy metadata and
+  historical exposure records, Issues #9/#11 and Livecho specifications/delta. Did
+  not read reference repository contents, old research, screenshots, reference
+  summaries, code or assets, and did not edit the author's files.
+- Result: fixture boundaries, endpoint and public reasons align with #9. Actual
+  model/audio execution and worker partial output remain unaccepted; this review
+  supplies no runtime or hardware acceptance. Implementation still waits for the
+  coordinator's confirmation of final CI and owner-authorized artifact merge.
+- This follow-up changes only `evidence.md`. `git diff --check`, `make artifacts`
+  and the exact single-file scope assertion below passed before commit; no runtime
+  tests were rerun.
+
+```sh
+git diff --check
+make artifacts
+/usr/bin/python3 -B - <<'PY'
+import subprocess
+changed = subprocess.check_output(['git', 'diff', '--name-only', 'HEAD'], text=True).splitlines()
+assert changed == ['docs/changes/11-subtitle-web/evidence.md'], changed
+print('review follow-up scope: evidence.md only')
+PY
+```
+
 ## Publication reconciliation — 2026-10-25
 
 The user authorized publishing the preserved local delivery `ff060d0ffec19d89b8528ba02991299f5c5118ff` as a draft.
