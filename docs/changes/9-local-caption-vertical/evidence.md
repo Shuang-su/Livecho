@@ -288,3 +288,27 @@ Body:
 ## Release and rollback evidence
 
 Not deployed. No production/source/model/worker enrollment gate is enabled.
+
+## Fixture-only independent review — 2026-10-30
+
+- Independent reviewer: Codex GUI `/root/subtitle_reviewer_terra_20261029`.
+  Read-only specification review of exact head
+  `61009e06f20c29c2506356c6d3c829233ab1e87c`; result: PASS, reported by the reviewer
+  through the coordinator. The reviewer did not modify author files.
+- Reviewer source/exposure declaration: read AGENTS.md, independent-implementation
+  policy metadata and historical records, Issues #9/#11 and Livecho specifications
+  and deltas. Did not read reference repository contents, old research, external
+  screenshots, reference summaries, or reference code/assets.
+- Findings: fixture boundaries, endpoints and reason mapping agree. Actual model,
+  audio and partial-inference acceptance remain incomplete. This is documentation
+  review, not runtime verification or authorization to enable those paths.
+- The coordinator independently verified the remote push of `61009e06`. The first
+  ordinary push was rejected with `remote rejected (failed)`; an ordinary retry
+  succeeded. No forced update was used.
+- This follow-up changes only this evidence file. Exact verification command:
+  `make artifacts && git diff --check && git diff --exit-code 61009e06f20c29c2506356c6d3c829233ab1e87c -- docs/changes/9-local-caption-vertical/intent.md docs/changes/9-local-caption-vertical/spec.md docs/changes/9-local-caption-vertical/plan.md`.
+  Result: exit 0, `change artifacts: ok`; intent/spec/plan unchanged.
+- Staged verification: `git diff --cached --check && git diff --cached --name-only`;
+  exit 0, only `docs/changes/9-local-caption-vertical/evidence.md`.
+  No code or runtime tests were rerun for this review record. Final hosted CI and
+  owner/delegated-owner merge remain separate gates before implementation.
