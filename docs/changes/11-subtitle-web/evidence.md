@@ -1,5 +1,51 @@
 # Evidence: Subtitle companion Web/PWA
 
+## Scope clarification author exposure — 2026-10-30
+
+- Author: Codex GUI `/root/subtitle_author_sol_20261029`, independent requirements
+  author for `docs/changes/11-subtitle-web/**`; reviewer:
+  `/root/subtitle_reviewer_terra_20261029`. Recorded before scope edits.
+- Inputs: user-assigned text-only fixture delivery scope, repository AGENTS,
+  independent-implementation policy, current remote Issue #11 and all four #11
+  artifacts. Coordination with the independent #9 author supplies only Livecho
+  endpoint/reason/mode requirements. No implementation is authorized in this batch.
+- Exposure: policy repository names/license metadata and historical exposure records;
+  memory registry workflow/approval/quota facts and reference project names. No
+  reference repository expression, old research, external screenshots, generated
+  reference summaries, code, fixtures or assets were opened or supplied. Memory is
+  not a product requirement or current-status authority.
+- Assignment: independently clarify the Livecho fixture-only UI gates. No upstream
+  copying, protocol change, model/audio execution, merge or deployment.
+
+### Scope and verification for this batch
+
+Reread remote Issue #11 using `gh issue view 11 --json title,body,url` (exit 0).
+Read all four #11 artifacts completely, following the truncated combined read with
+focused complete reads. Read #9's Livecho spec sections for modes, local endpoints
+and public status reasons in its separate worktree; these remain proposals pending
+owner merge. `/api/viewer/ws`, `fixture_timeline` and fixed public reasons agree;
+fixture `live` requires no worker and is always labeled synthetic.
+
+This revision separates text-only UI implementation/validation gates from actual
+model/audio/worker/host capability approval. It preserves v1, partial/four-final
+display, 0–5 second session delay, immediate disconnection/stop clearing and every
+existing capacity/recovery/privacy rule. Actual worker partial and MLX acceptance
+remain incomplete. No product code or hardware evidence is added.
+
+Commands run in this worktree on 2026-10-30:
+
+| Exact command | Observed result |
+| --- | --- |
+| `/usr/bin/python3 -B /Users/szmg/.codex/monitors/livecho-20261029/gui_gate.py` | Exit 0, `work_allowed: true`, before reading and before scope editing |
+| `gh issue view 11 --json title,body,url` | Exit 0; current Issue scope and unchecked acceptance read |
+| `gh pr view 42 --json headRefOid,state,isDraft,url` | Exit 0; open draft head `f09514a5e14ce326e842906366277fdd15e1e5c5` |
+| `git diff --check` | Exit 0 |
+| `make artifacts` | Exit 0, `change artifacts: ok` |
+| Local Markdown target check recorded below | Exit 0, 4 links checked, 0 broken |
+
+The local link check used the existing exact Python check in Automated verification
+below. Documentation-only checks do not establish UI, E2E, MLX or production acceptance.
+
 ## Publication reconciliation — 2026-10-25
 
 The user authorized publishing the preserved local delivery `ff060d0ffec19d89b8528ba02991299f5c5118ff` as a draft.
@@ -143,7 +189,7 @@ documentation-only batch. Plan commands for future implementation are not run re
 
 | Requirement | Allowed source and limitation |
 | --- | --- |
-| Subtitle/status-only PWA, partial/final, gap/resync, shell-only cache, delay and 20 viewers | Historical owning Issue #11 body and current user goal; remote freshness pending |
+| Subtitle/status-only PWA, partial/final, gap/resync, shell-only cache, delay and 20 viewers | Current owning Issue #11 reread 2026-10-30 and user goal; approval remains pending |
 | Backend authority, untrusted normalized rendering, no raw/audio/secret surface | Accepted #2 spec and independent-implementation policy at the recorded local base |
 | Exact subprotocol/models/cursor/revision and 256/4,096 state bounds | Accepted #3 spec and local `ViewerCursorV1`/`ViewerReadyV1`/timeline models |
 | Final-only completed-segment path; no invented partial audio protocol | Accepted #8 spec and current user scope; #5 latency/selection remains separately gated |

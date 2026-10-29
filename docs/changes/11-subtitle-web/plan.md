@@ -2,10 +2,11 @@
 
 ## Order of work
 
-1. Obtain owner merge of this artifact, reconcile the latest remote Issue when access
-   returns, and record a fresh independent implementation assignment. Before backend
+1. Obtain owner merge of this artifact, reread the current remote Issue,
+   and record a fresh independent implementation assignment. Before backend
    integration, require accepted #9 endpoint and public-reason contracts; fixture-only
-   UI work may proceed after this artifact is accepted without model/platform execution.
+   UI work may proceed after this artifact is accepted without model, worker, audio,
+   platform or trusted-host execution approval. Keep those execution paths disabled.
 2. Create `apps/web/` with the repository's pinned React/TypeScript/Vite toolchain and
    types. Refactor only the shared protocol package's environment adapters/schema
    packaging to expose the browser-safe entry defined in the spec; preserve the Node
@@ -25,7 +26,8 @@
 6. Add the static shell manifest and narrowly allowlisted service worker. Intercept
    every browser persistence surface in tests; prove offline reload never restores
    timeline text or cursor, and denied cache/storage writes fail before retention.
-7. Integrate #9's accepted local synthetic viewer route and test 20 clients, fast/slow
+7. Integrate #9's accepted text-only `fixture_timeline` mode at `/api/viewer/ws`
+   and test 20 clients, fast/slow
    isolation, retry exhaustion, stop/disable/delete at maximum delay, socket closure,
    old epoch callbacks and fresh resync. No public account or device registration gate
    is introduced. #7 and #27 remain separate capability boundaries.
@@ -63,4 +65,6 @@ The view, delay range, queue limits, reconnect budget and retention behavior are
 proposals for owner review. Agreement with #9's accepted endpoint/reason mapping is an
 integration gate, not implementer discretion to invent wire fields. Remote Issue
 freshness, owner merge, runtime tests, model adoption and host evidence remain separate
-unmet gates. A protocol conflict requires its own accepted protocol Issue.
+acceptance records: model/host evidence does not block fixture-only UI implementation
+or synthetic validation. Actual ASR partial/MLX acceptance stays incomplete until
+separately demonstrated. A protocol conflict requires its own accepted protocol Issue.

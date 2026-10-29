@@ -13,6 +13,11 @@ room-start action. A deployment-configured same-origin backend supplies the sele
 opaque room ID; a route parameter may select only that configured room, never a URL or
 an arbitrary public ingest target. The demonstration runs locally with synthetic
 transcript/status fixtures from #9. It is labeled as a synthetic demonstration.
+The first delivery uses #9's text-only `fixture_timeline` mode; no audio, decoder,
+model or worker is started. Owner acceptance of the #11 artifacts permits fixture-only
+UI implementation without model/worker/audio approval. Backend integration additionally
+requires agreement with the accepted #9 contract. Actual worker partial emission and
+MLX/host acceptance remain unproved, separate from UI fixture acceptance.
 
 The view contains room/session status, connection state, current provisional text,
 up to four recent final segments, a visible gap notice when needed, a display-delay
@@ -42,7 +47,7 @@ if a whole accepted row cannot fit, clear the view and show the local overflow g
 
 ### Protocol acceptance before presentation
 
-Connect to the backend viewer endpoint owned by #9 with `livecho.viewer.v1`, minor 0,
+Connect to #9's same-origin `/api/viewer/ws` with `livecho.viewer.v1`, minor 0,
 and a compatible client version. Consume only `ViewerReadyV1`, `TimelineEventV1`, and
 the existing bounded ack/error responses. Import the generated types and validator
 from the protocol package's browser-safe shared entry specified below. Reject binary
@@ -139,6 +144,11 @@ The #9 closed public reason mapping must distinguish `no_compatible_worker`,
 reason codes render a generic status, not arbitrary server text or an inferred cause.
 "No compatible worker" is shown only for an explicit mapped reason; a silent stream
 is not sufficient evidence. Connection status and session status remain separate.
+In `fixture_timeline`, #9 may publish `live` with no reason without a worker;
+the synthetic-demonstration label remains visible. The worker-wait deadline belongs
+to `synthetic_mlx`, not to this text-only mode. Fixed failure reasons
+`worker_failed`, `source_failed` and `protocol_failed` render safe local labels;
+unknown reasons use the generic failed/status label.
 
 Process status immediately after validation, with zero display delay. `stopping`,
 `stopped`, `failed`, `ingest_disabled`, `policy_disable` or `session_deleted` clears
@@ -164,11 +174,13 @@ the same bounded input path; no message may overtake an earlier candidate. Brows
 Node runners must retain every existing golden outcome and exact schema bytes. This
 packaging work is part of #11 implementation, not a new approval or runtime gate, and
 does not authorize protocol semantics/schema/fixture changes. #9 owns the backend
-endpoint, publication policy, concurrency and status-reason mapping. Before implementation
+endpoint, publication policy, concurrency and status-reason mapping. Before integration
 the two owner-merged artifacts must agree on the same-origin route and the reason
 mapping. This draft does not treat an unmerged #9 proposal as accepted authority.
 It adds no protocol model, status enum, timestamp meaning, schema or generated fixture.
 An incompatible requirement blocks integration until its separate protocol Issue lands.
+Model adoption, trusted-host execution and actual ASR evidence gate their own real
+capabilities; they do not gate text-only fixture UI work or its synthetic E2E checks.
 
 ## Security, privacy, and data lifecycle
 

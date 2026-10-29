@@ -5,7 +5,7 @@
 - GitHub Issue: [#11](https://github.com/Shuang-su/Livecho/issues/11).
 - Human owner: @Shuang-su.
 - Stage/area/risk: `stage:m1`, browser/PWA, normalized-content visibility risk.
-- Remote Issue reread on 2026-10-25; [evidence](evidence.md) records publication
+- Remote Issue reread on 2026-10-30; [evidence](evidence.md) records publication
   reconciliation and remaining approval/acceptance limits.
 
 ## Problem
@@ -20,6 +20,10 @@ Provide a responsive React/Vite PWA showing one operator-selected room's normali
 subtitles and session state. It consumes Issue #9's local synthetic timeline through
 the existing viewer protocol. Public account enrollment, device self-service, platform
 ingest and long-stream lifecycle extensions do not block this short local demonstration.
+The first deliverable is the text-only `fixture_timeline` UI. Once these artifacts
+are owner-merged, its implementation and local synthetic validation do not require
+model adoption, worker enrollment, audio execution or MLX/host acceptance. Those
+capabilities remain disabled and separately gated.
 
 Keep the page independent of an external video player. An explicit, session-only
 display delay helps a viewer align text manually; it cannot predict unavailable text
