@@ -16,7 +16,12 @@ and measured limitations without making platform access, accounts or devices pre
 
 ## Desired outcome
 
-Provide one manually started synthetic memory speech session, one approved local MLX
+The first implementation phase is only `fixture_timeline`: manually started synthetic
+text/status on the validated viewer path. It needs accepted #9 artifacts and the
+existing viewer protocol, not a model manifest, worker, audio integration or host audio
+evidence. It cannot close Issue #9's real ASR criteria.
+
+A separately gated later phase would provide one synthetic memory speech session, one approved local MLX
 worker and a normalized subtitle/status viewer endpoint. A separate text-only fixture
 mode supports deterministic Web/PWA development while real model/audio execution is
 blocked. Its success is explicitly a fixture success, never a working ASR claim.
@@ -36,8 +41,9 @@ separate work and do not block a short synthetic demonstration.
 
 ## Constraints and data impact
 
-All accepted #2/#3/#5/#8 constraints remain authoritative. Audio stays bounded and
-ephemeral. The selected model needs a complete actual report and owner-approved ADR;
+All accepted #2/#3/#5/#8 constraints remain authoritative where applicable. Fixture
+execution opens no audio source and loads no model. For `synthetic_mlx`, audio stays
+bounded and ephemeral. The selected model needs a complete actual report and owner-approved ADR;
 the exact host/source/decoder/provider evidence and separate execution authorization
 must pass before any real run. The execution registry remains closed in this batch.
 Only approved synthetic normalized text/status and payload-free observations may be

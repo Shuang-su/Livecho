@@ -2,6 +2,12 @@
 
 ## Order of work
 
+Current implementation scope after artifact merge is fixture-only: steps 1–3, the
+text schedule/publication portions of steps 5–6, and step 7 once #11 is accepted.
+Steps 4 and 8 and all audio/worker/model portions remain deferred, with
+`synthetic_mlx` closed. Missing #5/#6/#8 runtime or host evidence cannot block the
+pure-text phase and cannot be waived for the later real phase.
+
 1. Reconcile current Issue text when available, obtain owner artifact merge, and record
    independent implementer/reviewer exposure before code. #5 coordinator completion
    is not a prerequisite for writing or reviewing this proposal.
@@ -14,6 +20,10 @@
    within 1,000 ms, then at least 2,000 ms without a mutable event; fresh/resync during
    an open partial is refused without issuing a cursor or storing a body replay.
    Test ordering and saturation with synthetic text only, without model/worker audio.
+   Verify fixture lifecycle without manifest, worker mount/process or audio registry
+   dependency. Create only a session and viewer timeline, never a fabricated lease.
+   Exercise held text callbacks after invalidation and a closed MLX request that
+   produces no fixture fallback.
 4. Once #6/#8 implementations and their relevant accepted contracts are ready, connect
    one bounded segment handle to the existing binary sender and one local worker.
    Validate the complete ownership inventory, terminal/overlap compatibility, deadlines
@@ -68,7 +78,8 @@ session and starts no replacement. There is no persisted audio/transcript recove
 ## Open decisions
 
 Endpoints, mode split, local limits, status mapping, reconnect behavior and short-session
-scope are fixed proposals. Current remote Issue reconciliation, owner acceptance,
-terminal/overlap compatibility and exact source/model/host evidence remain explicit
-integration/run gates. Missing evidence never permits a fallback implementation or an
+scope are fixed proposals. Current remote Issue reconciliation and owner acceptance
+gate implementation. Terminal/overlap compatibility and source/model/host evidence
+gate only later audio/worker integration and real execution, not the accepted
+fixture-only phase. Missing evidence never permits a fallback implementation or an
 unapproved change to `epoch`, `seq`, `revision`, PTS or the accepted audio interfaces.

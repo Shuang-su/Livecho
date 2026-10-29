@@ -1,5 +1,58 @@
 # Evidence: Single local worker caption vertical
 
+## Fixture-scope revision: exposure and sources — 2026-10-30
+
+- Author: Codex GUI `/root/caption_author_astra_20261029`, independent requirements
+  author; scope is this Issue's four Markdown artifacts only. Registered before edits
+  to intent/spec/plan. Independent reviewer: `/root/subtitle_reviewer_terra_20261029`.
+- Allowed inputs read: repository AGENTS.md, independent-implementation policy, all
+  four current #9 artifacts, Makefile and live Issue #9 body/comments using
+  `gh issue view 9 --json title,body,comments` (exit 0; no comments).
+- Context contains local task instructions and memory registry gate/history notes,
+  including a generic independently-authored design summary mentioning Danmakus;
+  that summary is excluded from requirements. The policy and historical #9 evidence
+  expose upstream names/license metadata and prior authors' exposure declarations.
+  No upstream source, tests, fixtures, schema, configuration, documentation expression,
+  screenshots, assets or reference implementation was opened or supplied. No known
+  upstream contribution is present. No old research or reference repository was read.
+- Assignment: documentation clarification from Livecho's existing mode split and the
+  current user-authorized fixture-only phase. No implementation assignment or runtime
+  authorization follows from this record. No external requirement was introduced.
+- Current Issue #9 still asks for actual partial/final ASR. This revision accepts no
+  such outcome: text-only fixtures and eventual final-only MLX remain distinct, and
+  actual partial inference/latency acceptance remains open. Artifact adoption still
+  requires independent review, CI and owner/delegated-owner merge.
+
+### Verification for this revision
+
+From this worktree, the following command exited 0, with `change artifacts: ok` and
+`Fixture scope check: 5 local links; exactly four Issue 9 Markdown artifacts`:
+
+```sh
+make artifacts && git diff --check && /usr/bin/python3 -B - <<'PY'
+from pathlib import Path
+import re
+import subprocess
+root = Path('docs/changes/9-local-caption-vertical')
+links = 0
+for file in sorted(root.glob('*.md')):
+    for target in re.findall(r'\]\(([^)]+)\)', file.read_text()):
+        if '://' in target or target.startswith('#'):
+            continue
+        assert (file.parent / target.split('#', 1)[0]).resolve().is_file(), (file, target)
+        links += 1
+changed = set(subprocess.check_output(['git', 'diff', '--name-only'], text=True).splitlines())
+assert changed == {str(root / name) for name in ('intent.md', 'spec.md', 'plan.md', 'evidence.md')}, changed
+print(f'Fixture scope check: {links} local links; exactly four Issue 9 Markdown artifacts')
+PY
+```
+
+`/usr/bin/python3 -B /Users/szmg/.codex/monitors/livecho-20261029/gui_gate.py`
+returned exit 0, `work_allowed: true`, before reads, before specification edits and
+before verification. Product code and tests are unchanged; no runtime suite, audio,
+model or hardware execution was performed. Hosted CI and independent review of the
+published revision are separate pending outcomes, not implied by these local checks.
+
 ## Publication reconciliation — 2026-10-25
 
 The user authorized publishing the preserved local delivery `f8f99d0eb9337d85db727c78842b21e2b5b84dbe` as a draft.

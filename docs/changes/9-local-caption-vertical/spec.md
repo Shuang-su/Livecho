@@ -16,6 +16,18 @@ path without audio, decoder, worker inference or model loading. It is appropriat
 #11 UI checks but cannot pass the audio/ASR vertical. Never fall back from MLX to this
 mode after failure, or label fixture text as recognized speech.
 
+The first implementation phase enables only explicitly selected `fixture_timeline`.
+After this Issue's artifacts are accepted, its admission requires existing v1 viewer
+validation, fixed loopback configuration, a bounded text schedule and local
+enable/stop/disable policy. It does not require #5 model evidence or manifest, #6
+worker readiness, #8 audio integration, speech producer approval, host audio evidence
+or the audio/MLX execution registry. It creates no worker, lease, PCM segment, decoder
+or provider. `synthetic_mlx` stays closed; selecting it reports `blocked_evidence`
+locally and never substitutes fixture output. Requirements below concerning source,
+audio, worker, lease or model apply only to `synthetic_mlx`; viewer validation,
+ordering, queue bounds, run-generation invalidation and publication closure apply to
+both modes. No v1 field or meaning changes with mode selection.
+
 `synthetic_mlx` requires an explicit trusted local operator start, one reviewed source
 binding, one local worker and all prerequisite evidence. Refuse before source opening
 unless #6/#8 integration is implemented from accepted artifacts; #5's actual complete
@@ -34,7 +46,8 @@ implicit authorization to download TTS models or invoke an unreviewed generator.
 Tones/noise may validate audio machinery but cannot count as speech-recognition evidence.
 
 There is one configured opaque synthetic room and one immutable session at a time.
-CLI start creates a new UUID session and backend epoch 1, selects one exact approved
+CLI start in either mode creates a new UUID session and backend epoch 1. Only
+`synthetic_mlx` selects one exact approved
 manifest and one compatible local worker. Worker enrollment and public account/device
 registration are not part of this loopback demonstration. A lease lasts 90 seconds
 at most; a demonstration accepts source media for at most 60 seconds and drains within
@@ -49,7 +62,9 @@ state or authorize a production/source capability. Unknown control state fails c
 
 Order: approved synthetic source -> #8 decoder/VAD/segment handle -> backend v1 binary
 sender -> one #6 worker -> validated final transcript -> normalized v1 timeline ->
-viewer. No browser or worker receives a source locator, account secret, raw event,
+viewer. Fixture order is authored text/status schedule -> backend validation ->
+normalized v1 timeline -> viewer; it never fabricates worker messages or audio handoff
+evidence. No browser or worker receives a source locator, account secret, raw event,
 archive key or acquisition instruction. Backend and worker have independent audio
 ledgers; all views/copies/transport internals stay within #2/#8 ceilings.
 
@@ -97,8 +112,10 @@ positions. It separately owns and advances the viewer timeline sequence allocato
 
 ### Local endpoints and permission boundary
 
-Mount `GET /api/viewer/ws` for the exact `livecho.viewer.v1` handshake and
-`GET /api/worker/ws` for `livecho.worker.v1` on the local backend. WebSocket upgrade
+Mount `GET /api/viewer/ws` for the exact `livecho.viewer.v1` handshake in both modes.
+`GET /api/worker/ws` for `livecho.worker.v1` belongs only to later gated
+`synthetic_mlx`; fixture-only implementation must not mount a worker endpoint.
+WebSocket upgrade
 paths are fixed; dynamic routing cannot become a source URL or worker command.
 Bind only loopback. The browser uses the same origin, no wildcard cross-origin access;
 the development origin is an explicit exact local allowlist. Reject browser Origin
@@ -209,7 +226,8 @@ status event has a fresh event ID and revision 1, preserving v1 immutable identi
 
 | Situation | Status | Optional reason code |
 | --- | --- | --- |
-| Approved local start admitted, waiting for worker | `starting` | `no_compatible_worker` if no compatible worker is currently available |
+| Fixture start admitted, before schedule activation | `starting` | omitted |
+| Approved MLX start admitted, waiting for worker | `starting` | `no_compatible_worker` if no compatible worker is currently available |
 | Local synthetic source and compatible worker ready, or fixture timeline active | `live` | omitted |
 | Operator normal stop / clean EOF final drain completed | `stopping` | omitted |
 | All work cleared after normal stop/EOF | `stopped` | omitted |
@@ -220,7 +238,12 @@ status event has a fresh event ID and revision 1, preserving v1 immutable identi
 
 No raw exception, worker UUID or source detail enters `reason_code`. Unknown internal
 failures map to generic `failed` with no reason. A missing worker cannot be called live;
-after 5 seconds without a compatible worker, fail the start and close source admission.
+this worker rule applies only to `synthetic_mlx`. Fixture readiness is the validated
+text schedule and publication path; it becomes `live` without a worker. Schedule
+completion emits `stopping` then `stopped`, subject to the exact-next send rule.
+Stop/disable/deletion/failure invalidates its schedule and pending text immediately,
+including held callbacks, with no lease cancellation or audio cleanup claim.
+For `synthetic_mlx`, after 5 seconds without a compatible worker, fail the start and close source admission.
 No source/audio opens while waiting for that worker. After all evidence gates pass,
 initial worker connect/hello/welcome is bounded by the same 5-second start deadline.
 
@@ -265,8 +288,10 @@ evidence. A first local path has no new latency qualification threshold that sup
 
 Implementation owns `services/backend/src/livecho_backend/local_vertical/`, local
 runner wiring, focused `tests/local_vertical/` and `make local-vertical-check`.
-The accepted #6 CLI/terminal ownership and #11 viewer/browser contracts must agree
-before integrating those implementations. Exact endpoints/reason mapping above are
+The accepted #6 CLI/terminal ownership must agree before later worker integration;
+#11 viewer/browser contracts must agree before browser integration. Neither #6 nor
+audio/host/model evidence blocks fixture-only backend implementation or text-only
+viewer checks after #9 artifact acceptance. Exact endpoints/reason mapping above are
 this Issue's proposal to be accepted, not authorization granted by another draft.
 No schemas, generated types, v1 meanings, database or deployment settings change.
 
@@ -283,6 +308,11 @@ device information is collected, stored or displayed.
 
 ## Acceptance criteria
 
+- [ ] Fixture start/live/completion/stop/disable/deletion work without a manifest,
+  worker endpoint/process, audio source, decoder/provider or audio registry admission;
+  a closed MLX request never starts fixtures.
+- [ ] Fixture completion is reported only for the text phase. Actual synthetic MLX,
+  audio ownership and real partial/latency criteria remain uncompleted.
 - [ ] Text-only fixture checks, audio contract doubles and actual MLX runs are visibly
   distinct; missing model ADR/report, host/source evidence or registry keeps real run off.
 - [ ] One approved synthetic memory speech stream reaches one worker and validated
