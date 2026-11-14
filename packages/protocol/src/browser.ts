@@ -13,6 +13,7 @@ import { browserAdapters } from "./adapters/browser.js";
 
 const protocol: Protocol = createProtocol(browserAdapters);
 
+export * from "./generated/protocol-v1.js";
 export {
   WORKER_PROTOCOL,
   VIEWER_PROTOCOL,
@@ -20,7 +21,7 @@ export {
   MAX_CONTROL_BYTES,
   canonicalJson,
 } from "./core.js";
-export type { StableCode, GoldenCaseV1, ProtocolAdapters, Protocol } from "./core.js";
+export type { StableCode, GoldenCaseV1, ProtocolAdapters } from "./core.js";
 export { sha256Hex } from "./sha256.js";
 
 export const strictJsonParse: Protocol["strictJsonParse"] = protocol.strictJsonParse;

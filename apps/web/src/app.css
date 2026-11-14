@@ -1,0 +1,261 @@
+:root {
+  color-scheme: light dark;
+  font-family: system-ui, "Segoe UI", Roboto, "PingFang SC", "Hiragino Sans",
+    "Noto Sans CJK SC", sans-serif;
+  line-height: 1.5;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: #101418;
+  color: #e8edf2;
+}
+
+.app {
+  max-width: 46rem;
+  margin: 0 auto;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  min-height: 100vh;
+}
+
+.app-header h1 {
+  font-size: 1.25rem;
+  margin: 0 0 0.25rem;
+}
+
+.synthetic {
+  margin: 0;
+  font-size: 0.8rem;
+  color: #b9c4cf;
+}
+
+.room {
+  margin: 0.25rem 0 0;
+  font-size: 0.8rem;
+  color: #b9c4cf;
+  overflow-wrap: anywhere;
+}
+
+.room code {
+  font-family: ui-monospace, monospace;
+}
+
+.status-panel,
+.notices,
+.subtitles,
+.delay {
+  border: 1px solid #2a323c;
+  border-radius: 0.5rem;
+  padding: 0.75rem;
+  background: #171c22;
+}
+
+.status-line {
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.chip {
+  display: inline-block;
+  border: 1px solid #3a4550;
+  border-radius: 999px;
+  padding: 0.1rem 0.6rem;
+  font-size: 0.85rem;
+  background: #1d242c;
+}
+
+.chip[data-connection="connected"]::before,
+.chip[data-session-status="live"]::before {
+  content: "\25cf";
+  margin-right: 0.35rem;
+  color: #63c98f;
+}
+
+.chip[data-connection="offline"]::before,
+.chip[data-connection="reconnecting"]::before,
+.chip[data-session-status="failed"]::before,
+.chip[data-session-status="stopped"]::before {
+  content: "\25cf";
+  margin-right: 0.35rem;
+  color: #d9a441;
+}
+
+.chip[data-connection="incompatible"]::before {
+  content: "\25d7";
+  margin-right: 0.35rem;
+  color: #d9a441;
+}
+
+.reason {
+  font-size: 0.85rem;
+  color: #eab0a0;
+}
+
+.notice {
+  margin: 0.5rem 0 0;
+  padding: 0.5rem 0.6rem;
+  border: 1px solid #7a5a2a;
+  border-radius: 0.4rem;
+  background: #2a2113;
+  font-size: 0.9rem;
+}
+
+.notice button {
+  margin-left: 0.4rem;
+}
+
+.subtitles {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.partial {
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: baseline;
+  font-style: italic;
+  color: #cfd9e2;
+  background: #1a2027;
+  border: 1px dashed #3a4550;
+  border-radius: 0.4rem;
+  padding: 0.6rem;
+}
+
+.partial .tag {
+  font-style: normal;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border: 1px solid #4a5a68;
+  border-radius: 0.25rem;
+  padding: 0.05rem 0.4rem;
+  color: #a8b6c4;
+  flex: none;
+}
+
+.finals {
+  margin: 0;
+  padding-inline-start: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.final .text,
+.partial .text {
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.empty {
+  margin: 0;
+  color: #8b98a6;
+}
+
+.delay .delay-control {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.delay-control input[type="range"] {
+  flex: 1 1 12rem;
+  min-width: 10rem;
+}
+
+.delay-control output {
+  font-variant-numeric: tabular-nums;
+}
+
+.hint {
+  margin: 0.5rem 0 0;
+  font-size: 0.8rem;
+  color: #b9c4cf;
+}
+
+button {
+  font: inherit;
+  border: 1px solid #4a5a68;
+  border-radius: 0.35rem;
+  background: #22303c;
+  color: inherit;
+  padding: 0.15rem 0.6rem;
+  cursor: pointer;
+}
+
+button:focus-visible,
+input:focus-visible {
+  outline: 2px solid #7fd1c0;
+  outline-offset: 2px;
+}
+
+@media (prefers-color-scheme: light) {
+  body {
+    background: #f4f6f8;
+    color: #1c2733;
+  }
+
+  .status-panel,
+  .notices,
+  .subtitles,
+  .delay {
+    background: #ffffff;
+    border-color: #d7dee5;
+  }
+
+  .chip {
+    background: #eef2f6;
+    border-color: #c3ccd6;
+  }
+
+  .synthetic,
+  .room,
+  .hint {
+    color: #55636f;
+  }
+
+  .partial {
+    background: #f2f5f8;
+    border-color: #b9c4cf;
+    color: #2a3540;
+  }
+
+  .partial .tag {
+    color: #4f5f6e;
+    border-color: #9aa7b3;
+  }
+
+  .reason {
+    color: #8c4a2f;
+  }
+
+  .notice {
+    background: #fdf4e3;
+    border-color: #c9a44a;
+    color: #4a3c14;
+  }
+
+  .empty {
+    color: #66727d;
+  }
+
+  button {
+    background: #e7edf3;
+    border-color: #9aa7b3;
+    color: inherit;
+  }
+}
