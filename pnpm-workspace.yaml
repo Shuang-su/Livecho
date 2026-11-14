@@ -2,5 +2,3 @@ packages:
   - .railway
   - apps/*
   - packages/*
-allowBuilds:
-  esbuild: false
