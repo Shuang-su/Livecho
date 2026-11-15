@@ -77,12 +77,23 @@ class ViewerConnection:
         return True
 
     def can_deliver_terminal(self, seq: int) -> bool:
-        """Terminal may send only as exact-next with no queued or partial write."""
+        """Terminal may enqueue only as exact-next with no queued or partial write."""
         if self.next_seq is None or seq != self.next_seq:
             return False
         if self.send_in_flight:
             return False
         return len(self.queue) == 0
+
+    def _terminal_send_allowed(self, seq: int) -> bool:
+        """At send time the terminal itself may be the sole queued frame."""
+        if self.next_seq is None or seq != self.next_seq:
+            return False
+        if self.send_in_flight:
+            return False
+        if not self.queue:
+            return True
+        head = self.queue[0]
+        return len(self.queue) == 1 and head.seq == seq and head.is_terminal
 
     async def run_sender(self) -> None:
         """Drain this viewer's queue with a bounded 500 ms send deadline."""
@@ -96,14 +107,21 @@ class ViewerConnection:
                     await self.detach()
                     return
                 frame = self.queue[0]
-                if frame.is_terminal and not self.can_deliver_terminal(frame.seq):
+                if frame.is_terminal and not self._terminal_send_allowed(frame.seq):
                     self._observations.terminal_clear_close_count += 1
                     await self.detach()
                     return
                 self.send_in_flight = True
                 self.stall_since = time.monotonic()
                 try:
-                    await self._send_json(frame.payload)
+                    await asyncio.wait_for(
+                        self._send_json(frame.payload),
+                        timeout=SEND_DEADLINE_SECONDS,
+                    )
+                except TimeoutError:
+                    self._observations.send_deadline_detach_count += 1
+                    await self.detach()
+                    return
                 except Exception:
                     await self.detach()
                     return
@@ -248,9 +266,7 @@ class ViewerRegistry:
             if not self.active:
                 return
             if all(
-                connection.open
-                and not connection.send_in_flight
-                and not connection.queue
+                connection.open and not connection.send_in_flight and not connection.queue
                 for connection in self.active.values()
             ):
                 return
@@ -278,6 +294,9 @@ class ViewerRegistry:
             await asyncio.sleep(0.01)
         detached = self.offer_all(frame, seq, is_terminal=True)
         await self.detach_all(detached)
+        # Wait for delivery so a following terminal (stopping → stopped) remains
+        # exact-next for every still-admitted viewer.
+        await self.drain_committed(timeout=pre_terminal_drain_seconds)
         self._recompute_aggregate()
 
     async def fanout_event(self, frame: bytes, seq: int, *, is_terminal: bool = False) -> None:

@@ -12,7 +12,7 @@ from typing import Any
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from livecho_protocol.compatibility import negotiate_viewer
-from livecho_protocol.errors import StableCode
+from livecho_protocol.errors import ProtocolValidationError, StableCode
 from livecho_protocol.models import (
     MINIMUM_VIEWER_VERSION,
     PROTOCOL_MINOR,
@@ -36,6 +36,7 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 
 from .config import (
+    MAX_VIEWERS,
     PRE_TERMINAL_DRAIN_SECONDS,
     VIEWER_ENDPOINT_PATH,
     LocalVerticalConfig,
@@ -101,23 +102,45 @@ class LocalVerticalService:
             "cross_process_latency": self.observations.cross_process_latency,
         }
 
-    async def start_fixture_session(self, spec: FixtureScheduleSpec | None = None) -> None:
+    def _assert_fixture_mode(self) -> None:
         if self.config.mode != LocalVerticalMode.FIXTURE_TIMELINE:
             raise ModeBlockedError(self.config.mode)
-        if spec is None:
-            spec = FixtureScheduleSpec()
-        self.ingest_open = True
-        self.schedule_generation += 1
-        self.run_generation = self.schedule_generation
-        generation = self.schedule_generation
-        self.timeline.reset_session(room_id=self.config.room_id)
-        self.registry.retained.clear()
+
+    async def _reset_for_new_session(self) -> int:
+        """Cancel any prior schedule and allocate a fresh session/generation."""
         if self._schedule_task is not None:
             self._schedule_task.cancel()
             with contextlib.suppress(asyncio.CancelledError):
                 await self._schedule_task
+            self._schedule_task = None
+        self.ingest_open = True
+        self.schedule_generation += 1
+        self.run_generation = self.schedule_generation
+        self.timeline.reset_session(room_id=self.config.room_id)
+        self.registry.retained.clear()
+        await self.registry.close_all()
+        return self.schedule_generation
+
+    async def open_fixture_session(self) -> None:
+        """Open a fixture session without the text schedule (manual/test control)."""
+        self._assert_fixture_mode()
+        await self._reset_for_new_session()
+        await self.publish_status("starting")
+        await self.publish_status("live")
+
+    async def start_fixture_session(self, spec: FixtureScheduleSpec | None = None) -> None:
+        self._assert_fixture_mode()
+        if spec is None:
+            spec = FixtureScheduleSpec()
+        from .schedule import validate_fixture_schedule
+
+        validate_fixture_schedule(spec)
+        generation = await self._reset_for_new_session()
+        # Publish starting before the schedule task so a racing viewer never
+        # admits against the reset "stopped" placeholder status.
+        await self.publish_status("starting")
         self._schedule_task = asyncio.create_task(
-            run_fixture_schedule(self, spec, generation=generation)
+            run_fixture_schedule(self, spec, generation=generation, starting_published=True)
         )
 
     async def _publish_locked(
@@ -213,8 +236,10 @@ class LocalVerticalService:
         self,
         status: str,
         reason_code: str | None = None,
+        *,
+        force: bool = False,
     ) -> None:
-        if self.run_generation != self.schedule_generation:
+        if not force and self.run_generation != self.schedule_generation:
             return
         await self._publish_locked(
             lambda: self._build_status_event(status, reason_code=reason_code)
@@ -255,29 +280,44 @@ class LocalVerticalService:
 
     async def operator_stop(self) -> None:
         await self._invalidate_schedule()
-        await self.publish_status("stopping")
-        await self.publish_status("stopped")
+        await self.publish_status("stopping", force=True)
+        await self.publish_status("stopped", force=True)
 
     async def close_ingest(self) -> None:
-        self.ingest_open = False
         await self._invalidate_schedule()
+        await self.publish_status("stopped", "ingest_disabled", force=True)
+
+    async def policy_disable(self) -> None:
+        await self._invalidate_schedule()
+        await self.publish_status("stopped", "policy_disable", force=True)
 
     async def delete_session(self) -> None:
         await self._invalidate_schedule()
-        await self.publish_status("stopped", "session_deleted")
+        await self.publish_status("stopped", "session_deleted", force=True)
 
     async def fail_session(self, reason: str = "protocol_failed") -> None:
         await self._invalidate_schedule()
-        await self.publish_status("failed", reason)
+        await self.publish_status("failed", reason, force=True)
 
     async def _invalidate_schedule(self) -> None:
         self.ingest_open = False
         self.schedule_generation += 1
+        # Drop the sole open fixture partial without fabricating a final.
+        self.timeline.mutable = None
         if self._schedule_task is not None:
             self._schedule_task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await self._schedule_task
             self._schedule_task = None
 
     async def handle_viewer_websocket(self, websocket: WebSocket) -> None:
+        subprotocols = websocket.scope.get("subprotocols") or []
+        if VIEWER_PROTOCOL not in subprotocols:
+            await websocket.close(code=1002)
+            return
+        if self.registry.connection_count() >= MAX_VIEWERS:
+            await websocket.close(code=1013)
+            return
         await websocket.accept(subprotocol=VIEWER_PROTOCOL)
         connection = ViewerConnection(
             send_json=lambda payload: websocket.send_bytes(payload),
@@ -287,15 +327,30 @@ class LocalVerticalService:
         admitted_id: int | None = None
         stored: ViewerConnection | None = None
         try:
-            raw = await websocket.receive_text()
-            payload = strict_json_loads(raw)
-            subscribe = validate_object(payload, ViewerSubscribeV1)
+            try:
+                raw = await websocket.receive_text()
+            except WebSocketDisconnect:
+                raise
+            except Exception:
+                await self._send_protocol_error(websocket, "schema_invalid", False)
+                return
+            try:
+                payload = strict_json_loads(raw)
+                subscribe = validate_object(payload, ViewerSubscribeV1)
+            except ProtocolValidationError as error:
+                await self._send_protocol_error(websocket, error.code.value, False)
+                return
             negotiation = negotiate_viewer(subscribe)
             if not negotiation.decision.accepted:
                 await self._send_protocol_error(websocket, negotiation.decision.code.value, False)
                 return
             if subscribe.room_id != self.config.room_id:
                 await self._send_protocol_error(websocket, "binding_mismatch", False)
+                return
+
+            # Capacity is checked before creating a protocol domain / ready.
+            if self.registry.connection_count() >= MAX_VIEWERS:
+                await websocket.close(code=1013)
                 return
 
             if subscribe.cursor is not None:
@@ -314,6 +369,9 @@ class LocalVerticalService:
                     message = await websocket.receive()
                     if message.get("type") == "websocket.disconnect":
                         break
+                    # Post-subscribe control traffic is unknown state: fail closed.
+                    await connection.detach_pending()
+                    break
             except WebSocketDisconnect:
                 pass
         except WebSocketDisconnect:
@@ -413,22 +471,22 @@ class LocalVerticalService:
         connection: ViewerConnection,
         cursor: ViewerCursorV1,
     ) -> bool:
+        # Zero-loss resume requires the exact current timeline next position
+        # and a still-live retained domain for that cursor.
         live = LiveViewerCursor(
             session_id=self.timeline.session_id,
             epoch=self.timeline.epoch,
-            next_seq=int(cursor.next_seq),
+            next_seq=self.timeline.next_seq,
         )
         decision = decide_viewer_resume(cursor, live)
-        if decision.code != StableCode.ACCEPTED:
-            retained = self.registry.find_resume_domain(live)
-            if retained is None:
-                self.observations.resync_required_count += 1
-                self.observations.viewer_refuse_count += 1
-                await self._send_protocol_error(websocket, "resync_required", True)
-                return False
-            live = retained.cursor
-            decision = decide_viewer_resume(cursor, live)
-        if decision.code != StableCode.ACCEPTED:
+        retained = self.registry.find_resume_domain(
+            LiveViewerCursor(
+                session_id=cursor.session_id,
+                epoch=int(cursor.epoch),
+                next_seq=int(cursor.next_seq),
+            )
+        )
+        if decision.code != StableCode.ACCEPTED or retained is None:
             self.observations.resync_required_count += 1
             self.observations.viewer_refuse_count += 1
             await self._send_protocol_error(websocket, "resync_required", True)

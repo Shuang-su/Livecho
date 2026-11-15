@@ -50,6 +50,16 @@ class FixtureScheduleSpec:
     disable_after_segment: int | None = None
 
 
+def validate_fixture_schedule(spec: FixtureScheduleSpec) -> None:
+    """Refuse schedules that cannot finish within the 60-second demonstration bound."""
+    total = max(1, spec.segments)
+    min_step_ms = FIXTURE_ADMISSION_INTERVAL_MS + 1_500 if spec.with_partials else 2_500
+    segment_step_ms = max(min_step_ms, spec.interval_ms)
+    planned_ms = 800 + total * segment_step_ms + 2_000
+    if planned_ms > FIXTURE_MAX_DURATION_SECONDS * 1_000:
+        raise FixtureScheduleError("fixture schedule exceeds 60 second bound")
+
+
 async def _wait_until(
     service: LocalVerticalService,
     *,
@@ -71,22 +81,22 @@ async def run_fixture_schedule(
     spec: FixtureScheduleSpec,
     *,
     generation: int,
+    starting_published: bool = False,
 ) -> None:
     """Emit synthetic transcript/status on the validated viewer path."""
 
+    validate_fixture_schedule(spec)
     total = max(1, spec.segments)
     min_step_ms = FIXTURE_ADMISSION_INTERVAL_MS + 1_500 if spec.with_partials else 2_500
     segment_step_ms = max(min_step_ms, spec.interval_ms)
-    planned_ms = 800 + total * segment_step_ms + 2_000
-    if planned_ms > FIXTURE_MAX_DURATION_SECONDS * 1_000:
-        raise FixtureScheduleError("fixture schedule exceeds 60 second bound")
 
     started_at = time.monotonic()
-    if not await _wait_until(
-        service, generation=generation, started_at=started_at, offset_seconds=0.05
-    ):
-        return
-    await service.publish_status("starting")
+    if not starting_published:
+        if not await _wait_until(
+            service, generation=generation, started_at=started_at, offset_seconds=0.05
+        ):
+            return
+        await service.publish_status("starting")
     if not await _wait_until(
         service, generation=generation, started_at=started_at, offset_seconds=0.35
     ):
@@ -108,17 +118,23 @@ async def run_fixture_schedule(
 
         segment_number = index + 1
         if spec.stop_after_segment == segment_number:
-            await service.publish_status("stopped", spec.stop_reason)
+            if spec.stop_reason == "ingest_disabled":
+                await service.close_ingest()
+            elif spec.stop_reason == "session_deleted":
+                await service.delete_session()
+            elif spec.stop_reason == "policy_disable":
+                await service.policy_disable()
+            else:
+                await service.operator_stop()
             return
         if spec.delete_after_segment == segment_number:
-            await service.publish_status("stopped", "session_deleted")
+            await service.delete_session()
             return
         if spec.fail_after_segment == segment_number:
-            await service.publish_status("failed", "protocol_failed")
+            await service.fail_session("protocol_failed")
             return
         if spec.disable_after_segment == segment_number:
             await service.close_ingest()
-            await service.publish_status("stopped", "ingest_disabled")
             return
 
         segment_id = str(uuid.uuid4())

@@ -113,7 +113,16 @@ class LocalTimeline:
         )
 
     def fresh_admission_allowed(self, now: float | None = None) -> bool:
-        """Fresh subscribe is safe only when no mutable object is open."""
+        """Fresh subscribe is safe only when no mutable object is open.
+
+        The 2,000 ms admission interval gates the schedule's next mutable
+        object, not viewer admission after a final.
+        """
+        del now  # reserved for clock injection in tests
+        return self.mutable is None
+
+    def mutable_open_allowed(self, now: float | None = None) -> bool:
+        """The schedule may open another mutable object only after the interval."""
         if self.mutable is not None:
             return False
         if self.last_mutable_final_monotonic <= 0:
@@ -125,6 +134,8 @@ class LocalTimeline:
     def open_mutable(self, event_id: str, now: float | None = None) -> None:
         """Mark revision 1 of a fixture transcript as mutable."""
         reference = time.monotonic() if now is None else now
+        if not self.mutable_open_allowed(reference):
+            raise FixtureScheduleError("fixture admission interval not elapsed")
         self.mutable = MutableFixtureEvent(
             event_id=event_id,
             revision_one_at=reference,

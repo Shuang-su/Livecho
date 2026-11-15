@@ -13,6 +13,7 @@ from .config import LocalVerticalConfig, LocalVerticalMode
 from .demo_client import run_demo_client
 from .schedule import FixtureScheduleSpec
 from .service import LocalVerticalService, ModeBlockedError, create_local_vertical_app
+from .timeline import FixtureScheduleError
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -121,6 +122,9 @@ def main(argv: list[str] | None = None) -> int:
         return asyncio.run(_run_fixture_demo(config, spec))
     except ModeBlockedError:
         print(json.dumps(LocalVerticalService(config).blocked_evidence()))
+        return 2
+    except FixtureScheduleError as error:
+        print(json.dumps({"outcome": "blocked_evidence", "reason": str(error)}))
         return 2
 
 

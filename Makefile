@@ -1,4 +1,4 @@
-.PHONY: bootstrap build dev lint test typecheck verify artifacts protocol-generate protocol-check web-check railway-check railway-start-web railway-start-backend railway-run-maintenance railway-migrate
+.PHONY: bootstrap build dev lint test typecheck verify artifacts protocol-generate protocol-check web-check local-vertical-check local-vertical-demo railway-check railway-start-web railway-start-backend railway-run-maintenance railway-migrate
 
 bootstrap:
 	uv sync --all-groups --frozen
@@ -16,7 +16,7 @@ lint:
 	pnpm lint
 
 test:
-	uv run pytest -q
+	uv run pytest -q -m "not stress"
 	pnpm test
 
 typecheck:
@@ -49,6 +49,12 @@ railway-check:
 railway-start-web:
 	@echo "Web runtime is not implemented; Issue #11 owns this entry point." >&2
 	@false
+
+local-vertical-check:
+	uv run pytest -q tests/local_vertical
+
+local-vertical-demo:
+	PYTHONPATH=packages/protocol/python:services/backend/src uv run python -m livecho_backend.local_vertical --segments 2
 
 railway-start-backend:
 	@echo "Backend runtime is not implemented; Issue #9 owns this entry point." >&2
