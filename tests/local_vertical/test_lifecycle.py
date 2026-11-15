@@ -13,6 +13,7 @@ from .helpers import (
     OrderChecker,
     backend_server,
     connect_viewer,
+    expect_closed,
     expect_no_message,
     read_ready,
 )
@@ -117,6 +118,37 @@ def test_runtime_failure_maps_to_failed_with_fixed_reason() -> None:
             assert terminal[2] == "failed"
             assert server.service.timeline.reason_code == "protocol_failed"
             await viewer.close()
+
+    asyncio.run(scenario())
+
+
+def test_close_after_segment_drops_viewer_while_schedule_continues() -> None:
+    async def scenario() -> None:
+        async with backend_server() as server:
+            await server.start_session(
+                FixtureScheduleSpec(
+                    segments=3,
+                    interval_ms=2_500,
+                    with_partials=False,
+                    close_after_segment=1,
+                )
+            )
+            viewer = await connect_viewer(server)
+            ready = await read_ready(viewer)
+            checker = OrderChecker(ready["session_id"], ready["epoch"], ready["next_seq"])
+            # Admission status + first final, then the socket is force-closed.
+            await checker.consume(viewer)
+            await checker.consume(viewer)
+            await expect_closed(viewer)
+            # Timeline kept running; a fresh viewer still reaches a terminal stop.
+            replacement = await connect_viewer(server)
+            ready_two = await read_ready(replacement)
+            checker_two = OrderChecker(
+                ready_two["session_id"], ready_two["epoch"], ready_two["next_seq"]
+            )
+            terminal = await consume_terminal(replacement, checker_two, timeout=30.0)
+            assert terminal[2] == "stopped"
+            await replacement.close()
 
     asyncio.run(scenario())
 

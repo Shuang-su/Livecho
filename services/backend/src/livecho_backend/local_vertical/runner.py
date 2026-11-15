@@ -6,6 +6,7 @@ import argparse
 import asyncio
 import contextlib
 import json
+from pathlib import Path
 
 import uvicorn
 
@@ -31,7 +32,33 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--no-partials", action="store_true")
     parser.add_argument("--server-only", action="store_true")
     parser.add_argument("--client-only", action="store_true")
+    parser.add_argument(
+        "--static-root",
+        type=Path,
+        default=None,
+        help="Optional apps/web/dist directory to serve on the same origin",
+    )
+    parser.add_argument("--stop-at", type=int, default=None)
+    parser.add_argument("--stop-reason", default="ingest_disabled")
+    parser.add_argument("--fail-at", type=int, default=None)
+    parser.add_argument("--delete-at", type=int, default=None)
+    parser.add_argument("--disable-at", type=int, default=None)
+    parser.add_argument("--close-at", type=int, default=None)
     return parser
+
+
+def _spec_from_args(args: argparse.Namespace) -> FixtureScheduleSpec:
+    return FixtureScheduleSpec(
+        segments=max(1, args.segments),
+        interval_ms=args.interval_ms,
+        with_partials=not args.no_partials,
+        stop_after_segment=args.stop_at,
+        stop_reason=args.stop_reason if args.stop_at is not None else None,
+        fail_after_segment=args.fail_at,
+        delete_after_segment=args.delete_at,
+        disable_after_segment=args.disable_at,
+        close_after_segment=args.close_at,
+    )
 
 
 async def _run_fixture_demo(config: LocalVerticalConfig, spec: FixtureScheduleSpec) -> int:
@@ -51,6 +78,12 @@ async def _run_fixture_demo(config: LocalVerticalConfig, spec: FixtureScheduleSp
             segments=spec.segments,
             interval_ms=min(spec.interval_ms, 800),
             with_partials=spec.with_partials,
+            stop_after_segment=spec.stop_after_segment,
+            stop_reason=spec.stop_reason,
+            fail_after_segment=spec.fail_after_segment,
+            delete_after_segment=spec.delete_after_segment,
+            disable_after_segment=spec.disable_after_segment,
+            close_after_segment=spec.close_after_segment,
         )
     await service.start_fixture_session(fast_spec)
     client_result = await run_demo_client(
@@ -100,16 +133,12 @@ def main(argv: list[str] | None = None) -> int:
             run_demo_client(host=config.host, port=config.port, room_id=config.room_id)
         )
         return result.exit_code
-    spec = FixtureScheduleSpec(
-        segments=max(1, args.segments),
-        interval_ms=args.interval_ms,
-        with_partials=not args.no_partials,
-    )
+    spec = _spec_from_args(args)
     if args.server_only:
         service = LocalVerticalService(config)
 
         async def _serve() -> None:
-            app = create_local_vertical_app(service)
+            app = create_local_vertical_app(service, static_root=args.static_root)
             await service.start_fixture_session(spec)
             server = uvicorn.Server(
                 uvicorn.Config(app, host=config.host, port=config.port, log_level="info"),

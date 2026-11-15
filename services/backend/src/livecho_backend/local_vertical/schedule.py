@@ -48,6 +48,9 @@ class FixtureScheduleSpec:
     fail_after_segment: int | None = None
     delete_after_segment: int | None = None
     disable_after_segment: int | None = None
+    # Drop every active viewer after this segment's final without stopping the
+    # timeline (browser reconnect/resync harness). None disables the hook.
+    close_after_segment: int | None = None
 
 
 def validate_fixture_schedule(spec: FixtureScheduleSpec) -> None:
@@ -90,25 +93,29 @@ async def run_fixture_schedule(
     min_step_ms = FIXTURE_ADMISSION_INTERVAL_MS + 1_500 if spec.with_partials else 2_500
     segment_step_ms = max(min_step_ms, spec.interval_ms)
 
-    started_at = time.monotonic()
+    # Hold starting/live briefly, then wait for the first viewer before the
+    # segment clock starts so late browser attach (Playwright multi-server) still
+    # sees a live timeline instead of a compressed catch-up burst.
+    boot_started = time.monotonic()
     if not starting_published:
         if not await _wait_until(
-            service, generation=generation, started_at=started_at, offset_seconds=0.05
+            service, generation=generation, started_at=boot_started, offset_seconds=0.05
         ):
             return
         await service.publish_status("starting")
     if not await _wait_until(
-        service, generation=generation, started_at=started_at, offset_seconds=0.35
+        service, generation=generation, started_at=boot_started, offset_seconds=0.35
     ):
         return
     await service.publish_status("live")
 
-    viewer_wait_deadline = time.monotonic() + 1.0
+    viewer_wait_deadline = time.monotonic() + 90.0
     while service.registry.connection_count() == 0 and time.monotonic() < viewer_wait_deadline:
         if service.schedule_generation != generation or not service.ingest_open:
             return
         await asyncio.sleep(0.05)
 
+    started_at = time.monotonic()
     for index in range(total):
         at_seconds = (800 + index * segment_step_ms) / 1_000
         if not await _wait_until(
@@ -179,6 +186,10 @@ async def run_fixture_schedule(
         )
         if service.schedule_generation != generation or not service.ingest_open:
             return
+
+        if spec.close_after_segment == segment_number:
+            # Socket drop only; schedule continues so a stale cursor is refused.
+            await service.force_disconnect_viewers()
 
         try:
             service.timeline.check_mutable_deadline()

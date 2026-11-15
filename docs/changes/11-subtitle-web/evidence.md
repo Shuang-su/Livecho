@@ -391,3 +391,55 @@ Body:
 ## Release and rollback evidence
 
 Not deployed. Execution registry, model adoption and production controls remain closed.
+
+## 2026-11-15 — Python `fixture_timeline` cross-stack E2E (plan step 7)
+
+Implementer: Cursor Auto (cloud agent). Base: `main` at
+`4721e795bd57ccc68f78aab7336fec4873bbdda3` (includes merged #9/#10/#11 fixture
+slices). Branch: `issue/11-python-fixture-e2e`. Accepted intent/spec/plan were
+**not** rewritten.
+
+### Why this slice
+
+#11 evidence previously recorded that automated E2E hit only
+`apps/web/scripts/fixture-server.mjs` (Node double) while plan step 7 requires
+integration with #9's real `fixture_timeline` at `/api/viewer/ws`. #9 is now on
+main; this PR closes that authorized fixture-integration gap only.
+
+### What landed
+
+- Python CLI schedule hooks (`--stop-at` / `--delete-at` / `--fail-at` /
+  `--disable-at` / `--close-at`) and optional `--static-root` same-origin shell
+  serving for the built `apps/web/dist`
+- Segment clock starts after the first viewer (avoids Playwright multi-server
+  attach racing a finished schedule)
+- **Wire fix:** viewer JSON control frames use WebSocket **text** (protocol v1);
+  prior `send_bytes` left the browser stuck on `Connecting` because
+  `CaptionSession` rejects binary control
+- `apps/web/playwright.python.config.ts` + `tests/e2e-python/` +
+  `make web-python-e2e` (Node-double `make web-check` unchanged)
+- Regression: `test_control_frames_are_websocket_text_not_binary`,
+  `test_close_after_segment_drops_viewer_while_schedule_continues`
+
+### Commands and results
+
+| Exact command | Result | Date/tree |
+| --- | --- | --- |
+| `make web-python-e2e` | Exit 0; Playwright 8 passed (1.1m) against real Python backends | 2026-11-15 / `issue/11-python-fixture-e2e` |
+| `make local-vertical-check` | Exit 0; 60 passed | 2026-11-15 |
+| `make protocol-check` | Exit 0; `protocol generated artifacts: ok` | 2026-11-15 |
+| `git diff --check` | Exit 0; no whitespace errors | 2026-11-15 |
+| `make verify` | Exit 0; Ruff/mypy/TypeScript ok; `935 passed, 1 deselected`; protocol 262 + Railway 63 + web 51 Vitest; artifact/protocol checks and build ok | 2026-11-15 |
+
+### Manual smoke (not acceptance of MLX/audio/live)
+
+Vite `:5173` proxied to Python `:8787` before the text-frame fix stayed on
+`Connecting` while WS binary frames arrived; after the fix,
+`make web-python-e2e` proves captions/status/delay/stop/delete/fail/resync/offline
+against Python. Screenshots do **not** prove runtime MLX/audio/live gates.
+
+### Still unresolved
+
+Real ASR/MLX (`synthetic_mlx`), #8 audio budgets, #5 ADR, live Bilibili, accounts,
+deployment, danmaku/SC wire. Node-double E2E remains the default `web-check` path;
+Python path is the explicit cross-stack fixture check.

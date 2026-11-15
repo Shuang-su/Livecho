@@ -1,4 +1,4 @@
-.PHONY: bootstrap build dev lint test typecheck verify artifacts protocol-generate protocol-check web-check local-vertical-check local-vertical-demo asr-benchmark-check audio-check audio-runtime-check worker-check ingest-check events-check railway-check railway-start-web railway-start-backend railway-run-maintenance railway-migrate
+.PHONY: bootstrap build dev lint test typecheck verify artifacts protocol-generate protocol-check web-check web-python-e2e local-vertical-check local-vertical-demo asr-benchmark-check audio-check audio-runtime-check worker-check ingest-check events-check railway-check railway-start-web railway-start-backend railway-run-maintenance railway-migrate
 
 bootstrap:
 	uv sync --all-groups --frozen
@@ -39,6 +39,10 @@ web-check:
 	pnpm --filter @livecho/web build
 	pnpm --filter @livecho/web test:stress
 	pnpm --filter @livecho/web test:e2e
+
+web-python-e2e:
+	pnpm --filter @livecho/web test:e2e:python
+	@echo "Python fixture_timeline + web E2E only: real MLX/audio/live Bilibili acceptance remains pending."
 
 railway-check:
 	pnpm --filter @livecho/railway-config lint
