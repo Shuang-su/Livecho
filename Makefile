@@ -1,4 +1,4 @@
-.PHONY: bootstrap build dev lint test typecheck verify artifacts protocol-generate protocol-check web-check local-vertical-check local-vertical-demo asr-benchmark-check audio-check audio-runtime-check worker-check ingest-check railway-check railway-start-web railway-start-backend railway-run-maintenance railway-migrate
+.PHONY: bootstrap build dev lint test typecheck verify artifacts protocol-generate protocol-check web-check local-vertical-check local-vertical-demo asr-benchmark-check audio-check audio-runtime-check worker-check ingest-check events-check railway-check railway-start-web railway-start-backend railway-run-maintenance railway-migrate
 
 bootstrap:
 	uv sync --all-groups --frozen
@@ -76,6 +76,10 @@ worker-check:
 ingest-check:
 	uv run pytest -q tests/ingest
 	@echo "Ingest fixture/contract checks only: real network/channel/rights/audio acceptance remains pending."
+
+events-check:
+	uv run pytest -q tests/events
+	@echo "Events normalize/fixture checks only: live chat, wire publish, protocol extension, and raw archive remain pending."
 
 railway-start-backend:
 	@echo "Backend runtime is not implemented; Issue #9 owns this entry point." >&2

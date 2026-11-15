@@ -73,3 +73,67 @@ Branch `issue/10-event-normalization`. Docs only. No product/protocol code.
 ## Release and rollback evidence
 
 Not deployed. No live chat, protocol minor, or raw archive gate enabled.
+
+## 2026-11-15 — First implementation (internal/offline/normalize-only)
+
+Implementer: Cursor Auto (cloud agent). Parent squash-merged docs PR #52 as
+`6ec9ad18c4d7c7dc80b4fcb3e5a9ae167ddc12f5`. Branch:
+`issue/10-event-normalization-impl` from that `main`. Accepted intent/spec/plan were
+**not** rewritten; this section appends implementer evidence only.
+
+### What landed (CI-safe only)
+
+- `services/backend/src/livecho_backend/events/` — closed fixture allowlists, NFC/
+  type/range validation, sensitive-key refusal, in-process normalize/dedup engine,
+  bounded output queue, closed feature flags (`live_adapter_disabled` /
+  `wire_publish_disabled` / `archive_disabled`)
+- Desensitized synthetic fixtures under `events/fixtures/` (visibly labeled; **not**
+  claimed as live Bilibili wire schemas)
+- `tests/events/` + `make events-check`
+- **No** `packages/protocol` edits, Timeline/WS publication, #29 UI, #16 archive,
+  live upstream traffic, cookies/accounts, audio/MLX, or raw chat persistence
+
+### Caps recorded
+
+| Cap | Value |
+| --- | ---: |
+| Batch items / `normalize_batch` | 256 |
+| Single item JSON UTF-8 | 8 KiB |
+| Dedup map entries / session | 4,096 |
+| Output queue retention | 256 |
+
+### Critical-review findings and fixes
+
+- Extra body keys with present `text` previously risked mis-labeling as
+  `text_invalid`; validators now classify allowlist/type failures as
+  `schema_invalid` and NFC/length failures as `text_invalid` (regression covered).
+- Dedup insert deferred until after closed output-record construction so a
+  defensive key mismatch cannot poison the map.
+- Dedup identity documented as `(room_id, session_id, source_event_id)` with
+  per-engine storage of `source_event_id` only.
+- Queue overflow drops oldest, increments `queue_overflow`, retains newest;
+  capacity fill tests tolerate concurrent overflow alerts.
+- Alerts remain `{reason, counters}` only; regressions assert chat text/sender
+  never appear in alert JSON.
+- Import/normalize path opens no sockets; write-mode `open` refused during
+  normalize; fixtures scanned for URL/cookie/token substrings.
+- Bool-as-int for `start_ms`/`end_ms` rejected; transcript window capped at
+  30_000 ms; non-NFC text rejected.
+
+### Commands and results
+
+| Exact command | Result | Date/tree |
+| --- | --- | --- |
+| `make events-check` | Exit 0; 23 passed; pending-gates banner printed | 2026-11-15 / `issue/10-event-normalization-impl` |
+| `make protocol-check` | Exit 0; `protocol generated artifacts: ok` | 2026-11-15 |
+| `git diff --check` | Exit 0; no whitespace errors | 2026-11-15 |
+| `make verify` | Exit 0; Ruff/mypy/TypeScript ok; `933 passed, 1 deselected`; protocol 262 + Railway 63 + web 51 Vitest; artifact/protocol checks and build ok | 2026-11-15 |
+| `git diff origin/main -- packages/protocol` | Empty (byte-for-byte unchanged) | 2026-11-15 |
+
+### Unresolved wire/live gates (not claimed done)
+
+- Live chat adapter / `BILI-ACQ-001` selection and rights
+- Viewer protocol minor / closed `TimelineEventV1` danmaku/SC wire payloads
+- Timeline/WS publication and Issue #29 display
+- Issue #16 raw archive enablement
+- Real upstream schema compatibility (fixtures remain synthetic)

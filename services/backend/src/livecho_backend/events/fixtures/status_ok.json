@@ -1,0 +1,9 @@
+{
+  "fixture_class": "status",
+  "source_event_id": "syn-st-001",
+  "source_ts": "2026-01-15T12:00:02.000Z",
+  "body": {
+    "status": "live",
+    "reason_code": "fixture_live"
+  }
+}
