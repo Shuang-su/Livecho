@@ -108,6 +108,9 @@ Implementer: Cursor Auto (cloud agent). Base: `main` at
 - Fixtures scanned for URL/token/cookie substrings
 - Reconnect clears prior locators before replacement; wall-budget exhaustion ends
 - mypy narrowing on enum equality fixed in tests
+- CI flake: `#9` `test_sequence_and_revision_basics` regenerated immutable
+  `occurred_at` across revisions (second-boundary → `revision_immutable`). Shared
+  stamp + regression `test_revision_rejects_occurred_at_mutation`
 
 ### Commands and results
 
