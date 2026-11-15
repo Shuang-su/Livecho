@@ -1,4 +1,4 @@
-.PHONY: bootstrap build dev lint test typecheck verify artifacts protocol-generate protocol-check web-check local-vertical-check local-vertical-demo asr-benchmark-check railway-check railway-start-web railway-start-backend railway-run-maintenance railway-migrate
+.PHONY: bootstrap build dev lint test typecheck verify artifacts protocol-generate protocol-check web-check local-vertical-check local-vertical-demo asr-benchmark-check audio-check audio-runtime-check railway-check railway-start-web railway-start-backend railway-run-maintenance railway-migrate
 
 bootstrap:
 	uv sync --all-groups --frozen
@@ -61,6 +61,13 @@ asr-benchmark-check:
 	uv run ruff format --check tools/asr_benchmark tests/asr_benchmark
 	uv run mypy tools/asr_benchmark tests/asr_benchmark
 	uv run pytest -q tests/asr_benchmark
+
+audio-check:
+	uv run pytest -q tests/audio
+	@echo "Audio control checks only: trusted FFmpeg/host acceptance remains pending."
+
+audio-runtime-check:
+	PYTHONPATH=packages/protocol/python:services/backend/src uv run python -m livecho_backend.audio.preflight
 
 railway-start-backend:
 	@echo "Backend runtime is not implemented; Issue #9 owns this entry point." >&2

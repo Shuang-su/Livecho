@@ -98,3 +98,73 @@ No implementation, protocol edit, accepted-artifact rewrite, or production enabl
 ## Release and rollback evidence
 
 Not deployed. No production data, live source, model, worker connection or audio is used.
+
+## 2026-11-15 — Gated control-plane port (PR branch `issue/8-memory-audio-impl`)
+
+Implementer: Cursor Auto (cloud agent). Base: current `main` at
+`818e6b15c79793c69c12af42ae00092d654975f0` (includes squash-merged Issue #5 control
+plane). Prior closed draft [#37](https://github.com/Shuang-su/Livecho/pull/37) on
+`codex/issue-8-memory-audio-impl` (head `9462811`, implementation `1458511`) was
+inspected as prior art only — not owner approval, not FFmpeg/host evidence. Trees under
+`services/backend/src/livecho_backend/audio/` and `tests/audio/` were ported onto a new
+branch from current main; the old draft history was not merged. Accepted
+`intent.md` / `spec.md` / `plan.md` were not rewritten.
+
+### Critical-review fixes on this port
+
+1. **`make audio-runtime-check` PYTHONPATH** — after Issue #9, `livecho_backend`
+   package init pulled `local_vertical` → protocol. Target now uses
+   `packages/protocol/python:services/backend/src` so the blocked preflight entrypoint
+   resolves on current main.
+2. **Lazy `livecho_backend` package exports** — avoid eager `local_vertical` import so
+   gated audio modules do not require production/protocol stack at import time.
+3. **Regression** — checked-in `APPROVED_BUILDS` / `APPROVED_HOSTS` remain empty;
+   `preflight(...)` still raises `audio_budget_unverified` for any id.
+
+No approved FFmpeg inventory row was invented. Empty registries stay empty.
+
+### Commands and results
+
+```sh
+make audio-check
+```
+
+Exit 0. `103 passed` under `tests/audio`. Target message: trusted FFmpeg/host
+acceptance remains pending.
+
+```sh
+make audio-runtime-check
+```
+
+**Blocked as required, exit 2:**
+`audio_budget_unverified: approved FFmpeg inventory and host evidence are pending`.
+Not a pass and not a successful skip.
+
+```sh
+make verify
+```
+
+Exit 0. Ruff/mypy/TypeScript ok; `uv run pytest -q -m "not stress"` →
+`880 passed, 1 deselected`; protocol/web/railway tests and build ok;
+`change artifacts: ok`; `protocol generated artifacts: ok`.
+
+```sh
+make protocol-check && git diff --check
+```
+
+Exit 0. Generated protocol artifacts unchanged; no whitespace errors.
+
+### Remaining acceptance gates (not claimed; not waived)
+
+- Owner-approved pinned FFmpeg executable/license/dependency digest and allocation
+  inventory recorded in `APPROVED_BUILDS`
+- Trusted Linux host no-paging / no-crash-collection / process-tree evidence in
+  `APPROVED_HOSTS`
+- Real conversion + sample-accurate checks for both source formats with the approved
+  decoder (not control doubles)
+- Native buffer erasure, pipe/allocator owners, TERM-resistant child, parent SIGKILL,
+  watchdog death, and reap proof under a trusted supervisor
+- Issue #9 integration of completed-segment handoff after the above gates pass
+- No production, Bilibili, account, worker, or `synthetic_mlx` enablement
+
+Missing decoder/host evidence keeps runtime admission closed and Issue #8 open.
