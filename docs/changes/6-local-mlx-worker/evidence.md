@@ -75,3 +75,66 @@ No product code, protocol edit, or production enablement.
 ## Release and rollback evidence
 
 Not deployed. No production/source/model/worker cloud enrollment gate is enabled.
+
+## 2026-11-15 — Linux-safe fixture/contract implementation
+
+Implementer: Cursor Auto (cloud agent). Base: `main` at
+`3358ebacd315ada7ea8eef32a672e8a226075b1f` (merged #6 artifacts). Branch:
+`issue/6-local-worker-impl`. Accepted intent/spec/plan were **not** rewritten.
+
+### What landed (CI-safe only)
+
+- `workers/mlx/` package with CLI `enroll` / `doctor` / `benchmark` / `run`
+- Closed local enroll config (loopback endpoint ids only; not community registration)
+- Empty `APPROVED_*` / `EXECUTION_REGISTRY` — real `run` exits 2 / `blocked_evidence`
+- Fixture session emitting legal partial→final against `StreamOrderingState` (labeled
+  `fixture_not_speech_recognition`; not model partial support)
+- `make worker-check`; installability via `workers/mlx/pyproject.toml` script
+  `livecho-mlx-worker` (`uv tool install` / `uvx` from that directory when desired)
+
+### Critical-review notes / fixes
+
+- Empty registries remain empty; no invented ADR/manifest/host rows
+- Import/fixture paths open no sockets; `run` performs no file writes beyond prior enroll
+- Diagnostics redact absolute paths and omit transcript/audio fields
+- `benchmark` may invoke the blocked #5 CLI and still reports `blocked_evidence` /
+  `selects_model: false` (never a pass)
+
+### Commands and results
+
+```sh
+make worker-check
+```
+
+Exit 0. `12 passed` under `tests/worker`. Message: real MLX/host acceptance pending.
+
+```sh
+PYTHONPATH=workers/mlx/src:packages/protocol/python:. uv run python -m livecho_mlx_worker doctor
+PYTHONPATH=workers/mlx/src:packages/protocol/python:. uv run python -m livecho_mlx_worker run
+```
+
+Each exits **2** with JSON `blocked_evidence` / `invalid_configuration` as applicable;
+reasons include empty registries and (on Linux) `non_apple_silicon_mlx`. No MLX load.
+
+```sh
+make verify
+```
+
+Exit 0. `892 passed, 1 deselected`.
+
+```sh
+make protocol-check && git diff --check
+```
+
+Exit 0. Protocol artifacts unchanged.
+
+### Remaining acceptance gates (not claimed; not waived)
+
+- Owner-approved #5 model-decision ADR and complete final inference manifest digests
+- #8 approved FFmpeg/host inventories clearing `audio_budget_unverified`
+- Non-empty local execution registry for real `run`
+- Trusted Apple Silicon doctor + real MLX conversion/cancellation evidence
+- Proven real-provider partial capability (default remains `partial_unavailable`)
+- Backend worker WebSocket admission / synthetic lease integration (#9 `synthetic_mlx`)
+
+Issue #6 stays open until those gates and remaining acceptance criteria are met.

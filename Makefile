@@ -1,4 +1,4 @@
-.PHONY: bootstrap build dev lint test typecheck verify artifacts protocol-generate protocol-check web-check local-vertical-check local-vertical-demo asr-benchmark-check audio-check audio-runtime-check railway-check railway-start-web railway-start-backend railway-run-maintenance railway-migrate
+.PHONY: bootstrap build dev lint test typecheck verify artifacts protocol-generate protocol-check web-check local-vertical-check local-vertical-demo asr-benchmark-check audio-check audio-runtime-check worker-check railway-check railway-start-web railway-start-backend railway-run-maintenance railway-migrate
 
 bootstrap:
 	uv sync --all-groups --frozen
@@ -68,6 +68,10 @@ audio-check:
 
 audio-runtime-check:
 	PYTHONPATH=packages/protocol/python:services/backend/src uv run python -m livecho_backend.audio.preflight
+
+worker-check:
+	uv run pytest -q tests/worker
+	@echo "Worker fixture/contract checks only: real MLX/host acceptance remains pending."
 
 railway-start-backend:
 	@echo "Backend runtime is not implemented; Issue #9 owns this entry point." >&2

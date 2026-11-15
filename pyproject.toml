@@ -27,7 +27,7 @@ addopts = "--strict-config --strict-markers --import-mode=importlib"
 markers = [
   "stress: long real-time saturation runs excluded from `make verify`",
 ]
-pythonpath = [".", "packages/protocol/python", "services/backend/src"]
+pythonpath = [".", "packages/protocol/python", "services/backend/src", "workers/mlx/src"]
 testpaths = ["tests", "apps", "packages", "services", "workers", "tools"]
 norecursedirs = [
   ".*",
@@ -59,4 +59,4 @@ python_version = "3.12"
 strict = true
 files = ["."]
 exclude_gitignore = true
-mypy_path = "packages/protocol/python, services/backend/src"
+mypy_path = "packages/protocol/python, services/backend/src, workers/mlx/src"
