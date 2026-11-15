@@ -187,3 +187,291 @@ None. The requested short branch spelling was adjusted to the repository's requi
 
 Not deployed. This draft creates no runtime, infrastructure, policy authorization,
 accepted risk, or source rights. It can be revised or closed without operational effect.
+
+## 2026-11-15 — Documentation implementation (index / README / roadmap)
+
+Implementer: Cursor Auto (cloud agent). Artifact PR [#32](https://github.com/Shuang-su/Livecho/pull/32)
+merged as `e62c65f`. Implementation base: `main` at
+`c8ee4a1658774416b1a00b70a872f8818110a060` (includes [#44](https://github.com/Shuang-su/Livecho/pull/44)–[#54](https://github.com/Shuang-su/Livecho/pull/54)
+fixture/CI slices). Branch: `issue/30-requirements-index-impl`. Accepted
+intent/spec/plan were **not** rewritten. Closed unmerged draft
+[#35](https://github.com/Shuang-su/Livecho/pull/35) was prior art only (structure
+reference); its git history was not merged.
+
+### Author exposure and assignment
+
+- Inputs: AGENTS.md, CONTRIBUTING.md, Issue #30 body, accepted #30 intent/spec/plan,
+  prior #35 tree (read-only), current README/roadmap, `docs/requirements-index` seed
+  from prior art, architecture/security/policy/operations sources for stable-ID
+  inventory, GitHub Issue #5–#19/#27–#31 state+`依赖` via read-only `gh`, merged PR
+  list #44–#54 on `main`.
+- Exclusions: no #31 body, no live services, no model/audio downloads, no user
+  machines, no normative source edits, no M2 implementation.
+- Assignment: documentation implementation only under the plan allowlist
+  (`docs/requirements-index.md`, `README.md`, `docs/roadmap.md`, this `evidence.md`).
+
+### What landed
+
+- `docs/requirements-index.md` — secondary navigation with evidence profiles for
+  foundation/protocol/Railway/policy plus **fixture/CI profiles S5–S11** for landed
+  #5–#11 slices; delivery rows distinguish fixture vs missing hardware/rights/wire;
+  conflict register notes closed Issues ≠ product acceptance.
+- `README.md` — names merged #1–#4 and fixture/gated M1 slices; states real ASR/live/
+  production are not established; links index/roadmap and local fixture commands.
+- `docs/roadmap.md` — dated GitHub dependency snapshot with planning state and
+  fixture/CI notes; conditional gates unchanged in intent.
+
+### Critical-review findings / fixes
+
+- Rejected treating GitHub-closed #5/#6/#7/#8/#10 as real MLX/live acceptance.
+- Rejected merging stale #35 history; refreshed against `c8ee4a1`.
+- Spec-family inventory (`DEC|FLOW|CTRL|DATA|THREAT|RISK|BILI|LIC|GATE`) excludes
+  wildcard prose prefixes `BILI-SRC` / `BILI-RIGHT` and non-required `ENTRY-*` /
+  `ASSET-*` / `ACT-*` taxonomy labels (those remain supporting threat-model tables,
+  not primary requirement rows).
+- Manual traces: #9/#11 fixture path is `fixture_timeline` + Node/Python E2E only;
+  #27/#28/#29 remain N; Railway W offline vs live provider missing; thirteen High
+  residuals stay NOT ACCEPTED; ADR remains Proposed.
+- Independent human reviewer for this documentation PR is **pending** (plan step 8);
+  this agent did not invent a second reviewer. Owner review of the draft PR supplies it.
+
+### Exact ephemeral audits (not added to the repository)
+
+Scripts were executed from `/tmp` only. Final counts below were taken after this evidence
+append and before commit.
+
+#### Index / link / ownership / scope audit
+
+Command: `uv run python /tmp/livecho-issue30-index-audit.py`
+
+```python
+from collections import Counter
+from pathlib import Path
+import re
+import subprocess
+import unicodedata
+
+BASE = "c8ee4a1658774416b1a00b70a872f8818110a060"
+DELIVERABLES = [Path(p) for p in (
+    "README.md", "docs/roadmap.md", "docs/requirements-index.md",
+    "docs/changes/30-requirements-evidence-index/evidence.md",
+)]
+SOURCES = [Path("docs") / (p + ".md") for p in (
+    "architecture/adr/0001-alpha-modular-monolith",
+    "security/alpha-threat-model", "security/data-lifecycle-and-deletion",
+    "policy/bilibili-public-ingest", "policy/independent-implementation",
+    "operations/incident-disable-and-recovery",
+    "operations/railway-deployment", "operations/railway-secrets",
+)]
+PATTERN = r"\b(?:DEC|FLOW|CTRL|DATA|THREAT|RISK|BILI|LIC|GATE)-[A-Z0-9]+(?:-[A-Z0-9]+)*"
+PROFILE_RE = (
+    r"\]\(#(?:foundation|design|protocol|railway|policy|license|pending|"
+    r"fixture-asr|fixture-worker|fixture-audio|fixture-ingest|"
+    r"fixture-caption|fixture-events|fixture-web)\)"
+)
+ALLOWED_PATHS = {
+    "docs/requirements-index.md", "README.md", "docs/roadmap.md",
+    "docs/changes/30-requirements-evidence-index/evidence.md",
+}
+
+def prose(path):
+    return re.sub(r"```.*?```", "", path.read_text(encoding="utf-8"), flags=re.S)
+
+def anchors(path):
+    result = set(re.findall(r'<a id="([^"]+)"', path.read_text(encoding="utf-8")))
+    counts = Counter()
+    for heading in re.findall(r"^#{1,6} (.+)$", prose(path), re.M):
+        slug = "".join(
+            c for c in heading.lower()
+            if c in " -_" or unicodedata.category(c)[0] in "LN"
+        ).replace(" ", "-")
+        count = counts[slug]
+        counts[slug] += 1
+        result.add(slug + (f"-{count}" if count else ""))
+    return result
+
+head = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()
+merge_base = subprocess.check_output(
+    ["git", "merge-base", "origin/main", "HEAD"], text=True
+).strip()
+assert merge_base == BASE or head.startswith(BASE[:7])
+all_changed = set(
+    subprocess.check_output(["git", "diff", "--name-only", "origin/main...HEAD"], text=True).splitlines()
+) | set(
+    subprocess.check_output(["git", "diff", "--name-only", "origin/main"], text=True).splitlines()
+) | set(
+    subprocess.check_output(["git", "diff", "--cached", "--name-only"], text=True).splitlines()
+)
+assert not sorted(p for p in all_changed if p and p not in ALLOWED_PATHS)
+for rel in (
+    "docs/changes/30-requirements-evidence-index/intent.md",
+    "docs/changes/30-requirements-evidence-index/spec.md",
+    "docs/changes/30-requirements-evidence-index/plan.md",
+):
+    assert subprocess.check_output(["git", "diff", "origin/main", "--", rel], text=True) == ""
+
+local_links, external_links = 0, set()
+for path in DELIVERABLES:
+    text = prose(path)
+    refs = dict(re.findall(r"^\[([^\]]+)\]:\s*(\S+)", text, re.M))
+    targets = re.findall(r"\[[^\]\n]+\]\(([^)\n]+)\)", text)
+    for label in re.findall(r"\[[^\]\n]+\]\[([^\]\n]+)\]", text):
+        assert label in refs
+        targets.append(refs[label])
+    targets.extend(refs.values())
+    for target in targets:
+        if re.match(r"https?://", target):
+            external_links.add(target)
+            continue
+        file_part, _, fragment = target.partition("#")
+        dest = (path.parent / file_part).resolve() if file_part else path.resolve()
+        assert dest.exists(), (path, target)
+        if fragment:
+            assert dest.is_file() and fragment in anchors(dest), (path, target)
+        local_links += 1
+
+source_ids = set()
+for path in SOURCES:
+    source_ids.update(re.findall(PATTERN, path.read_text(encoding="utf-8")))
+source_ids -= {"BILI-SRC", "BILI-RIGHT"}
+index = Path("docs/requirements-index.md").read_text(encoding="utf-8")
+records = re.findall(
+    r"^\| ((?:IDX|DEC|FLOW|CTRL|DATA|THREAT|RISK|BILI|LIC|GATE)-[A-Z0-9-]+) — (.*)$",
+    index, re.M,
+)
+counts = Counter(key for key, _ in records)
+assert all(v == 1 for v in counts.values())
+indexed_stable = {k for k in counts if not k.startswith("IDX-")}
+assert source_ids == indexed_stable
+unresolved = 0
+for key, rest in records:
+    cells = rest.split("|")
+    assert len(cells) == 5 and all(c.strip() for c in cells[:4])
+    assert len(re.findall(r"\[[^\]]+\](?:\([^)]+\)|\[[^\]]+\])", cells[1])) == 1
+    assert re.search(PROFILE_RE, cells[3])
+    if "authority unresolved" in rest.lower():
+        unresolved += 1
+control_owners = {}
+for line in Path("docs/security/alpha-threat-model.md").read_text(encoding="utf-8").splitlines():
+    if line.startswith("| `CTRL-"):
+        cells = line.split("|")
+        control_owners[cells[1].strip(" `")] = set(re.findall(r"#(\d+)", cells[3]))
+owner_matches = 0
+for key, rest in records:
+    if key.startswith("CTRL-"):
+        owners = set(re.findall(r"#(\d+)", rest.split("|")[2]))
+        assert owners == control_owners[key]
+        owner_matches += 1
+assert owner_matches == 30
+false_phrases = (
+    "production ready", "fully accepted", "real asr operational",
+    "live product ready", "100% complete", "all acceptance complete",
+)
+false_hits = []
+for path in DELIVERABLES:
+    low = prose(path).lower()  # strip fences so this deny-list quote cannot self-fail
+    for phrase in false_phrases:
+        if phrase in low:
+            false_hits.append((str(path), phrase))
+assert not false_hits
+print({
+    "MARKDOWN_LOCAL_LINKS": local_links,
+    "EXTERNAL_URLS": len(external_links),
+    "SOURCE_STABLE_IDS": len(source_ids),
+    "INDEX_STABLE_IDS": len(indexed_stable),
+    "IDX_NAV": len([k for k in counts if k.startswith("IDX-")]),
+    "DUP_PRIMARY": 0,
+    "UNRESOLVED_AUTHORITY": unresolved,
+    "CTRL_OWNER_MATCHES": owner_matches,
+    "FALSE_COMPLETE": false_hits,
+    "AUDIT_PASS": True,
+})
+```
+
+Result (fenced script bodies excluded from link/false-complete scans via `prose()`):
+local links 564, external URLs 46, source/index stable IDs 130/130, IDX nav 70,
+unresolved 0, CTRL owner matches 30, false-complete none, `AUDIT_PASS`. Rechecked
+after this evidence append with the same counts.
+
+#### Dependency / roadmap / merged-PR audit
+
+Command: `uv run python /tmp/livecho-issue30-dependency-audit.py`
+
+```python
+from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
+import json, re, subprocess
+
+NUMBERS = list(range(1, 20)) + [27, 28, 29, 30]
+MERGED_PRS = [
+    20, 21, 22, 23, 24, 25, 26, 32, 33, 34, 41, 42,
+    44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54,
+]
+
+def capture(number):
+    value = json.loads(subprocess.check_output([
+        "gh", "issue", "view", str(number), "--repo", "Shuang-su/Livecho",
+        "--json", "number,title,state,body,url",
+    ], text=True))
+    section = re.search(r"^## 依赖\s*\n(.*?)(?=^## |\Z)", value.pop("body"), re.M | re.S)
+    value["dependencies"] = list(map(int, re.findall(r"#(\d+)", section.group(1)))) if section else []
+    return value
+
+roadmap = Path("docs/roadmap.md").read_text(encoding="utf-8")
+expected = {}
+for line in roadmap.splitlines():
+    if re.match(r"\| \[#\d+\]\[i\d+\]", line):
+        cells = line.split("|")
+        number = int(re.search(r"#(\d+)", cells[1]).group(1))
+        expected[number] = (cells[2].strip().upper(), list(map(int, re.findall(r"#(\d+)", cells[4]))))
+assert set(expected) == set(NUMBERS)
+with ThreadPoolExecutor(max_workers=4) as pool:
+    captured = sorted(pool.map(capture, NUMBERS), key=lambda v: v["number"])
+differences = []
+for value in captured:
+    got = (value["state"], value["dependencies"])
+    if got != expected[value["number"]]:
+        differences.append({"number": value["number"], "github": got, "roadmap": expected[value["number"]]})
+proposal = json.loads(subprocess.check_output([
+    "gh", "issue", "view", "31", "--repo", "Shuang-su/Livecho",
+    "--json", "number,title,state,url",
+], text=True))
+assert proposal["state"] == "OPEN" and proposal["title"] in roadmap
+for number in MERGED_PRS:
+    value = json.loads(subprocess.check_output([
+        "gh", "pr", "view", str(number), "--repo", "Shuang-su/Livecho",
+        "--json", "number,state,mergedAt,mergeCommit,url",
+    ], text=True))
+    assert value["state"] == "MERGED" and value["mergeCommit"]["oid"]
+print({"issues": len(captured),
+       "direct_edges": sum(len(v["dependencies"]) for v in captured),
+       "roadmap_differences": differences,
+       "proposal_title_only": 1,
+       "merged_prs_checked": len(MERGED_PRS),
+       "AUDIT_PASS": not differences})
+assert not differences
+```
+
+Result: 23 Issues, 62 direct edges, 0 roadmap differences, #31 title-only OPEN,
+23 merged PRs checked (`#20`–`#26`, `#32`–`#34`, `#41`–`#42`, `#44`–`#54`),
+`AUDIT_PASS`.
+
+### Automated verification
+
+| Exact command | Result | Date/tree |
+| --- | --- | --- |
+| `uv run python /tmp/livecho-issue30-index-audit.py` | `AUDIT_PASS`; local links 564; external 46; stable IDs 130; IDX 70; unresolved 0; CTRL owners 30; false-complete none | 2026-11-15 / `issue/30-requirements-index-impl` @ `c8ee4a1` + docs |
+| `uv run python /tmp/livecho-issue30-dependency-audit.py` | `AUDIT_PASS`; 23 Issues; 62 edges; 0 roadmap diffs; 23 merged PRs | 2026-11-15 |
+| `git diff --quiet origin/main -- docs/changes/30-requirements-evidence-index/intent.md docs/changes/30-requirements-evidence-index/spec.md docs/changes/30-requirements-evidence-index/plan.md` | Exit 0 (accepted artifacts unchanged) | 2026-11-15 |
+| `git diff --check` / `git diff --cached --check` | Exit 0 | 2026-11-15 |
+| `make artifacts` | `change artifacts: ok` | 2026-11-15 |
+| `make verify` | Passed: Ruff; mypy 149 files; TS typecheck; pytest 935 passed (1 deselected); protocol Vitest 262; Railway Vitest 63; web Vitest 51; artifacts ok; protocol codegen ok; web build ok | 2026-11-15 |
+| `git diff --name-only origin/main` | Exactly allowlisted four paths | 2026-11-15 |
+
+### Remaining blockers (not claimed done)
+
+- Product/runtime: real MLX/#5 ADR, #8 host/FFmpeg, live `BILI-ACQ-001`/rights,
+  #9 `synthetic_mlx`, #10 wire/protocol minor/#29/#16, provider Railway environments,
+  M2 identity/gateway, #27/#28. Index maintenance does not enable those capabilities.
+- Process: independent human reviewer (plan step 8) and owner merge of this draft PR.
+  No auto-close of Issue #30 from this change.
