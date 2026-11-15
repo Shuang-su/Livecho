@@ -100,3 +100,84 @@ No product implementation, accepted-artifact rewrite, or policy relaxation.
 
 Not deployed. All production switches remain unchanged and disabled. This documentation
 does not authorize a model download, hardware run, real worker audio, or public output.
+
+## Guarded implementation port verification — 2026-11-15
+
+Implementer: Cursor Auto (cloud agent). Base: current `main` at
+`d73f2e27f8c431cdf2f00df8dc9ca70af4426e95` (includes merged Issue #9 fixture slice).
+Branch: `issue/5-asr-benchmark-impl`.
+
+### Prior work reviewed (not approved evidence)
+
+Parked closed draft PR [#36](https://github.com/Shuang-su/Livecho/pull/36) on
+`codex/issue-5-asr-benchmark-impl` (head `a78837e`, reviewed implementation
+`491c0bb`) was inspected as prior art only. This PR does **not** merge that
+46-commit history. Reviewed trees under `tools/asr_benchmark/`,
+`tests/asr_benchmark/`, and `benchmarks/asr/README.md` were ported onto current
+main as a new branch, then integrity checks were tightened for coarse-timestamp
+Linux filesystems (content re-hash on promote/finish/validate) so same-size
+mutation tests remain honest. Accepted `intent.md` / `spec.md` / `plan.md` were
+not rewritten. Old publication-reconciliation evidence from #36 is not reused as
+runtime acceptance.
+
+### Commands and results
+
+```sh
+make asr-benchmark-check
+```
+
+Exit 0. Ruff/mypy ok; `608 passed` under `tests/asr_benchmark`.
+
+```sh
+make verify
+```
+
+Exit 0. Notable: mypy ok (90 source files); `uv run pytest -q -m "not stress"` →
+`771 passed, 1 deselected`; protocol/web/railway tests and build ok;
+`change artifacts: ok`; `protocol generated artifacts: ok`.
+
+```sh
+git diff --check
+```
+
+Exit 0.
+
+```sh
+uv run python -m tools.asr_benchmark prepare-models --manifest demo-manifest --source huggingface
+uv run python -m tools.asr_benchmark preflight --manifest demo-manifest
+uv run python -m tools.asr_benchmark run --manifest demo-manifest
+```
+
+Each exits **2** with JSON
+`state=blocked_evidence` and reasons
+`reviewed_manifest_unavailable`, `independent_mlx_adapter_unavailable`,
+`approved_corpus_unavailable`, `protected_host_evidence_unavailable`.
+No model download, audio, or scoring runs.
+
+### What this PR implements (Linux/CI-safe)
+
+- Closed manifest/report/metric/decision contracts and synthetic text tests
+- PassPlan coordinator, supervisor, preparation/cache/transfer doubles
+- Hugging Face HTTPS/Range preparation shaping (tests inject streams; no live fetch in CI)
+- Model-only cache / converted store / verified readers with content integrity
+- Blocked CLI registry (`prepare-models` / `preflight` / `run`)
+- `make asr-benchmark-check`
+
+### Remaining acceptance gates (not claimed; not waived)
+
+- Owner-approved immutable preparation + final inference manifests (exact asset
+  digests, conversion map, licenses) and a non-empty execution registry
+- **Independent MLX Qwen adapter** (quantize/load/transcribe) with dependency pin
+  evidence — cannot be measured on this Linux CI host
+- **ModelScope** official HTTP contract still missing → no ModelScope adapter/fallback
+- Qualified 60-script consenting-speaker corpus with in-RAM-only audio acquisition
+- Trusted **M3 Ultra** protected-host evidence: no-paging/no-dump, cold/warm full
+  matrices for 1/2/4/6 s windows, ≥3 repetitions, RTF/memory/latency percentiles,
+  CER/boundary/partial gates
+- Owner-approved **model-decision ADR** (`qualified_1_7b` / `qualified_0_6b` /
+  `neither_qualifies` / `blocked_evidence`)
+- No production, Bilibili, account, worker, or Issue #9 `synthetic_mlx` enablement
+
+Hardware/manual gates require an authorized Apple Silicon operator on a reviewed
+commit; this agent does not access user machines or paid services for that evidence.
+Missing hardware evidence keeps the Issue open and selection blocked.
