@@ -312,3 +312,76 @@ Not deployed. No production/source/model/worker enrollment gate is enabled.
   exit 0, only `docs/changes/9-local-caption-vertical/evidence.md`.
   No code or runtime tests were rerun for this review record. Final hosted CI and
   owner/delegated-owner merge remain separate gates before implementation.
+
+## Fixture-only implementation verification — 2026-11-15
+
+Implementer: Cursor Auto (cloud agent). Scope is the accepted first slice only:
+`fixture_timeline` text schedule → v1 validation → backend timeline → loopback
+`GET /api/viewer/ws`. `synthetic_mlx` remains closed with `blocked_evidence`.
+No real MLX, audio, worker endpoint, lease, #6/#8 runtime, accounts, history, or
+production gate was enabled. Accepted `intent.md` / `spec.md` / `plan.md` were
+not rewritten; this section appends verification only.
+
+### Commands and results
+
+From the Issue #9 worktree on branch `issue/9-local-caption-vertical`:
+
+```sh
+make local-vertical-check
+```
+
+Exit 0. `57 passed in 73.96s` (includes `@pytest.mark.stress` twenty-viewer run).
+
+```sh
+make local-vertical-demo
+```
+
+Exit 0. Stdout ends with `[STATUS] stopped` then
+`{"outcome": "fixture_complete", "terminal_status": "stopped", ... "real_asr_evidence": false, ...}`.
+Demo client waits for `stopped`/`failed`, not `stopping`.
+
+```sh
+make verify
+```
+
+Exit 0. Notable lines: ruff ok; mypy `Success: no issues found in 43 source files`;
+`uv run pytest -q -m "not stress"` → `163 passed, 1 deselected`; pnpm web/protocol/railway
+tests and build ok; `change artifacts: ok`; `protocol generated artifacts: ok`.
+Stress saturation remains excluded from `make verify` (same pattern as #11).
+
+```sh
+make artifacts && git diff --check
+```
+
+Exit 0. `change artifacts: ok`.
+
+```sh
+PYTHONPATH=packages/protocol/python:services/backend/src \
+  uv run python -m livecho_backend.local_vertical --mode synthetic_mlx
+```
+
+Exit 2. JSON payload includes `"outcome": "blocked_evidence"`,
+`"mode": "synthetic_mlx"`, `"real_asr_evidence": false`. No fixture session starts.
+
+#11 companion page integration (proxy/contract only; no browser E2E claimed here):
+`apps/web/vite.config.ts` proxies `/api` to `ws://127.0.0.1:8787`; `App.tsx` uses
+`/api/viewer/ws`. A loopback `--server-only` backend on `:8787` plus
+`run_demo_client` returned `DemoClientResult(exit_code=0, terminal_status='stopped')`.
+`pnpm --filter @livecho/web test` → `51 passed`.
+
+### Implemented vs deferred
+
+Implemented in this PR: fixture mode gates; loopback viewer WS; origin allowlist;
+20-viewer / queue / 500 ms send bounds; pre-terminal drain + exact-next clear-send;
+fresh admission only when no mutable object is open; 2 s mutable admission interval;
+1 s final deadline; resume/resync; status reason mapping; payload-free observations;
+`make local-vertical-check` / `make local-vertical-demo`.
+
+Remaining blockers (not waived):
+
+- **#6**: no worker endpoint, enrollment, lease, or worker-owned output sequencing.
+- **#8**: no PCM/decoder/segment handle, ownership inventory, or no-persistence audio
+  evidence; application queue caps are not kernel/socket buffer proof.
+- **#5 / model ADR / execution registry**: required before any authorized
+  `synthetic_mlx` run; missing evidence stays a failed gate, not a pass.
+- Real ASR partial/latency acceptance and production/public listeners stay off.
