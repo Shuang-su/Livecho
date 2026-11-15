@@ -372,3 +372,51 @@ def test_transient_text_scoring_discards_text_from_report() -> None:
     assert scored.substitutions == scored.deletions == scored.insertions == 0
     assert all(span.exact.numerator == span.exact.denominator for span in scored.targets)
     assert script.reference not in scored.model_dump_json()
+    assert scored.failure is None
+
+
+def test_score_script_maps_segment_failure_onto_script_failure() -> None:
+    script = corpus().scripts[0]
+    observations = []
+    for start in range(0, script.duration_ns // NS, 6):
+        base = timing(6, origin=start * NS)
+        calls = list(base.calls)
+        if start == 0:
+            slow = calls[-1].model_copy(
+                update={"execution_end_ns": calls[-1].execution_start_ns + 11 * NS}
+            )
+            calls[-1] = slow
+            base = base.model_copy(
+                update={"calls": tuple(calls), "tf_ns": max(base.tf_ns, slow.execution_end_ns)}
+            )
+        chunk = script.reference[start // 6 * 20 : (start // 6 + 1) * 20]
+        observations.append(
+            SegmentText(
+                start_ns=start * NS,
+                end_ns=(start + 6) * NS,
+                partials=tuple(chunk[: min(i, len(chunk))] for i in range(1, 24)),
+                final=chunk,
+                timing=base,
+            )
+        )
+    scored = score_script(script, tuple(observations), 6)
+    assert scored.failure == "provider_timeout"
+    assert scored.segments[0].failure == "provider_timeout"
+
+
+def test_script_level_failure_alone_fails_cold_sample() -> None:
+    good = report()
+    failed = alter_run(
+        good,
+        0,
+        cold=good.repetitions[0].cold.model_copy(
+            update={
+                "score": good.repetitions[0].cold.score.model_copy(
+                    update={"failure": "provider_failure"}
+                )
+            }
+        ),
+    )
+    decision = evaluate(failed)
+    assert decision.state == "qualified_0_6b"
+    assert any(item.endswith("cold_failed_sample") for item in decision.failed_1_7b)

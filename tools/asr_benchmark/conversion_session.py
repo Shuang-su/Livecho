@@ -17,7 +17,7 @@ from pydantic import ValidationError
 from .cache_reader import VerifiedModelReader
 from .contracts import PreparationManifest
 from .conversion import ConversionBackend, ConvertedTensor, TensorShape, convert_verified_tensors
-from .http_transfer import HTTPSResponse, ModelResponse
+from .http_transfer import ModelResponse, transport_not_injected
 from .model_cache import ModelOnlyCache
 from .preparation import TransferProgress
 from .preparation_run import prepare_sources
@@ -150,7 +150,7 @@ async def conversion_session[T](
     cache: ModelOnlyCache,
     backend: PreparationConversionBackend[T],
     *,
-    response_factory: Callable[[], ModelResponse] = HTTPSResponse,
+    response_factory: Callable[[], ModelResponse] = transport_not_injected,
     clock: Callable[[], int] = time.monotonic_ns,
     sleep: Callable[[float], Awaitable[None]] = asyncio.sleep,
     progress: Callable[[TransferProgress], None] | None = None,

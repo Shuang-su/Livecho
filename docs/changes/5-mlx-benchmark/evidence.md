@@ -181,3 +181,50 @@ No model download, audio, or scoring runs.
 Hardware/manual gates require an authorized Apple Silicon operator on a reviewed
 commit; this agent does not access user machines or paid services for that evidence.
 Missing hardware evidence keeps the Issue open and selection blocked.
+
+## 2026-11-15 — Critical review hardening (PR #46, same branch)
+
+Implementer: Cursor Auto (cloud agent). Review of the #36-ported tree against
+accepted #5 artifacts and current `main`. “Reviewed” on the closed draft is
+**not** treated as owner approval or hardware evidence.
+
+### Findings fixed on this PR
+
+1. **Important / safety default** — `download_asset` / `prepare_sources` /
+   `conversion_session` used `HTTPSResponse` as the default `response_factory`,
+   so omitting the kwarg could open TLS sockets. Defaults now call
+   `transport_not_injected()` → `BlockedEvidence("transport_not_injected")`.
+   Explicit `HTTPSResponse` remains operator opt-in only.
+2. **Important / scoring contract** — `score_script` left `ScriptScore.failure`
+   unset even when segments failed (`provider_timeout` / mapped
+   `provider_failure`). Propagated so report-level cold failure is not relying
+   solely on nested segment inspection for this path.
+3. **Regression coverage** — fail-closed transport (no `open_connection`),
+   same-size+mtime-restored partial refuse promotion, script failure mapping /
+   evaluate cold failure.
+
+### Commands and results
+
+```sh
+make asr-benchmark-check
+```
+
+Exit 0. `614 passed` under `tests/asr_benchmark`.
+
+```sh
+make verify
+```
+
+Exit 0. `uv run pytest -q -m "not stress"` → `777 passed, 1 deselected`.
+
+CLI prepare/preflight/run still exit **2** / `blocked_evidence`. No live
+download, audio, MLX, or hardware claims. Issue #5 remains open; real execution
+gates remain closed.
+
+### Residual (not blocking CI-safe merge of this control-plane slice)
+
+- `evaluate()` trusts persisted report edit counts (text is discarded by design);
+  tampered-on-disk reports are an operator-host concern, not CI import risk.
+- Live `HTTPSResponse` still exists for trusted opt-in; never exercised by
+  defaults or CI.
+- Apple Silicon / MLX / ModelScope / corpus / ADR gates unchanged and unmet.

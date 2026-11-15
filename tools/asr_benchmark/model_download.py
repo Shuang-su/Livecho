@@ -16,9 +16,9 @@ from .contracts import NS, PreparationManifest
 from .http_transfer import (
     CHUNK_LIMIT,
     DownloadFailure,
-    HTTPSResponse,
     ModelResponse,
     model_request,
+    transport_not_injected,
     validate_response,
 )
 from .model_cache import ModelCacheEntry, ModelOnlyCache
@@ -91,7 +91,7 @@ async def download_asset(
     asset_path: str,
     cache: ModelOnlyCache,
     *,
-    response_factory: Callable[[], ModelResponse] = HTTPSResponse,
+    response_factory: Callable[[], ModelResponse] = transport_not_injected,
     clock: Callable[[], int] = time.monotonic_ns,
     sleep: Callable[[float], Awaitable[None]] = asyncio.sleep,
     progress: Callable[[TransferProgress], None] | None = None,

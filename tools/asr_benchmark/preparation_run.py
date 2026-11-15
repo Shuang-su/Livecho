@@ -8,7 +8,7 @@ from typing import Literal
 
 from .cache_reader import VerifiedModelReader
 from .contracts import PreparationManifest
-from .http_transfer import HTTPSResponse, ModelResponse
+from .http_transfer import ModelResponse, transport_not_injected
 from .model_cache import ModelOnlyCache
 from .model_download import download_asset
 from .preparation import TransferProgress
@@ -21,7 +21,7 @@ async def prepare_sources(
     mode: Literal["huggingface", "modelscope"],
     cache: ModelOnlyCache,
     *,
-    response_factory: Callable[[], ModelResponse] = HTTPSResponse,
+    response_factory: Callable[[], ModelResponse] = transport_not_injected,
     clock: Callable[[], int] = time.monotonic_ns,
     sleep: Callable[[float], Awaitable[None]] = asyncio.sleep,
     progress: Callable[[TransferProgress], None] | None = None,

@@ -143,6 +143,15 @@ class ModelResponse(Protocol):
     def close(self) -> None: ...
 
 
+def transport_not_injected() -> ModelResponse:
+    """Fail-closed default: preparation APIs must receive an explicit transport.
+
+    A live ``HTTPSResponse`` is only constructed by a trusted operator who opts in.
+    Library defaults must not open sockets when a factory is omitted.
+    """
+    raise BlockedEvidence("transport_not_injected")
+
+
 class HTTPSResponse:
     """TLS verification on, fixed authority, no environment proxy/token/URL integration."""
 

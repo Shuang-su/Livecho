@@ -136,6 +136,26 @@ def score_script(
         target.kind for target in script.targets if target_exact(edits, target.start, target.end)
     )
     boundaries = boundary_counts(script.reference, hypothesis, intervals)
+    # Segment reasons are a strict subset of script-level reasons; map the rest.
+    script_failure: (
+        Literal[
+            "input_stall",
+            "provider_timeout",
+            "invalid_timing",
+            "budget_exceeded",
+            "digest_failure",
+            "cancelled",
+            "provider_failure",
+        ]
+        | None
+    ) = None
+    for segment in segments:
+        if segment.failure == "provider_timeout":
+            script_failure = "provider_timeout"
+            break
+        if segment.failure is not None:
+            script_failure = "provider_failure"
+            break
     return ScriptScore(
         script_id=script.script_id,
         substitutions=errors.substitutions,
@@ -158,4 +178,5 @@ def score_script(
             denominator=boundaries.reference_characters,
         ),
         segments=tuple(segments),
+        failure=script_failure,
     )
