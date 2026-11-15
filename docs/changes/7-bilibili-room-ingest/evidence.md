@@ -72,3 +72,66 @@ edit, or production enablement.
 ## Release and rollback evidence
 
 Not deployed. No production ingest, channel, or worker disclosure gate is enabled.
+
+## 2026-11-15 — Fixture/metadata/state implementation
+
+Implementer: Cursor Auto (cloud agent). Base: `main` at
+`c1e9eb4c126d6244a40c8d29d34a554330ce7110` (merged #7 artifacts). Branch:
+`issue/7-bilibili-ingest-impl`. Accepted intent/spec/plan were **not** rewritten.
+
+### What landed (CI-safe only)
+
+- `services/backend/src/livecho_backend/ingest/` — actor gates, empty acquisition/
+  rights/encoded registries, in-memory kill switch/denylist (starts disabled),
+  selector→canonical `room_id`, fixture eligibility, offline SSRF URL policy,
+  owner-serialized OFFLINE→STARTING→LIVE→STALLED→RECONNECTING→ENDED session with
+  backoff caps (≤8 attempts, ≤120_000 ms wall), RAM-only locators/tokens, payload-free
+  status events
+- Desensitized metadata fixtures (no URLs/cookies/tokens)
+- `tests/ingest/` + `make ingest-check`
+- Playback-URL→#8 handoff always returns `encoded_admission_missing`; real
+  `start_real` returns `acquisition_channel_unselected`
+
+### Caps recorded
+
+| Cap | Value |
+| --- | ---: |
+| `MAX_RECONNECT_ATTEMPTS` | 8 |
+| `MAX_RECONNECT_WALL_MS` | 120_000 |
+| `BACKOFF_BASE_MS` | 250 |
+| `BACKOFF_CAP_MS` | 8_000 |
+
+### Critical-review notes / fixes
+
+- Empty registries remain empty; admin `enable_global` refuses without evidence
+- Import/fixture paths open no sockets (regression)
+- Fixtures scanned for URL/token/cookie substrings
+- Reconnect clears prior locators before replacement; wall-budget exhaustion ends
+- mypy narrowing on enum equality fixed in tests
+- CI flake: `#9` `test_sequence_and_revision_basics` regenerated immutable
+  `occurred_at` across revisions (second-boundary → `revision_immutable`). Shared
+  stamp + regression `test_revision_rejects_occurred_at_mutation`
+
+### Commands and results
+
+```sh
+make ingest-check
+```
+
+Exit 0. `17 passed`. Message: real network/channel/rights/audio pending.
+
+```sh
+make protocol-check && git diff --check && make verify
+```
+
+Exit 0. Protocol unchanged. `909 passed, 1 deselected`.
+
+### Remaining acceptance gates (not claimed; not waived)
+
+- Owner-selected `BILI-ACQ-001` channel + host allowlist
+- Rights evidence rows; `BILI-DEC-001` production enablement
+- #8 encoded admission + `audio_budget_unverified` clearance
+- Trusted-host live probe (never untrusted CI)
+- #28 worker PCM disclosure; #10 danmaku (out of scope)
+
+Issue #7 stays open until remaining gates and live acceptance criteria are met.

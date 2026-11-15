@@ -57,6 +57,7 @@ def transcript_message(
     text: str,
     is_final: bool,
     start_ms: int = 1_000,
+    occurred_at: str | None = None,
 ) -> dict[str, object]:
     seq = timeline.allocate_seq()
     return {
@@ -71,7 +72,8 @@ def transcript_message(
         "epoch": str(timeline.epoch),
         "seq": str(seq),
         "revision": str(revision),
-        "occurred_at": utc_stamp(),
+        # occurred_at is immutable across revisions of the same event_id.
+        "occurred_at": occurred_at if occurred_at is not None else utc_stamp(),
         "payload": {
             "segment_id": event_id,
             "start_ms": start_ms,
@@ -89,17 +91,59 @@ def test_sequence_and_revision_basics() -> None:
     assert decision.accepted and timeline.next_seq == 2
     assert timeline.session_status == "starting" and timeline.reason_code is None
     event_id = str(uuid4())
+    occurred_at = utc_stamp()
     partial = timeline.accept_timeline_event(
-        transcript_message(timeline, event_id=event_id, revision=1, text="partial…", is_final=False)
+        transcript_message(
+            timeline,
+            event_id=event_id,
+            revision=1,
+            text="partial…",
+            is_final=False,
+            occurred_at=occurred_at,
+        )
     )
     assert partial.accepted and timeline.mutable is not None
     final = timeline.accept_timeline_event(
         transcript_message(
-            timeline, event_id=event_id, revision=2, text="partial text complete", is_final=True
+            timeline,
+            event_id=event_id,
+            revision=2,
+            text="partial text complete",
+            is_final=True,
+            occurred_at=occurred_at,
         )
     )
     assert final.accepted and timeline.mutable is None
     assert timeline.next_seq == 4
+
+
+def test_revision_rejects_occurred_at_mutation() -> None:
+    """Regression: clock tick must not mutate immutable occurred_at across revisions."""
+    timeline = new_timeline()
+    event_id = str(uuid4())
+    first = timeline.accept_timeline_event(
+        transcript_message(
+            timeline,
+            event_id=event_id,
+            revision=1,
+            text="partial…",
+            is_final=False,
+            occurred_at="2026-01-01T00:00:00.000Z",
+        )
+    )
+    assert first.accepted
+    second = timeline.accept_timeline_event(
+        transcript_message(
+            timeline,
+            event_id=event_id,
+            revision=2,
+            text="partial text complete",
+            is_final=True,
+            occurred_at="2026-01-01T00:00:01.000Z",
+        )
+    )
+    assert not second.accepted
+    assert second.code.value == "revision_immutable"
 
 
 def test_second_mutable_object_is_rejected() -> None:

@@ -1,0 +1,8 @@
+{
+  "room_id": "123456",
+  "live": false,
+  "access": "free_anonymous",
+  "geo_ok": true,
+  "drm_ok": true,
+  "rate_ok": true
+}
