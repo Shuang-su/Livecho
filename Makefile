@@ -1,4 +1,4 @@
-.PHONY: bootstrap build dev lint test typecheck verify artifacts protocol-generate protocol-check railway-check railway-start-web railway-start-backend railway-run-maintenance railway-migrate
+.PHONY: bootstrap build dev lint test typecheck verify artifacts protocol-generate protocol-check web-check railway-check railway-start-web railway-start-backend railway-run-maintenance railway-migrate
 
 bootstrap:
 	uv sync --all-groups --frozen
@@ -31,6 +31,14 @@ protocol-generate:
 
 protocol-check:
 	uv run python tools/protocol_codegen.py --check
+
+web-check:
+	pnpm --filter @livecho/web lint
+	pnpm --filter @livecho/web typecheck
+	pnpm --filter @livecho/web test
+	pnpm --filter @livecho/web build
+	pnpm --filter @livecho/web test:stress
+	pnpm --filter @livecho/web test:e2e
 
 railway-check:
 	pnpm --filter @livecho/railway-config lint

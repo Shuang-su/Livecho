@@ -1,5 +1,114 @@
 # Evidence: Subtitle companion Web/PWA
 
+## Fixture-only UI implementation — 2026-11-14
+
+- Implementer: Cursor cloud agent (GLM 5.3), implementation run on branch
+  `cursor/issue-11-subtitle-web-9d19` from main `71055ee` (merged PR #42 artifacts).
+- Read before any code: AGENTS, CONTRIBUTING, all four accepted #11 artifacts,
+  the accepted #9 artifacts (endpoint/reason/mode contract), the #3 protocol
+  spec, the existing protocol package sources and generation tools, the root
+  Makefile and workspace manifests, and the current remote Issue #11 body via
+  `gh issue view 11` (exit 0). Exposure: this repository only, plus public npm
+  registry metadata (versions and peer ranges) used to pin new dependencies.
+  No reference repository, external screenshots, generated summaries, upstream
+  code, or audio/model artifacts were consulted or introduced.
+- Implemented on the accepted artifacts' first slice only: `apps/web/` PWA
+  (single-room view, provisional row plus four recent finals, safe status/reason
+  labels, dismissible gap/overflow/undisplayed notices, session-only 0-5,000 ms
+  display delay in 100 ms steps, bounded presentation queues, immediate clearing
+  on disconnect/stop/disable/delete/failure), the minimum browser-safe
+  `@livecho/protocol/browser` shared entry refactor with generated bundled
+  schemas and a synchronous pure SHA-256 adapter, a contract-conformant local
+  `fixture_timeline` server double for tests and the offline shell-only service
+  worker with a build-produced allowlist, plus `make web-check`.
+- Deliberately not implemented (owned elsewhere or out of scope): the #9 backend
+  service itself (not present on main; integration is validated against the
+  accepted contract through the fixture server double under `apps/web/scripts/`,
+  which mounts the exact same-origin `/api/viewer/ws` handshake), danmaku/Super
+  Chat (#29), history/persistence/worker management/raw payloads, accounts,
+  deployment or production enablement (#7/#27 unchanged), and any model, audio,
+  worker, or MLX execution.
+
+### Exact verification commands and results (run 2026-11-14)
+
+| Exact command | Observed result |
+| --- | --- |
+| `make bootstrap` | Exit 0 (uv 0.12.1, Python 3.12 env, pnpm 11.21.0, 143 lockfile entries) |
+| `make verify` (plain, branch `cursor/issue-11-subtitle-web-9d19`) | Fails only at the artifact lifecycle branch-name check: `change branch must match codex/issue-<number>-<slug> or issue/<number>-<slug>` (see Deviations); every lint, typecheck, test, protocol and build step before it passes |
+| `LIVECHO_HEAD_REF=issue/11-subtitle-web make verify` | Exit 0: ruff clean, mypy clean, pytest 107 passed, protocol 262 tests, railway 63 tests, web unit 51 tests, `change artifacts: ok`, `protocol generated artifacts: ok`, all four workspace projects build |
+| `make protocol-check` | `protocol generated artifacts: ok` (now also byte-checks the generated `packages/protocol/src/generated/schemas.ts`) |
+| `make web-check` | Exit 0: web lint + typecheck (three tsconfig projects), 51 unit tests, production build, 20-viewer stress run, and 12 Playwright E2E tests |
+| `pnpm --filter @livecho/web test` | `Tests 51 passed (51)` |
+| `pnpm --filter @livecho/web test:stress` | `Tests 1 passed (1)` in 62.6 s (details below) |
+| `pnpm --filter @livecho/web test:e2e` | `12 passed (1.1m)` (Playwright 1.64.1, Chromium headless shell 156.0.8078.4) |
+| `pnpm --filter @livecho/protocol test` | `Tests 262 passed (262)` and `browser entry: ok (6 modules, no Node built-ins, shared core reachable)` |
+| `git diff --check` (staged before each commit) | Exit 0 |
+| Production bundle scan | `dist/sw.js` contains no Node built-in; the only `/node:[a-z]/` match in `dist/assets/main-*.js` is the object literal `node:n` inside React DOM code, not an import; no filesystem or schema read remains in the browser bundle |
+
+E2E coverage: connect/live/partial-replaces-in-place/final-fixates/four-final
+retention, keyboard delay control at 0 and 5,000 ms (display-only; displayed
+finals never hidden), 360x800 and 1280x800 layouts with no horizontal scroll,
+200 % page zoom, near-4,096-scalar long-text layout, stop (`ingest_disabled`),
+deletion (`session_deleted`), failure (`protocol_failed`) hiding text ahead of a
+maximum delay, refused-cursor resync with the exact gap notice and dismissal,
+offline shell reload with no timeline data in DOM, Service Worker cache
+(only build-allowlisted shell URLs), localStorage/sessionStorage/IndexedDB
+(all empty of timeline data), API `Cache-Control: no-store`, and recovery when
+back online. Screenshots at both viewports and 200 % zoom are attached to the
+draft implementation pull request.
+
+### Twenty-viewer stress run (fixture fan-out only)
+
+`pnpm --filter @livecho/web test:stress`: 20 viewer sessions over one shared
+synthetic timeline for 62.6 s (19 segments at 3 s with partials): 18 fast
+viewers, one consuming once per second, one stalled for 28 s with a 5,000 ms
+delay. Recorded peaks and outcomes (`test-results/stress-summary.json`, not
+committed):
+
+- Fast viewers: all 18 applied an identical 38 accepted text mutations;
+  0 resyncs; worst client receive-to-render lag 0.34 ms on the local monotonic
+  clock; per-client queue peak 1 entry / 4,578 bytes.
+- Once-per-second viewer: 38 mutations applied, 0 resyncs, queue peak 1.
+- Stalled viewer: resumed to 38 mutations, queue peak 1, no gap claim needed.
+- All 20 clients ended on the terminal `stopped` status with displayed text
+  cleared; no client queue exceeded 128 entries or 262,144 bytes.
+
+This run proves UI isolation and bounded client queues only. No overflow
+resync occurred in the run (all queues stayed bounded); the overflow and
+fresh-resync paths are exercised deterministically by unit tests
+(`tests/unit/scheduler.test.ts`, `tests/unit/session.test.ts`). Nothing here
+is MLX, worker, audio, or end-to-end latency evidence, and no absolute
+worker-to-browser latency is claimed.
+
+### Deviations and limits
+
+1. Branch name: this environment requires `cursor/<descriptive-name>-9d19`
+   branches, which the artifact lifecycle check rejects in favor of
+   `codex/issue-<number>-<slug>` or `issue/<number>-<slug>`. Plain `make verify`
+   therefore fails on that check alone on this branch (the CI step sets
+   `LIVECHO_HEAD_REF` to the same environment-mandated name). Running the same
+   suite with `LIVECHO_HEAD_REF=issue/11-subtitle-web` exits 0, proving the
+   content satisfies the accepted-artifact gate; the name mismatch is the only
+   failure and is recorded here rather than hidden.
+2. Backend integration: the accepted plan's step 7 targets #9's fixture mode at
+   `/api/viewer/ws`, but the #9 backend service does not exist on main yet.
+   This PR ships the client contract implementation and validates it against a
+   fixture server double that speaks the accepted handshake, reason mapping,
+   fresh-admission window, cursor-resume refusal, and bounded fan-out caps.
+   Real #9 integration remains open with that Issue.
+3. `pnpm-workspace.yaml` briefly carried an auto-added `allowBuilds: esbuild`
+   entry during development; the Railway supply-chain contract test forbids any
+   `allowBuilds`/`onlyBuiltDependencies` key, so it was removed. Installs run
+   through `make bootstrap` with `--ignore-scripts`, which also covers esbuild.
+4. The browser hash adapter is a small synchronous pure-TypeScript SHA-256
+   (FIPS 180-4 vectors and 127-case browser golden parity pinned in tests)
+   rather than asynchronous Web Crypto, so one shared synchronous acceptance
+   implementation serves both entries without a serialized async path.
+
+No real model partial output, real latency acceptance, worker readiness, audio
+evidence, production enablement, or deployment is claimed anywhere in this
+batch. Issue #11 remains open pending owner review.
+
 ## Scope clarification author exposure — 2026-10-30
 
 - Author: Codex GUI `/root/subtitle_author_sol_20261029`, independent requirements

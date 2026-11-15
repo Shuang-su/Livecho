@@ -1,0 +1,24 @@
+{
+  "name": "Livecho captions",
+  "short_name": "Livecho",
+  "description": "Standalone single-room caption companion (synthetic demonstration).",
+  "start_url": ".",
+  "scope": ".",
+  "display": "standalone",
+  "background_color": "#101418",
+  "theme_color": "#101418",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-maskable.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ]
+}
