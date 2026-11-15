@@ -1,4 +1,4 @@
-.PHONY: bootstrap build dev lint test typecheck verify artifacts protocol-generate protocol-check web-check local-vertical-check local-vertical-demo railway-check railway-start-web railway-start-backend railway-run-maintenance railway-migrate
+.PHONY: bootstrap build dev lint test typecheck verify artifacts protocol-generate protocol-check web-check local-vertical-check local-vertical-demo asr-benchmark-check railway-check railway-start-web railway-start-backend railway-run-maintenance railway-migrate
 
 bootstrap:
 	uv sync --all-groups --frozen
@@ -55,6 +55,12 @@ local-vertical-check:
 
 local-vertical-demo:
 	PYTHONPATH=packages/protocol/python:services/backend/src uv run python -m livecho_backend.local_vertical --segments 2
+
+asr-benchmark-check:
+	uv run ruff check tools/asr_benchmark tests/asr_benchmark
+	uv run ruff format --check tools/asr_benchmark tests/asr_benchmark
+	uv run mypy tools/asr_benchmark tests/asr_benchmark
+	uv run pytest -q tests/asr_benchmark
 
 railway-start-backend:
 	@echo "Backend runtime is not implemented; Issue #9 owns this entry point." >&2
