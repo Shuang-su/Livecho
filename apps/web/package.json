@@ -10,6 +10,7 @@
     "test": "vitest run",
     "test:stress": "vitest run --config vitest.stress.config.ts",
     "test:e2e": "pnpm build && playwright test",
+    "test:e2e:python": "pnpm build && playwright test -c playwright.python.config.ts",
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.stress.json && tsc --noEmit -p tsconfig.node.json",
     "demo": "pnpm build && node scripts/fixture-server.mjs --root dist"
   },

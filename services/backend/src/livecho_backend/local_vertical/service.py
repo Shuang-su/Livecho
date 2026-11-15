@@ -8,9 +8,11 @@ import time
 import uuid
 from collections.abc import Callable
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi.staticfiles import StaticFiles
 from livecho_protocol.compatibility import negotiate_viewer
 from livecho_protocol.errors import ProtocolValidationError, StableCode
 from livecho_protocol.models import (
@@ -283,6 +285,16 @@ class LocalVerticalService:
         await self.publish_status("stopping", force=True)
         await self.publish_status("stopped", force=True)
 
+    async def force_disconnect_viewers(self) -> None:
+        """Close every active viewer socket without stopping the fixture schedule.
+
+        Domains are retained by the websocket handler finally-block so a stale
+        cursor resume can be refused after the timeline advances.
+        """
+        for connection in list(self.registry.active.values()):
+            with contextlib.suppress(Exception):
+                await connection.close_socket()
+
     async def close_ingest(self) -> None:
         await self._invalidate_schedule()
         await self.publish_status("stopped", "ingest_disabled", force=True)
@@ -320,7 +332,8 @@ class LocalVerticalService:
             return
         await websocket.accept(subprotocol=VIEWER_PROTOCOL)
         connection = ViewerConnection(
-            send_json=lambda payload: websocket.send_bytes(payload),
+            # Protocol v1: JSON control is one UTF-8 object per WebSocket text frame.
+            send_json=lambda payload: websocket.send_text(payload.decode("utf-8")),
             close_socket=lambda: websocket.close(code=1000),
             observations=self.observations,
         )
@@ -420,7 +433,7 @@ class LocalVerticalService:
             },
             ProtocolErrorV1,
         )
-        await websocket.send_bytes(canonical_json(frame.model_dump(mode="json")))
+        await websocket.send_text(canonical_json(frame.model_dump(mode="json")).decode("utf-8"))
         await websocket.close(code=1000)
 
     async def _admit_fresh(self, websocket: WebSocket, connection: ViewerConnection) -> bool:
@@ -451,9 +464,9 @@ class LocalVerticalService:
                 ViewerReadyV1,
             )
             connection.next_seq = status_seq
-            await websocket.send_bytes(canonical_json(ready.model_dump(mode="json")))
+            await websocket.send_text(canonical_json(ready.model_dump(mode="json")).decode("utf-8"))
             status_wire = canonical_json(status_message)
-            await websocket.send_bytes(status_wire)
+            await websocket.send_text(status_wire.decode("utf-8"))
             connection.next_seq = status_seq + 1
             for _viewer_id, viewer in list(self.registry.active.items()):
                 if viewer is connection:
@@ -508,12 +521,20 @@ class LocalVerticalService:
             ViewerReadyV1,
         )
         connection.next_seq = live.next_seq
-        await websocket.send_bytes(canonical_json(ready.model_dump(mode="json")))
+        await websocket.send_text(canonical_json(ready.model_dump(mode="json")).decode("utf-8"))
         return True
 
 
-def create_local_vertical_app(service: LocalVerticalService) -> FastAPI:
-    """Create a loopback FastAPI application with the viewer WebSocket route."""
+def create_local_vertical_app(
+    service: LocalVerticalService,
+    *,
+    static_root: Path | None = None,
+) -> FastAPI:
+    """Create a loopback FastAPI application with the viewer WebSocket route.
+
+    When ``static_root`` points at a built ``apps/web/dist`` tree, the same
+    origin also serves the Issue #11 shell (fixture integration only).
+    """
 
     app = FastAPI(title="Livecho local vertical", docs_url=None, redoc_url=None)
     app.add_middleware(_NoStoreHeaders)
@@ -529,5 +550,12 @@ def create_local_vertical_app(service: LocalVerticalService) -> FastAPI:
             await websocket.close(code=1008)
             return
         await service.handle_viewer_websocket(websocket)
+
+    if static_root is not None:
+        root = static_root.resolve()
+        if not root.is_dir():
+            raise FileNotFoundError(f"static root does not exist: {root}")
+        # Registered after /health and the viewer WebSocket so those stay exact.
+        app.mount("/", StaticFiles(directory=str(root), html=True), name="shell")
 
     return app

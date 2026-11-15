@@ -167,6 +167,25 @@ def test_browser_origin_allowlist_is_exact() -> None:
     asyncio.run(scenario())
 
 
+def test_control_frames_are_websocket_text_not_binary() -> None:
+    """Protocol v1 requires JSON control as UTF-8 text frames (browser rejects binary)."""
+
+    async def scenario() -> None:
+        async with backend_server() as server:
+            await server.open_session()
+            viewer = await connect_viewer(server)
+            # websockets exposes the last frame opcode via the protocol after recv.
+            ready = await viewer.recv(decode=True)
+            assert isinstance(ready, str)
+            assert '"viewer.ready"' in ready or '"type":"viewer.ready"' in ready.replace(" ", "")
+            status = await viewer.recv(decode=True)
+            assert isinstance(status, str)
+            assert "viewer.timeline_event" in status
+            await viewer.close()
+
+    asyncio.run(scenario())
+
+
 def test_missing_subprotocol_is_refused_before_handshake() -> None:
     async def scenario() -> None:
         async with backend_server() as server:

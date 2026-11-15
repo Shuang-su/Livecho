@@ -20,7 +20,9 @@
     "vitest.config.ts",
     "vitest.stress.config.ts",
     "playwright.config.ts",
+    "playwright.python.config.ts",
     "scripts/**/*.d.mts",
-    "tests/e2e/**/*.ts"
+    "tests/e2e/**/*.ts",
+    "tests/e2e-python/**/*.ts"
   ]
 }

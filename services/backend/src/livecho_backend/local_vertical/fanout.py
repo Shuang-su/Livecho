@@ -133,6 +133,10 @@ class ViewerConnection:
                 self.stall_since = None
                 self._observations.record_send_interval((time.monotonic() - started) * 1_000)
 
+    async def close_socket(self) -> None:
+        """Close the underlying websocket; the service handler retains the domain."""
+        await self._close_socket()
+
     async def detach(self) -> None:
         if not self.open:
             return
