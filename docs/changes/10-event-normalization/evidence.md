@@ -2,68 +2,74 @@
 
 ## Artifact approval
 
-- Artifact PR: Pending (this documentation draft)
+- Artifact PR: [#52](https://github.com/Shuang-su/Livecho/pull/52) (documentation draft)
 - Approved by/date: Pending @Shuang-su review and merge
-- Base: `main` at `d3dae9f9472df274aba6bf3151b9b513b8a63456` (includes squash-merged #7
-  fixture ingest). Owning Issue #10 reread 2026-11-15.
+- Base: `main` at `d3dae9f9472df274aba6bf3151b9b513b8a63456`. Owning Issue #10 reread
+  2026-11-15; revised same day after parent feedback on unresolved protocol choice.
 - Branch: `issue/10-event-normalization`
+
+## Revision note (2026-11-15)
+
+Parent inspected head `2e07618` and required the immediate first implementation slice to
+be unambiguously **internal / offline / normalize-only**, without treating docs merge as
+selection of viewer `protocol_minor = 1`. All four artifacts were revised accordingly:
+minor-1 / Timeline publication moved to **deferred**; concrete fixture allowlists, caps,
+dedup, backpressure, and reject reasons specified for the first slice. This is a
+**sequencing** clarification under accepted v1—not protocol approval.
 
 ## Prior art (not approval)
 
-No merged `docs/changes/10-*` tree existed on `main` at documentation start. Accepted
-Issue #3 states v1.0 timeline payloads are transcript + session-status only; danmaku/SC
-fields were explicitly deferred. Issue #10 owner comment (2026-09-26) and Issue #31 are
-governance context for dedup/statistics—not authorization to ship live chat, raw
-archive, or silent protocol maps. Closed drafts elsewhere are not copied blindly.
+No prior merged `docs/changes/10-*`. Accepted #3: v1.0 timeline is transcript +
+session-status only. Issue #10 / #31 comments are governance context only. Closed
+drafts not copied blindly.
 
 ## Scope reconciliation
 
-| Topic | Issue #10 | Accepted deps | This artifact |
+| Topic | Issue #10 | Accepted deps | This artifact (revised) |
 | --- | --- | --- | --- |
-| Wire shape | Closed normalized danmaku/SC on timeline | #3: no arbitrary objects; v1.0 lacks danmaku/SC | Explicit protocol extension (recommend minor 1); defer if owner chooses internal-only |
-| Four events | danmaku, SC, status, transcript | Transcript/status exist | Add danmaku/SC contracts; keep status/transcript |
-| Raw archive | Strip secrets; #16 for durable | #2/#16 gates | No implicit DB/Bucket ON |
-| UI | Not this Issue | #11 caption/status; #29 danmaku UI | Out of scope |
-| Live chat | Feature flag; fixtures | #7 channel/rights OFF | Fixture-only CI |
+| First code slice | Normalize + privacy/dedup | #3 closed wire; #11 caption/status | Internal offline normalize only |
+| Wire danmaku/SC | Eventual closed payloads | Not on minor 0 | **Deferred**; docs merge does not select minor 1 |
+| Raw archive | Strip secrets; #16 durable | #2/#16 | Blocked; `archive_disabled` |
+| UI | Not this Issue | #29 display | Out of scope |
+| Live chat | Feature flag; fixtures | #7 OFF | Synthetic fixtures; adapter off |
 
 ## Requirements-author exposure and provenance
 
-- Author: Cursor Auto (cloud agent), 2026-11-15.
-- Livecho inputs: AGENTS.md, CONTRIBUTING.md, Issue #10 (+ owner comment), Issue #3
-  protocol models/spec, Issue #2 data classes, Issue #7/#11 boundaries, Issue #31
-  dedup/statistics notes as context only.
-- No live Bilibili chat, account signup, media/model download, paid API, user-machine
-  access, or fabricated protocol/rights approval was performed.
+- Author: Cursor Auto (cloud agent), 2026-11-15 (initial + revision).
+- Inputs: AGENTS.md, CONTRIBUTING.md, Issue #10 (+ comment), #2/#3/#7/#11 artifacts,
+  parent instruction to prefer internal-first sequencing.
+- No live chat, accounts, downloads, paid APIs, user-machine access, or fabricated
+  protocol/rights approval. Fixtures remain synthetic; upstream shape uncertainty
+  recorded in spec.
 
 ## Automated verification
 
 | Exact command | Result | Date/tree |
 | --- | --- | --- |
-| `make artifacts` | Exit 0; `change artifacts: ok` | 2026-11-15 / docs worktree on `d3dae9f` |
+| `make artifacts` | Exit 0; `change artifacts: ok` | 2026-11-15 / revision on `issue/10-event-normalization` |
 | `git diff --check` | Exit 0; no whitespace errors | 2026-11-15 |
 | `make verify` | Exit 0; Ruff/mypy/TypeScript ok; `910 passed, 1 deselected`; protocol 262 + Railway 63 + web 51 Vitest; artifact/protocol checks and build ok | 2026-11-15 |
-| Local Markdown link check | 5 relative/absolute refs inspected; 0 broken | 2026-11-15 |
+| Local Markdown link check | Relative refs to #2/#3/#7/#11 specs; 0 broken | 2026-11-15 |
 | `git diff --cached --name-only` | Exactly four files under `docs/changes/10-event-normalization/` | 2026-11-15 |
 
 ## Manual or hardware evidence
 
-None. No live chat capture or raw archive enablement is claimed.
+None.
 
-## Review findings (critical review before return)
+## Review findings (critical review of revision)
 
-- **Representability:** Honest deferral—danmaku/SC cannot ride minor 0 without a
-  protocol Issue; recommended minor 1 rather than fake delivery via transcript `text`.
-- **Privacy:** Raw vs normalized separation; secrets/audio rejected; ordinary APIs
-  allowlist-only; unparseable → payload-free alerts.
-- **Dedup:** Source-event vs worker-result domains called out per owner #31 note.
-- **Owner ambiguity (recommendation):** Merge docs now; choose minor 1 (or internal
-  normalize-only) explicitly at implementation; keep #16/#29/#7 live gates closed.
+- **Protocol choice:** Removed “default recommend minor 1 for first impl”; deferred
+  wire extension so merge cannot be read as minor selection.
+- **Implementability:** First slice now has explicit input/output allowlists, byte/count
+  caps, dedup key, queue policy, and stable reject reasons.
+- **Honesty:** Synthetic fixtures + source-shape uncertainty called out; no invented
+  live Bilibili schema.
+- **Boundaries:** No Timeline/WS/#29/#16/live network in first slice; #11 unchanged.
 
 ## Deviations
 
-Uses branch `issue/10-event-normalization`. Directory slug matches area. No product
-code, protocol edit, or production enablement.
+Branch `issue/10-event-normalization`. Docs only. No product/protocol code.
 
 ## Release and rollback evidence
 
-Not deployed. No live chat, protocol minor bump, or raw archive gate is enabled.
+Not deployed. No live chat, protocol minor, or raw archive gate enabled.

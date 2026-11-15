@@ -1,182 +1,188 @@
-# Specification: Danmaku / SC / status event normalization
+# Specification: Internal offline event normalization (first slice)
 
 This specification implements owning [Issue #10](https://github.com/Shuang-su/Livecho/issues/10)
 using accepted [architecture/risk](../2-architecture-risk-boundaries/spec.md),
 [protocol v1](../3-protocol-v1-contract/spec.md), [Bilibili ingest](../7-bilibili-room-ingest/spec.md),
-and [subtitle web](../11-subtitle-web/spec.md) boundaries. Owner comment on Issue #10
-(2026-09-26) and Issue #31 (D5/D6, E2/E4) require explicit dedup/statistics contracts
-without treating same-site data as independent verification. Closed drafts are not
-accepted scope. Issue #29 owns public viewer display of danmaku/SC and is out of this
-PR’s product surface.
+and [subtitle web](../11-subtitle-web/spec.md). Owner comment on Issue #10 (2026-09-26)
+and Issue #31 (D5/D6, E2/E4) inform dedup/privacy notes only. Closed drafts are not
+accepted scope. Issue #29 (viewer danmaku/SC display) and Issue #16 (raw archive) are
+out of the first slice.
 
-## Behavior
+## Phasing (normative)
 
-### Representability gate (protocol)
-
-Accepted `TimelineEventV1` today admits only:
-
-- `TranscriptTimelinePayloadV1`
-- `SessionStatusTimelinePayloadV1`
-
-**Danmaku and superchat are not representable on protocol minor 0.** This Issue must
-not pretend delivery by smuggling platform JSON into `text`, status `reason_code`, or
-extra fields. Implementation is split:
-
-| Phase | Content | Authorization |
+| Slice | In scope | Out of scope |
 | --- | --- | --- |
-| This documentation PR | Closed normalized payload contracts, privacy/dedup rules, flags, and test plan | Docs merge only |
-| Later implementation PR(s) | Python source models → JSON Schema/TS; goldens; normalize/dedup engine; feature flag | After this artifact merges; protocol change requires goldens + BC evidence |
-| Raw durable archive | Encrypted private Bucket / admin export | Issue #16 + rights gates only |
-| Viewer danmaku/SC UI | Rendering | Issue #29 |
+| **First implementation (after this docs merge)** | Internal offline normalize/dedup against synthetic fixtures; closed in-process records; feature flag for any future live adapter remains **off** | Protocol edits, codegen, `TimelineEventV1` / WS publication, #29 UI, #16 archive, live network |
+| **Deferred** | Viewer wire danmaku/SC (e.g. hypothetical `protocol_minor = 1`), public allowlist publication, durable sanitized raw | Not selected by merging these docs |
 
-### Recommended protocol extension (owner decision)
+**Danmaku/SC are not representable on accepted protocol minor 0.** The first slice must
+not pretend wire delivery (including via transcript `text` or status `reason_code`).
 
-**Recommendation:** introduce viewer **`protocol_minor = 1`** that extends the
-`TimelineEventV1.payload` closed union with exactly two new StrictModel branches
-(names illustrative until implementation locks identifiers):
+### Deferred protocol note (non-authorizing)
 
-1. **`DanmakuTimelinePayloadV1`** — closed fields only, for example:
-   - `kind: "danmaku"` (or equivalent discriminant compatible with existing branch
-     selection rules)
-   - `source_event_id` (bounded NFC/ASCII identity from upstream after validation)
-   - `source_ts` / binding to envelope `occurred_at` rules as defined in goldens
-   - `text` (NFC, 1–512 scalars unless owner revises)
-   - optional `sender_display` (NFC, bounded; never account cookies or auth ids)
-   - no nested maps, HTML, URLs-as-actions, or binary
+A future owner-approved protocol artifact may propose closed `TimelineEventV1` payload
+branches and a minor bump. That work needs separate intent/spec/plan, goldens, and
+backward-compatibility evidence. **This documentation merge does not choose or approve
+that extension.** Until then, normalized records stay process-internal.
 
-2. **`SuperChatTimelinePayloadV1`** — closed fields only, for example:
-   - `kind: "superchat"`
-   - `source_event_id`, timestamps as above
-   - `text` (NFC, bounded)
-   - optional `amount_display` / `currency_code` as **display strings** from an
-     allowlist (not opaque money objects)
-   - optional `sender_display`
-   - no payment-processor secrets, QR payloads, or raw platform blobs
+## First-slice behavior
 
-`SessionStatusTimelinePayloadV1` remains the status branch (already on minor 0).
-Transcript remains unchanged. **Do not change** the meaning of `epoch`, stream `seq`,
-or object `revision`. Immutable projections for new payloads must pin identity + time
-bounds analogous to transcript (`event_id`, `occurred_at`, segment-like keys) and be
-golden-tested.
+### Synthetic fixture input (desensitized)
 
-**Old clients (minor 0):** negotiate minor 0; backend **must not** emit danmaku/SC
-payloads on that connection. Unknown/unsupported payload shapes are rejected at the
-publisher with stable codes—never coerced into transcript text.
+Fixtures are **visibly synthetic**. They are not claimed to match live Bilibili wire
+schemas. Upstream field names and nesting remain **uncertain** until an owner-selected
+acquisition channel documents them; adapters map real shapes later under #7 gates.
 
-If the owner prefers to keep minor 0 and only document internal normalize structs
-without wire publication until a later protocol Issue, that is an acceptable alternate;
-wire publication still cannot proceed without an accepted protocol change. This
-artifact’s default recommendation is the minor-1 path above so #29 has a clear wire
-target.
+Each fixture item is a JSON object with **exactly** these top-level keys (extra keys →
+`schema_invalid`):
 
-### Four event classes and identities
+| Key | Type | Rule |
+| --- | --- | --- |
+| `fixture_class` | string | One of `danmaku`, `superchat`, `status`, `transcript_companion` |
+| `source_event_id` | string | 1–128 chars; conservative ASCII `[A-Za-z0-9._:-]` |
+| `source_ts` | string | RFC 3339 UTC with `Z` (same discipline as protocol timestamps) |
+| `body` | object | Class-specific closed map below |
 
-Every normalized event (transcript, danmaku, SC, status) carries:
+**Sensitive keys anywhere in the object** (case-insensitive name match) cause hard
+reject `sensitive_field_refused` before normalize: `cookie`, `cookies`, `authorization`,
+`auth_token`, `sessdata`, `bili_jct`, `signed_url`, `playback_url`, `pcm`, `wav`,
+`audio`, `base64`, `password`. Nested objects/arrays are not walked for open content—
+any nested `object`/`array` value under `body` is `schema_invalid` (flat body only).
+
+#### `body` allowlists by class
+
+**`danmaku`** — required: `text` (NFC string, 1–512 Unicode scalars). Optional:
+`sender_display` (NFC, 1–64). No other keys.
+
+**`superchat`** — required: `text` (NFC, 1–512). Optional: `sender_display` (1–64),
+`amount_display` (1–32 NFC display string), `currency_code` (3–8 ASCII `[A-Z]`). No
+other keys. Amounts are display strings only—not money objects or processor payloads.
+
+**`status`** — required: `status` in
+`starting` \| `live` \| `stopping` \| `stopped` \| `failed`. Optional: `reason_code`
+(1–64 conservative ASCII). No other keys. Aligns with existing session-status vocabulary
+for internal tests only—not a wire publisher.
+
+**`transcript_companion`** — required: `text` (NFC, 1–4096), `start_ms` / `end_ms`
+(ints, `0 <= start_ms < end_ms <= start_ms + 30000`). Optional: `is_final` (bool).
+Used only to exercise shared identity/dedup alongside chat fixtures; **must not** be
+emitted on viewer APIs by this module.
+
+### Normalized output record (in-process only)
+
+Successful normalize yields a closed dict (or StrictModel in implementation) with
+**exactly**:
 
 | Field | Rule |
 | --- | --- |
-| Logical type | Closed discriminant (`transcript` / `danmaku` / `superchat` / `session_status`) |
-| Source timestamp | Upstream or synthetic fixture time; validated bounds |
-| Received timestamp | Backend observe time; never secret-bearing |
-| Viewer `seq` | Exact-next allocator per session/epoch (existing #3 rules) |
-| Source event identity | Stable key for dedup (platform id after validation, or fixture id) |
-| `event_id` / `revision` | Existing TimelineEventV1 rules; finals/immutability per payload class |
+| `schema_version` | Literal `1` |
+| `class` | Same as `fixture_class` |
+| `source_event_id` | Echo validated id |
+| `source_ts` | Echo validated source time |
+| `received_ts` | Backend observe time (injectable clock in tests) |
+| `room_id` | Operator-supplied synthetic room id for the batch (1–64 conservative ASCII) |
+| `session_id` | Synthetic session UUID string for the batch |
+| `payload` | Closed projection: only the allowlisted `body` fields that validated |
 
-Dedup keys are **source-event identity scoped to room/session/epoch**, distinct from
-worker transcript segment revision domains (owner #31 note). Worker-result dedup and
-source-event dedup are separately tested.
+No viewer `seq`, no `event_id` wire envelope, no protocol `revision` assignment in this
+slice (those belong to a future publisher bound to #3). Dedup and ordering use
+`(room_id, session_id, source_event_id)` as the source-event key (Issue #31: distinct
+from worker transcript revision domains).
 
-### Ordering, reconnect, and queues
+### Dedup, ordering, queues, backpressure
 
-- One owner serializes normalize → publish for a session.
-- Bounded in-memory queues only; overflow drops with counters + payload-free alerts,
-  never disk spill.
-- Reconnect / upstream duplicate / reorder fixtures must prove: no double publish for
-  the same source identity; late duplicates acknowledged without state corruption;
-  gaps surface as status/alerts without inventing filler events.
-- Backend restart clears ephemeral normalize buffers; durable resume of raw chat is
-  not claimed until #16.
+| Control | Cap / rule |
+| --- | --- |
+| Batch input size | ≤ 256 fixture items per `normalize_batch` call |
+| Single item JSON size | ≤ 8 KiB UTF-8 |
+| Dedup map entries | ≤ 4,096 distinct source-event keys per session; insert beyond → drop with `dedup_capacity` alert |
+| Output queue | ≤ 256 normalized records retained for the test harness; overflow → drop oldest with `queue_overflow` counter (never disk) |
+| Duplicate `source_event_id` in same room/session | Second+ → `duplicate_suppressed`; no second normalized emit |
+| Reorder | Items processed in call order; late duplicate still suppressed; no invented gap fillers |
+| Unparseable / wrong class / bad NFC / oversize text | `schema_invalid` or `text_invalid`; payload-free alert only |
 
-### Normalization vs raw
+Reconnect-style fixtures are simulated by re-feeding the same synthetic ids after a
+cleared or retained dedup map as the test specifies—no network.
 
-| Layer | Contents | Retention in this Issue |
+### Alerts and logging
+
+Alerts are payload-free: `{ "reason": <stable code>, "counters": {...} }` only. Never
+log `text`, `sender_display`, raw fixture bodies, or secrets. Stable reasons include:
+`schema_invalid`, `sensitive_field_refused`, `text_invalid`, `duplicate_suppressed`,
+`dedup_capacity`, `queue_overflow`, `batch_too_large`, `live_adapter_disabled`,
+`wire_publish_disabled`, `archive_disabled`.
+
+### Feature flags (default closed)
+
+| Flag | Default | First-slice behavior |
 | --- | --- | --- |
-| Upstream fixture/raw candidate | Desensitized synthetic platform-like JSON | Test fixtures only; no live capture |
-| Sanitized raw (future) | Credential/locator/audio-stripped business JSON | **Blocked** until #16; in-memory optional for tests that immediately discard |
-| Normalized projection | Closed allowlist fields only | In-memory / future restricted DB under #16 purpose gates |
-| Public/ordinary API | Allowlisted normalized subset | Never raw; #29 consumes normalized wire after protocol enablement |
+| Live chat adapter | off | Any live/network entry returns `live_adapter_disabled` |
+| Wire / Timeline publish | off | Any publish attempt returns `wire_publish_disabled` |
+| Raw archive | off | Any persist attempt returns `archive_disabled` |
 
-Before any retention candidate, reject or clear: cookies, auth tokens, signed playback
-URLs, audio/PCM/WAV/base64, and unknown nested blobs. Malicious text is kept as text
-only (no HTML/Markdown execution). Field missing / unknown extra field / schema invalid
-→ reject normalize with stable reason; do not partially publish open objects.
+Fixtures may call normalize without flipping these flags.
 
-### Unparseable upstream shapes
+### Privacy and data lifecycle
 
-New or undecodable platform messages produce **payload-free structured alerts**
-(reason code + counters). They must not enter `TimelineEventV1`, logs as raw bodies,
-or synthetic “best effort” text.
+- No durable chat or personal text. Process exit clears maps/queues.
+- No cookies, signed URLs, or audio in fixtures or outputs.
+- Ordinary APIs and browsers are not consumers of this module in the first slice.
+- Kill switch / denylist from #2/#7 are not required to unit-test pure normalize, but
+  any future live adapter must honor them before calling normalize.
 
-### Feature flag and live acquisition
+### Goldens / tests required for first implementation PR
 
-Platform chat adapter is behind a feature flag default **off**. Live Bilibili danmaku
-sockets remain gated by Issue #7 channel/rights/production decisions
-(`BILI-ACQ-001` / `BILI-DEC-001`). This Issue’s CI path is fixture-only: no real network,
-no cookies, no paid/member/private content. Completing normalize tests does not enable
-ingest or production.
+Desensitized fixtures + deterministic tests must cover at least:
 
-### Public projection allowlist
+1. Happy path each class → exact allowlisted output fields.
+2. Extra top-level / body key → reject.
+3. Sensitive key name → `sensitive_field_refused`.
+4. Oversize text / batch / item bytes → reject or cap alert.
+5. Duplicate source id → single emit + `duplicate_suppressed`.
+6. Reorder + re-feed reconnect simulation → no double emit when dedup retained.
+7. Nested object in body → `schema_invalid`.
+8. Import/normalize path opens **no sockets**; no file writes of chat text.
+9. Attempts to “publish” or “archive” hit disabled reasons.
+10. Document in evidence that fixtures are synthetic and upstream shape is uncertain.
 
-Public/ordinary projection is an **explicit allowlist** per payload class (final field
-list locked in the implementation PR goldens). Tests must cover: missing required
-field, unknown extra field, duplicate/reorder, malicious text, and sensitive-payload
-refusal. #29 may only render allowlisted normalized fields.
-
-### Statistics note (Issue #31)
-
-Short-window or site-derived counts are not independent verification. Effective zeros,
-missing observations, unsupported fields, and disconnects must remain distinguishable
-in counters/alerts. This Issue does not ship public statistics surfaces.
+`make events-check` (name may match implementation) runs these tests and prints that
+live chat, wire publish, protocol extension, and raw archive remain pending.
 
 ## Interfaces and compatibility
 
-- Documentation (this PR only): four Markdown files under
+- **This docs PR:** only the four Markdown files under
   `docs/changes/10-event-normalization/`.
-- Future code: backend normalize module, desensitized fixtures, `make` check target,
-  protocol model/golden updates under the chosen minor, Python/TS parity.
-- Wire: no silent extension of minor 0. Epoch/seq/revision semantics unchanged unless
-  a separate protocol Issue + BC evidence says otherwise (not expected here).
+- **First code PR:** internal module under the backend monolith (path named then),
+  fixture corpus, tests, `make events-check`. **No** changes to
+  `packages/protocol` models, goldens, or codegen.
+- Accepted v1 wire semantics unchanged. #11 remains caption/status only.
 
-## Failure modes and disable path
+## Failure modes
 
 | Condition | Outcome |
 | --- | --- |
-| Feature flag off / channel rights missing | No live chat; fixtures may still unit-test normalize |
-| Payload not in closed schema | Reject; alert; no publish |
-| Sensitive fields present | Strip/reject before any retention candidate |
-| Duplicate source identity | No second publish; stable ack/counter |
-| Minor 0 viewer subscribed | Danmaku/SC not emitted |
-| #16 not ready | No DB/Bucket raw archive |
+| Invalid fixture / sensitive field | Reject; alert; no normalized emit |
+| Duplicate source id | Suppress; counter |
+| Live/wire/archive entry points | Disabled reasons; no side effects |
+| Protocol publish attempted | Forbidden in first slice |
 
 ## Security, privacy, and data lifecycle
 
-Chat text and platform identifiers are sensitive. Raw business payloads are high-risk.
-Ordinary APIs and browsers never receive raw. Logs are payload-free. Audio remains
-forbidden in this path. Kill switch / denylist from #2/#7 stop new acquisition and
-clear ephemeral buffers without depending on the chat parse path.
+Internal normalized records are restricted test/memory artifacts. Raw business payloads
+are not archived. Logs stay payload-free. Audio forbidden.
 
 ## Acceptance criteria
 
-- [ ] Four event classes defined with type, source/received time, seq, and source
-  identity; transcript remains compatible.
-- [ ] Closed danmaku/SC normalized payloads specified; no arbitrary raw objects on
-  `TimelineEventV1`.
-- [ ] Protocol extension path explicit (recommended minor 1) with negotiation, old
-  client behavior, and unchanged epoch/seq/revision meaning.
-- [ ] Fixture tests planned for reconnect duplicate, reorder, unknown fields, malicious
-  text, and sensitive-field refusal.
-- [ ] Raw vs normalized separation; cookies/tokens/signed URLs/audio cleared or rejected.
-- [ ] Unparseable events → payload-free alerts only.
-- [ ] Adapter feature flag default off; no live CI chat; no implicit #16 archive ON.
-- [ ] #29 UI and production enablement remain out of scope; no auto-close of #10 on
-  docs merge alone.
+### First slice (docs + subsequent impl)
+
+- [ ] Internal normalize-only contracts above are implementable without protocol edits.
+- [ ] Closed input/output allowlists, caps, dedup, backpressure, and reject reasons are
+  specified; synthetic fixture uncertainty recorded.
+- [ ] No Timeline/WS publication, #29 UI, #16 archive, or live network in first slice.
+- [ ] Docs merge does **not** select `protocol_minor = 1` or any wire extension.
+
+### Deferred (separate owner/protocol work)
+
+- [ ] Closed wire danmaku/SC payloads, minor negotiation, goldens, BC evidence.
+- [ ] Public projection allowlist for #29; #16 sanitized-raw enablement; live chat under
+  #7 rights/channel gates.
