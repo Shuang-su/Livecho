@@ -29,12 +29,18 @@ the only minor that connection may send afterward.
 | anything else that does not intersect `[0, 1]` | any | `unsupported_minor` |
 
 Viewer negotiation uses the same minor intersection and has no capability list.
-A connection that selected 0 and then receives `protocol_minor: 1`, a minor-1-only
-message type, or capability `protocol.epoch-rotation` is `unsupported_minor` or
-`capability_required` as applicable, with no state change. A connection that selected
-1 and receives `protocol_minor: 0` is `unsupported_minor`. Negotiation is not an
-in-session downgrade. An established minor-1 session that loses the capability match
-is closed; it is not rewritten to minor 0.
+`WorkerHelloV1` and `ViewerSubscribeV1` are the only pre-selection envelopes. They
+keep `protocol_minor: 0` and offer minor 1 through `supported_minors`. A hello or
+subscribe whose `protocol_minor` is not 0 is rejected before selection.
+
+After selection, the connection decodes and emits only the closed schema for that
+minor. A minor-0 connection that then receives `protocol_minor: 1`, a minor-1-only
+type, or capability `protocol.epoch-rotation` is `unsupported_minor` or
+`capability_required` as applicable, with no state change. A minor-1 connection
+that then receives `protocol_minor: 0` is `unsupported_minor`, including a lease,
+transcript, timeline event, ack, or error built from a minor-0 class. Negotiation
+is not an in-session downgrade. An established minor-1 session that loses the
+capability match is closed; it is not rewritten to minor 0.
 
 Existing minor-0 golden inputs keep their accept/reject codes. Advertising an extra
 minor that the peer also supports may select 1 only under the table above. No current
@@ -211,8 +217,9 @@ and does not rotate.
 
 ### Stable codes
 
-Add these codes to the shared closed code list. Minor 0 machines must not emit
-them. They are legal `ProtocolErrorV1` codes on minor 1:
+Add these codes only to the minor-1 `ProtocolErrorV1` schema. The minor-0 error
+schema keeps the #3 code list and must reject these three. Minor-0 machines must
+not emit them. They are legal on minor 1:
 
 | Code | Retryable | When |
 | --- | --- | --- |
@@ -227,25 +234,52 @@ them. They are legal `ProtocolErrorV1` codes on minor 1:
 
 ### Schema deltas
 
-Existing minor-0 models keep `protocol_minor: 0`. New messages use
-`protocol_minor: 1` only.
+Minor-0 envelope classes keep `protocol_minor: Literal[0]`. Do not widen that
+literal. Minor 1 is a second closed schema for each post-selection message:
+the same fields, bounds, and validators, with `protocol_minor: Literal[1]`.
+The decoder for a connection uses only the schema of the minor it selected.
+The replacement lease, ordinary transcripts, timeline events, acknowledgements,
+and errors on a minor-1 connection are those twins, not the minor-0 classes.
 
-| Surface | Change |
+Pre-selection requests stay on the minor-0 classes:
+
+| Request | Rule |
 | --- | --- |
-| Worker capability literal | add `protocol.epoch-rotation` |
-| `WorkerWelcomeV1.accepted_capabilities` | allow the new literal; max length 3. Semantic rule: minor 0 welcomes carry exactly the original two; minor 1 welcomes carry exactly the three |
-| `selected_minor` on welcome and `ViewerReadyV1` | `0` or `1` |
-| `ProtocolErrorV1` code enum | add the three codes in the table above |
-| `LeaseCancelV1.reason` | unchanged |
-| `audio_origin` | unchanged (`synthetic` only) |
-| `TimelineEventV1` payloads | unchanged. Rotation is not a timeline payload and must not be stuffed into transcript text or `reason_code` |
-| New `EpochRotatedV1`, `ViewerResyncV1` | as specified above. Closed objects, no extra fields |
+| `WorkerHelloV1` | `protocol_minor: 0`. Capability literal gains `protocol.epoch-rotation` so an offer can be parsed. The offer table still requires an exact set. Nested `WorkerResumeV1` is unchanged. |
+| `ViewerSubscribeV1` | `protocol_minor: 0`. No new field. `supported_minors` carries the offer. Nested `ViewerCursorV1` is unchanged. |
+
+Post-selection twins, one minor-0 class and one minor-1 class each:
+
+| Message | Minor-1 difference from the minor-0 class |
+| --- | --- |
+| `WorkerWelcomeV1` | `protocol_minor: 1`, `selected_minor: 1`, `accepted_capabilities` exactly the original two plus `protocol.epoch-rotation` |
+| `ViewerReadyV1` | `protocol_minor: 1`, `selected_minor: 1` |
+| `LeaseV1` | `protocol_minor: 1`. `audio_origin` stays `synthetic`. The post-rotation lease uses this twin. |
+| `LeaseCancelV1` | `protocol_minor: 1`. `reason` enum is identical to minor 0. |
+| `HeartbeatV1`, `WorkerStatsV1`, `TranscriptSegmentV1` | `protocol_minor: 1`. Field rules otherwise identical. |
+| `TimelineEventV1` | `protocol_minor: 1`. Payload branches stay transcript and session status. Rotation is not a payload and must not be stuffed into transcript text or `reason_code`. |
+| `ProtocolAckV1` | `protocol_minor: 1`. Outcome enum unchanged. |
+| `ProtocolErrorV1` | `protocol_minor: 1`. Code enum is the #3 list plus `epoch_rotated`, `epoch_exhausted`, and `media_time_regressed`. |
+
+Minor 1 only, with no minor-0 class:
+
+| Message | Rule |
+| --- | --- |
+| `EpochRotatedV1`, `ViewerResyncV1` | `protocol_minor: 1`, fields as specified above, no extra fields |
+
+The minor-0 welcome still has `selected_minor: 0` and exactly the original two
+capabilities. The minor-0 error schema does not list the three new codes.
+Nested payload, manifest, and audio-format objects stay shared; they do not
+carry `protocol_minor`.
 
 Generation stays single-source from the Pydantic models through the existing
-generator. Hand-edited schema or TypeScript is not allowed. `make protocol-check`
-must pass. Every pre-existing golden case keeps its decision and stable code.
-New cases use ids prefixed `long-session-` and live in the existing accepted and
-rejected corpora and manifest.
+generator. The generator must emit both closed schemas. Hand-edited schema or
+TypeScript is not allowed. `make protocol-check` must pass. Every pre-existing
+golden case keeps its decision and stable code. New cases use ids prefixed
+`long-session-` and live in the existing accepted and rejected corpora and
+manifest. One new accepted case must show a minor-1 `LeaseV1`, transcript,
+timeline event, ack, and error. One new rejected case must show each of those
+payloads with `protocol_minor: 0` on a connection that selected 1.
 
 ### Compatibility matrix
 
@@ -254,8 +288,9 @@ rejected corpora and manifest.
 | Worker | 1 | 0, 1 | `0.1.0` |
 | Viewer | 1 | 0, 1 | `0.1.0` |
 
-A minor-0 peer never receives minor-1 messages. A minor-1 peer that sends a
-minor-0 envelope is rejected. Rollback removes minor 1 from the matrix together
+A minor-0 peer never receives minor-1 messages. After selection, a minor-1 peer
+that sends a minor-0 envelope is rejected. The hello and subscribe that offered
+minor 1 remain `protocol_minor: 0`. Rollback removes minor 1 from the matrix together
 with the new models, codes, schema, types, and fixtures. Sessions that were on
 minor 1 fail closed with `unsupported_minor` after rollback. Rollback must not
 revive a retired epoch or reset a minor-0 counter.
@@ -320,6 +355,9 @@ existing protocol package tests and golden runner.
 - [ ] Transcript and PCM time continue across an epoch and reset across a
       session. Regression is `media_time_regressed` or `audio_pts_invalid`.
       A gap does not create filler text.
+- [ ] A minor-1 connection accepts `LeaseV1`, transcript, timeline, ack, and
+      error twins with `protocol_minor: 1`, and rejects those payloads when
+      `protocol_minor` is 0. Minor-0 schemas still reject `protocol_minor: 1`.
 - [ ] `epoch_exhausted` does not wrap. Header minor bytes follow the negotiated
       minor. `audio_origin` and `LeaseCancelV1.reason` are unchanged.
 - [ ] Schema, TypeScript, and fixtures are generated or corpus-checked from the

@@ -67,8 +67,17 @@ browser session. No audio bytes were created.
 
 ## Review findings
 
-None yet. Owner review is still pending. The draft resolves the issue's open
-lifecycle questions inside the spec so the plan's open-decision list is empty.
+Codex review on `271c593`
+([comment](https://github.com/Shuang-su/Livecho/pull/56#discussion_r4601395290))
+found that a minor-1 connection rejected every `protocol_minor: 0` envelope
+while the schema section left reused messages on minor 0. A replacement lease,
+transcript, timeline event, ack, or error then had no legal encoding. The spec
+and plan now require a closed minor-1 twin for every post-selection message,
+and leave minor-0 `protocol_minor` literals at 0. Hello and subscribe stay
+pre-selection minor-0 requests. After that edit,
+`LIVECHO_HEAD_REF=issue/27-long-session-state uv run python tools/check_change_artifacts.py`
+exited 0 (`change artifacts: ok`) and the local Markdown link check reported
+`local links ok: 1`. Owner review of the revised text is still pending.
 
 ## Deviations
 

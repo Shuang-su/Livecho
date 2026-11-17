@@ -8,10 +8,13 @@
 2. After owner merge, open a separate `issue/27-long-session-state-impl` branch
    from that main commit. Record implementer exposure in `evidence.md` before
    editing Python.
-3. Extend the Pydantic source only as the spec's schema table allows: capability
-   literal, welcome capability length, `selected_minor` values `0` and `1`, three
-   stable codes, and the two new closed messages. Leave `LeaseCancelV1.reason`,
-   `audio_origin`, timeline payloads, and minor-0 `protocol_minor` literals alone.
+3. Extend the Pydantic source only as the spec's schema section allows. Keep
+   every minor-0 `protocol_minor` literal at 0. Add a closed minor-1 twin for
+   each post-selection message in that section, including `LeaseV1`,
+   `TranscriptSegmentV1`, `TimelineEventV1`, `ProtocolAckV1`, and
+   `ProtocolErrorV1`. Add `EpochRotatedV1` and `ViewerResyncV1` as minor-1-only
+   messages. Leave `LeaseCancelV1.reason`, `audio_origin`, and timeline payload
+   shapes unchanged on both twins.
 4. Extend negotiation to the spec's offer table. Keep today's results for every
    existing hello and subscribe fixture.
 5. Add a minor-1 session machine beside the existing minor-0 machines. Minor 0
