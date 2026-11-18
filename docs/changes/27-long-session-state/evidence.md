@@ -96,7 +96,31 @@ absent until these artifacts are on `main`. The single pytest failure is an
 atime comparison in the existing #5 store test on this machine's filesystem; it
 is not a change in this diff.
 
+## Implementation
+
+- Branch: `issue/27-long-session-state-impl`, based on `1968239` (`main`, after
+  this artifact directory merged in #56).
+- Scope: `packages/protocol/**`, `tests/protocol/**`, and this evidence file.
+  No backend, web, worker, or ingest changes. `audio_origin` stays `synthetic`.
+
+The historical goldens `version.worker_supported_minor_missing` and
+`version.viewer_supported_minor_missing` send `supported_minors: [1]` and expect
+`unsupported_minor`. Those codes stay. A worker offer of only minor 1 is
+accepted only with the exact three capabilities. A viewer selects minor 1 only
+when the offer contains both 0 and 1. That keeps the accepted "existing golden
+codes stay" rule.
+
+| Command | Result |
+| --- | --- |
+| `uv run pytest -q tests/protocol` | 76 passed |
+| `uv run pytest -q tests/protocol/test_long_session.py` | 9 passed. Counts cover 4,095/4,096/4,097 on each domain, three crossings, ceiling 8,193, and no epoch wrap. |
+| `pnpm --filter @livecho/protocol test` | 304 passed, browser entry ok |
+| `uv run python tools/protocol_codegen.py --check` | `protocol generated artifacts: ok` |
+| `uv run mypy packages/protocol/python tests/protocol` | no issues |
+| `make verify` | Exit 0. 944 pytest passed, 1 deselected; protocol 304; web 51; railway 63; artifacts and protocol drift ok. |
+
 ## Release and rollback evidence
 
-Not deployed. Rollback of this pull request deletes the four new Markdown files
-and leaves protocol behavior unchanged.
+Not deployed. Rollback of the implementation reverts the Pydantic source and
+the generated schema, types, and fixtures together. Minor-0 fixtures keep their
+previous codes. A reader without minor 1 rejects those envelopes.

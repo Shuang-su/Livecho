@@ -1,0 +1,18 @@
+{
+  "case_id": "long-session.protocolerrorv1minor1_rejects_minor0",
+  "code": "unsupported_minor",
+  "expect": "rejected",
+  "model": "ProtocolErrorV1Minor1",
+  "wire": {
+    "code": "epoch_rotated",
+    "expected": null,
+    "message": "Invalid synthetic message",
+    "message_id": "00000000-0000-4000-8000-000000000001",
+    "protocol": "livecho.worker.v1",
+    "protocol_minor": 0,
+    "received": null,
+    "retryable": true,
+    "sent_at": "2026-01-01T00:00:00.000Z",
+    "type": "protocol.error"
+  }
+}

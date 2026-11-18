@@ -59,6 +59,12 @@ Milliseconds = Annotated[
 Confidence = Annotated[float, Field(strict=True, ge=0, le=1)]
 RealtimeFactor = Annotated[float, Field(strict=True, ge=0, le=100)]
 ProtocolMinorLiteral = Annotated[Literal[0], BeforeValidator(_json_integer)]
+Minor1Literal = Annotated[Literal[1], BeforeValidator(_json_integer)]
+WorkerCapability = Literal["asr.transcribe", "protocol.binary-pcm", "protocol.epoch-rotation"]
+BASE_CAPABILITIES = frozenset({"asr.transcribe", "protocol.binary-pcm"})
+MINOR1_CAPABILITIES = frozenset(
+    {"asr.transcribe", "protocol.binary-pcm", "protocol.epoch-rotation"}
+)
 SampleRateLiteral = Annotated[Literal[16000], BeforeValidator(_json_integer)]
 ChannelCountLiteral = Annotated[Literal[1], BeforeValidator(_json_integer)]
 RejectCode = Literal[
@@ -92,6 +98,41 @@ RejectCode = Literal[
     "binary_frame_too_large",
     "audio_pts_invalid",
     "audio_budget_exceeded",
+]
+Minor1RejectCode = Literal[
+    "malformed_json",
+    "duplicate_key",
+    "unknown_field",
+    "schema_invalid",
+    "control_frame_too_large",
+    "unknown_major",
+    "unsupported_minor",
+    "worker_version_too_old",
+    "capability_required",
+    "manifest_not_allowed",
+    "lease_unknown",
+    "lease_expired",
+    "lease_closed",
+    "binding_mismatch",
+    "epoch_stale",
+    "epoch_unknown",
+    "seq_conflict",
+    "seq_gap",
+    "revision_conflict",
+    "revision_stale",
+    "revision_gap",
+    "revision_immutable",
+    "revision_capacity_exceeded",
+    "cancel_conflict",
+    "object_final",
+    "resync_required",
+    "binary_header_invalid",
+    "binary_frame_too_large",
+    "audio_pts_invalid",
+    "audio_budget_exceeded",
+    "epoch_rotated",
+    "epoch_exhausted",
+    "media_time_regressed",
 ]
 
 
@@ -161,7 +202,7 @@ class WorkerHelloV1(WorkerEnvelopeV1):
         list[Minor], Field(min_length=1, max_length=16, json_schema_extra={"uniqueItems": True})
     ]
     capabilities: Annotated[
-        list[Literal["asr.transcribe", "protocol.binary-pcm"]],
+        list[WorkerCapability],
         Field(min_length=1, max_length=16, json_schema_extra={"uniqueItems": True}),
     ]
     model_manifests: Annotated[
@@ -425,39 +466,154 @@ class ProtocolErrorV1(EitherEnvelopeV1):
         return self
 
 
+class LeaseV1Minor1(LeaseV1):
+    protocol_minor: Minor1Literal  # type: ignore[assignment]
+
+
+class LeaseCancelV1Minor1(LeaseCancelV1):
+    protocol_minor: Minor1Literal  # type: ignore[assignment]
+
+
+class HeartbeatV1Minor1(HeartbeatV1):
+    protocol_minor: Minor1Literal  # type: ignore[assignment]
+
+
+class WorkerStatsV1Minor1(WorkerStatsV1):
+    protocol_minor: Minor1Literal  # type: ignore[assignment]
+
+
+class TranscriptSegmentV1Minor1(TranscriptSegmentV1):
+    protocol_minor: Minor1Literal  # type: ignore[assignment]
+
+
+class TimelineEventV1Minor1(TimelineEventV1):
+    protocol_minor: Minor1Literal  # type: ignore[assignment]
+
+
+class ProtocolAckV1Minor1(ProtocolAckV1):
+    protocol_minor: Minor1Literal  # type: ignore[assignment]
+
+
+class ProtocolErrorV1Minor1(ProtocolErrorV1):
+    protocol_minor: Minor1Literal  # type: ignore[assignment]
+    code: Minor1RejectCode  # type: ignore[assignment]
+
+
+class WorkerWelcomeV1Minor1(WorkerWelcomeV1):
+    protocol_minor: Minor1Literal  # type: ignore[assignment]
+    selected_minor: Minor1Literal  # type: ignore[assignment]
+    accepted_capabilities: Annotated[
+        list[WorkerCapability],
+        Field(min_length=3, max_length=3, json_schema_extra={"uniqueItems": True}),
+    ]  # type: ignore[assignment]
+
+    @model_validator(mode="after")
+    def exact_acceptance_sets(self) -> WorkerWelcomeV1Minor1:
+        if set(self.accepted_capabilities) != MINOR1_CAPABILITIES:
+            raise ValueError("accepted_capabilities must be the minor-1 set")
+        manifests = {
+            (item.provider, item.model_id, item.revision, item.sha256)
+            for item in self.accepted_manifests
+        }
+        if len(manifests) != len(self.accepted_manifests):
+            raise ValueError("accepted_manifests must be unique")
+        return self
+
+
+class ViewerReadyV1Minor1(ViewerReadyV1):
+    protocol_minor: Minor1Literal  # type: ignore[assignment]
+    selected_minor: Minor1Literal  # type: ignore[assignment]
+
+
+class EpochRotatedV1(WorkerEnvelopeV1):
+    protocol_minor: Minor1Literal  # type: ignore[assignment]
+    type: Literal["worker.epoch_rotated"]
+    session_id: UUID4String
+    lease_id: UUID4String
+    closed_epoch: PositiveUint64Decimal
+    opened_epoch: PositiveUint64Decimal
+    media_continue_ms: Milliseconds
+    pcm_continue_pts: Uint64Decimal
+    reason: Literal["revision_capacity", "lease_replaced"]
+
+    @model_validator(mode="after")
+    def successor_epoch(self) -> EpochRotatedV1:
+        closed = int(self.closed_epoch)
+        opened = int(self.opened_epoch)
+        if opened != closed + 1:
+            raise ValueError("opened epoch must be the closed epoch plus one")
+        return self
+
+
+class ViewerResyncV1(ViewerEnvelopeV1):
+    protocol_minor: Minor1Literal  # type: ignore[assignment]
+    type: Literal["viewer.resync"]
+    session_id: UUID4String
+    room_id: RoomId
+    epoch: PositiveUint64Decimal
+    next_seq: Uint64Decimal
+    media_continue_ms: Milliseconds
+    reason: Literal["epoch_rotated", "cursor_expired", "cursor_unknown"]
+    gap: Literal[True]
+
+
 type ProtocolMessageV1 = (
     WorkerHelloV1
     | WorkerWelcomeV1
+    | WorkerWelcomeV1Minor1
     | LeaseV1
+    | LeaseV1Minor1
     | LeaseCancelV1
+    | LeaseCancelV1Minor1
     | HeartbeatV1
+    | HeartbeatV1Minor1
     | WorkerStatsV1
+    | WorkerStatsV1Minor1
     | TranscriptSegmentV1
+    | TranscriptSegmentV1Minor1
     | TimelineEventV1
+    | TimelineEventV1Minor1
     | ViewerSubscribeV1
     | ViewerReadyV1
+    | ViewerReadyV1Minor1
     | ProtocolAckV1
+    | ProtocolAckV1Minor1
     | ProtocolErrorV1
+    | ProtocolErrorV1Minor1
+    | EpochRotatedV1
+    | ViewerResyncV1
 )
 
 PUBLIC_MODELS: tuple[type[StrictModel], ...] = (
     AudioFormatV1,
+    EpochRotatedV1,
     HeartbeatV1,
+    HeartbeatV1Minor1,
     LeaseCancelV1,
+    LeaseCancelV1Minor1,
     LeaseV1,
+    LeaseV1Minor1,
     ModelManifestRefV1,
     ProtocolAckV1,
+    ProtocolAckV1Minor1,
     ProtocolErrorV1,
+    ProtocolErrorV1Minor1,
     SessionStatusTimelinePayloadV1,
     TimelineEventV1,
+    TimelineEventV1Minor1,
     TranscriptSegmentV1,
+    TranscriptSegmentV1Minor1,
     TranscriptTimelinePayloadV1,
     ViewerCursorV1,
     ViewerReadyV1,
+    ViewerReadyV1Minor1,
+    ViewerResyncV1,
     ViewerSubscribeV1,
     WorkerHelloV1,
     WorkerResumeV1,
     WorkerStatsV1,
+    WorkerStatsV1Minor1,
     WorkerWelcomeV1,
+    WorkerWelcomeV1Minor1,
 )
 MODEL_BY_NAME: dict[str, type[StrictModel]] = {model.__name__: model for model in PUBLIC_MODELS}

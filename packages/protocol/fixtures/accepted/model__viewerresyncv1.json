@@ -1,0 +1,20 @@
+{
+  "case_id": "model.viewerresyncv1",
+  "code": "accepted",
+  "expect": "accepted",
+  "model": "ViewerResyncV1",
+  "wire": {
+    "epoch": "2",
+    "gap": true,
+    "media_continue_ms": 1000,
+    "message_id": "00000000-0000-4000-8000-000000000001",
+    "next_seq": "1",
+    "protocol": "livecho.viewer.v1",
+    "protocol_minor": 1,
+    "reason": "epoch_rotated",
+    "room_id": "synthetic-room",
+    "sent_at": "2026-01-01T00:00:00.000Z",
+    "session_id": "00000000-0000-4000-8000-000000000030",
+    "type": "viewer.resync"
+  }
+}

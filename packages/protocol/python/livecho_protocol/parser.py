@@ -83,7 +83,20 @@ def canonical_digest(value: Any) -> bytes:
     return hashlib.sha256(canonical_json(value)).digest()
 
 
-def _precheck_version(value: dict[str, Any], allowed_protocols: frozenset[str] | None) -> None:
+def _expected_minor(model: type[Any]) -> int:
+    field = model.model_fields.get("protocol_minor")
+    if field is None:
+        return 0
+    annotation = field.annotation
+    args = getattr(annotation, "__args__", ())
+    return 1 if args == (1,) else 0
+
+
+def _precheck_version(
+    value: dict[str, Any],
+    allowed_protocols: frozenset[str] | None,
+    expected_minor: int,
+) -> None:
     if allowed_protocols is None:
         return
     protocol = value.get("protocol")
@@ -102,7 +115,7 @@ def _precheck_version(value: dict[str, Any], allowed_protocols: frozenset[str] |
         return
     if protocol not in allowed_protocols:
         raise ProtocolValidationError(StableCode.UNKNOWN_MAJOR)
-    if protocol_minor != 0:
+    if protocol_minor != expected_minor:
         raise ProtocolValidationError(StableCode.UNSUPPORTED_MINOR)
 
 
@@ -147,7 +160,11 @@ def validate_object[ModelT: StrictModel](value: dict[str, Any], model: type[Mode
             allowed.add(WORKER_PROTOCOL)
         if VIEWER_PROTOCOL in annotation_text:
             allowed.add(VIEWER_PROTOCOL)
-    _precheck_version(value, frozenset(allowed) if protocol_annotation is not None else None)
+    _precheck_version(
+        value,
+        frozenset(allowed) if protocol_annotation is not None else None,
+        _expected_minor(model),
+    )
     try:
         return model.model_validate(value)
     except ValidationError as error:

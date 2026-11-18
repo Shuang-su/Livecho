@@ -99,7 +99,8 @@
       "items": {
         "enum": [
           "asr.transcribe",
-          "protocol.binary-pcm"
+          "protocol.binary-pcm",
+          "protocol.epoch-rotation"
         ],
         "type": "string"
       },

@@ -47,7 +47,10 @@ export type StableCode =
   | "binary_header_invalid"
   | "binary_frame_too_large"
   | "audio_pts_invalid"
-  | "audio_budget_exceeded";
+  | "audio_budget_exceeded"
+  | "epoch_rotated"
+  | "epoch_exhausted"
+  | "media_time_regressed";
 
 export interface GoldenCaseV1 {
   case_id: string;
@@ -84,24 +87,65 @@ const PUBLIC_MODELS = [
   "WorkerHelloV1",
   "WorkerResumeV1",
   "WorkerStatsV1",
+  "WorkerStatsV1Minor1",
   "WorkerWelcomeV1",
+  "WorkerWelcomeV1Minor1",
+  "EpochRotatedV1",
+  "HeartbeatV1Minor1",
+  "LeaseCancelV1Minor1",
+  "LeaseV1Minor1",
+  "ProtocolAckV1Minor1",
+  "ProtocolErrorV1Minor1",
+  "TimelineEventV1Minor1",
+  "TranscriptSegmentV1Minor1",
+  "ViewerReadyV1Minor1",
+  "ViewerResyncV1",
 ] as const;
 
 const WORKER_MODELS = new Set([
   "HeartbeatV1",
+  "HeartbeatV1Minor1",
   "LeaseCancelV1",
+  "LeaseCancelV1Minor1",
   "LeaseV1",
+  "LeaseV1Minor1",
   "WorkerHelloV1",
   "WorkerStatsV1",
+  "WorkerStatsV1Minor1",
   "WorkerWelcomeV1",
+  "WorkerWelcomeV1Minor1",
   "TranscriptSegmentV1",
+  "TranscriptSegmentV1Minor1",
+  "EpochRotatedV1",
 ]);
 const VIEWER_MODELS = new Set([
   "TimelineEventV1",
+  "TimelineEventV1Minor1",
   "ViewerReadyV1",
+  "ViewerReadyV1Minor1",
   "ViewerSubscribeV1",
+  "ViewerResyncV1",
 ]);
-const SHARED_ENVELOPE_MODELS = new Set(["ProtocolAckV1", "ProtocolErrorV1"]);
+const SHARED_ENVELOPE_MODELS = new Set([
+  "ProtocolAckV1",
+  "ProtocolAckV1Minor1",
+  "ProtocolErrorV1",
+  "ProtocolErrorV1Minor1",
+]);
+const MINOR1_MODELS = new Set([
+  "EpochRotatedV1",
+  "HeartbeatV1Minor1",
+  "LeaseCancelV1Minor1",
+  "LeaseV1Minor1",
+  "ProtocolAckV1Minor1",
+  "ProtocolErrorV1Minor1",
+  "TimelineEventV1Minor1",
+  "TranscriptSegmentV1Minor1",
+  "ViewerReadyV1Minor1",
+  "ViewerResyncV1",
+  "WorkerStatsV1Minor1",
+  "WorkerWelcomeV1Minor1",
+]);
 const TIMELINE_EVENT_FIELDS = new Set([
   "protocol",
   "protocol_minor",
@@ -292,7 +336,8 @@ function precheckVersion(model: string, value: Record<string, unknown>): StableC
   if (!allowed.includes(value.protocol as typeof WORKER_PROTOCOL)) {
     return "unknown_major";
   }
-  if (value.protocol_minor !== PROTOCOL_MINOR) return "unsupported_minor";
+  const expectedMinor = MINOR1_MODELS.has(model) ? 1 : PROTOCOL_MINOR;
+  if (value.protocol_minor !== expectedMinor) return "unsupported_minor";
   return undefined;
 }
 
@@ -313,18 +358,19 @@ function isNfcScalarText(value: unknown): boolean {
 }
 
 function semanticModelCode(model: string, value: Record<string, unknown>): StableCode {
-  if (model === "LeaseV1") {
+  const base = model.endsWith("Minor1") ? model.slice(0, -"Minor1".length) : model;
+  if (base === "LeaseV1") {
     const issued = Date.parse(String(value.issued_at));
     const expires = Date.parse(String(value.expires_at));
     if (expires <= issued || expires - issued > 120_000) return "schema_invalid";
   }
-  if (model === "WorkerStatsV1") {
+  if (base === "WorkerStatsV1") {
     if (Date.parse(String(value.window_ended_at)) < Date.parse(String(value.window_started_at))) {
       return "schema_invalid";
     }
     if (!hasAtMostSixDecimalPlaces(value.realtime_factor)) return "schema_invalid";
   }
-  if (model === "TranscriptSegmentV1" || model === "TranscriptTimelinePayloadV1") {
+  if (base === "TranscriptSegmentV1" || model === "TranscriptTimelinePayloadV1") {
     const start = Number(value.start_ms);
     const end = Number(value.end_ms);
     if (start >= end || end - start > 30_000) return "schema_invalid";
@@ -337,15 +383,15 @@ function semanticModelCode(model: string, value: Record<string, unknown>): Stabl
     }
     if (!isNfcScalarText(value.text)) return "schema_invalid";
   }
-  if (model === "TimelineEventV1") {
+  if (base === "TimelineEventV1") {
     const payload = value.payload as Record<string, unknown>;
     if ("segment_id" in payload) {
       const result = semanticModelCode("TranscriptTimelinePayloadV1", payload);
       if (result !== "accepted") return result;
     }
   }
-  if (model === "ProtocolErrorV1" && !isNfcScalarText(value.message)) return "schema_invalid";
-  if (model === "ProtocolAckV1") {
+  if (base === "ProtocolErrorV1" && !isNfcScalarText(value.message)) return "schema_invalid";
+  if (base === "ProtocolAckV1") {
     const outcome = value.outcome;
     const hasSeq = value.seq != null;
     const hasRevision = value.revision != null;
@@ -418,6 +464,12 @@ export interface Protocol {
   validateModel(model: string, value: Record<string, unknown>): StableCode;
 }
 
+function sameSet(left: Set<string>, right: Set<string>): boolean {
+  if (left.size !== right.size) return false;
+  for (const item of left) if (!right.has(item)) return false;
+  return true;
+}
+
 export function createProtocol(adapters: ProtocolAdapters): Protocol {
   const ajv = new Ajv2020({
     allErrors: true,
@@ -462,7 +514,7 @@ export function createProtocol(adapters: ProtocolAdapters): Protocol {
     if (version !== undefined) return version;
     const validator = validators.get(model);
     if (validator === undefined || !validator(value)) {
-      if (model === "TimelineEventV1") {
+      if (model === "TimelineEventV1" || model === "TimelineEventV1Minor1") {
         return timelineHasUnknownField(value) ? "unknown_field" : "schema_invalid";
       }
       return classifySchemaErrors(validator?.errors);
@@ -470,17 +522,19 @@ export function createProtocol(adapters: ProtocolAdapters): Protocol {
     const semantic = semanticModelCode(model, value);
     if (semantic !== "accepted") return semantic;
     if (model === "WorkerHelloV1") {
-      const supportedMinors = value.supported_minors as number[];
-      if (!supportedMinors.includes(PROTOCOL_MINOR)) return "unsupported_minor";
-      if (!semverAtLeast(String(value.worker_version), "0.1.0")) return "worker_version_too_old";
-      const capabilities = value.capabilities as string[];
-      if (
-        capabilities.length !== 2 ||
-        !capabilities.includes("asr.transcribe") ||
-        !capabilities.includes("protocol.binary-pcm")
-      ) {
-        return "capability_required";
+      const supportedMinors = new Set(value.supported_minors as number[]);
+      const capabilities = new Set(value.capabilities as string[]);
+      const baseCaps = new Set(["asr.transcribe", "protocol.binary-pcm"]);
+      const minor1Caps = new Set([...baseCaps, "protocol.epoch-rotation"]);
+      const intersection = new Set([...supportedMinors].filter((minor) => minor === 0 || minor === 1));
+      const eligible = new Set<number>();
+      if (intersection.has(0) && sameSet(capabilities, baseCaps)) eligible.add(0);
+      if (intersection.has(1) && sameSet(capabilities, minor1Caps)) eligible.add(1);
+      if (intersection.size === 0 || (eligible.size === 0 && !intersection.has(0))) {
+        return "unsupported_minor";
       }
+      if (!semverAtLeast(String(value.worker_version), "0.1.0")) return "worker_version_too_old";
+      if (eligible.size === 0) return "capability_required";
       const manifests = value.model_manifests as Array<Record<string, unknown>>;
       if (
         manifests.length === 0 ||
@@ -495,7 +549,7 @@ export function createProtocol(adapters: ProtocolAdapters): Protocol {
         return "manifest_not_allowed";
       }
     }
-    if (model === "LeaseV1") {
+    if (model === "LeaseV1" || model === "LeaseV1Minor1") {
       const manifest = value.model_manifest as Record<string, unknown>;
       if (
         manifest.provider !== "synthetic" ||
