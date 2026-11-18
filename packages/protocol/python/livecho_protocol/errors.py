@@ -43,6 +43,9 @@ class StableCode(StrEnum):
     BINARY_FRAME_TOO_LARGE = "binary_frame_too_large"
     AUDIO_PTS_INVALID = "audio_pts_invalid"
     AUDIO_BUDGET_EXCEEDED = "audio_budget_exceeded"
+    EPOCH_ROTATED = "epoch_rotated"
+    EPOCH_EXHAUSTED = "epoch_exhausted"
+    MEDIA_TIME_REGRESSED = "media_time_regressed"
 
 
 SUCCESS_CODES = frozenset(

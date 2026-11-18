@@ -21,7 +21,7 @@ from .models import (
     WorkerResumeV1,
 )
 from .parser import canonical_digest, parse_control, strict_json_loads, validate_object
-from .scalars import UINT64_MAX
+from .scalars import UINT64_MAX, ZERO_LEASE_ID
 from .state import (
     ActiveLease,
     CancellationRegistry,
@@ -243,6 +243,51 @@ def _public_values() -> dict[str, dict[str, Any]]:
         "WorkerResumeV1": resume,
         "WorkerStatsV1": stats,
         "WorkerWelcomeV1": welcome,
+        "LeaseV1Minor1": _changed(
+            lease, protocol_minor=1, input_start_seq="1", output_start_seq="1"
+        ),
+        "LeaseCancelV1Minor1": _changed(cancel, protocol_minor=1),
+        "HeartbeatV1Minor1": _changed(heartbeat, protocol_minor=1),
+        "WorkerStatsV1Minor1": _changed(stats, protocol_minor=1),
+        "TranscriptSegmentV1Minor1": _changed(transcript, protocol_minor=1),
+        "TimelineEventV1Minor1": _changed(timeline, protocol_minor=1),
+        "ProtocolAckV1Minor1": _changed(ack, protocol_minor=1),
+        "ProtocolErrorV1Minor1": _changed(
+            error, protocol_minor=1, code="epoch_rotated", retryable=True
+        ),
+        "WorkerWelcomeV1Minor1": _changed(
+            welcome,
+            protocol_minor=1,
+            selected_minor=1,
+            accepted_capabilities=[
+                "asr.transcribe",
+                "protocol.binary-pcm",
+                "protocol.epoch-rotation",
+            ],
+        ),
+        "ViewerReadyV1Minor1": _changed(ready, protocol_minor=1, selected_minor=1),
+        "EpochRotatedV1": {
+            **_worker_envelope("worker.epoch_rotated"),
+            "protocol_minor": 1,
+            "session_id": SESSION_ID,
+            "lease_id": LEASE_ID,
+            "closed_epoch": "1",
+            "opened_epoch": "2",
+            "media_continue_ms": 1000,
+            "pcm_continue_pts": "1000",
+            "reason": "revision_capacity",
+        },
+        "ViewerResyncV1": {
+            **_viewer_envelope("viewer.resync"),
+            "protocol_minor": 1,
+            "session_id": SESSION_ID,
+            "room_id": "synthetic-room",
+            "epoch": "2",
+            "next_seq": "1",
+            "media_continue_ms": 1000,
+            "reason": "epoch_rotated",
+            "gap": True,
+        },
     }
 
 
@@ -1276,8 +1321,95 @@ def _binary_case(case_id: str, code: StableCode, **updates: Any) -> dict[str, An
     return _case(case_id, "PcmHeaderV1", expect, code, binary_header=metadata)
 
 
+def long_session_cases() -> list[dict[str, Any]]:
+    values = _public_values()
+    hello = values["WorkerHelloV1"]
+    subscribe = values["ViewerSubscribeV1"]
+    triple = ["asr.transcribe", "protocol.binary-pcm", "protocol.epoch-rotation"]
+    cases = [
+        _case(
+            "long-session.worker_offer_minor1",
+            "WorkerHelloV1",
+            "accepted",
+            StableCode.ACCEPTED,
+            wire=_changed(hello, supported_minors=[0, 1], capabilities=triple),
+        ),
+        _case(
+            "long-session.worker_minor0_rejects_rotation_capability",
+            "WorkerHelloV1",
+            "rejected",
+            StableCode.CAPABILITY_REQUIRED,
+            wire=_changed(hello, capabilities=triple),
+        ),
+        _case(
+            "long-session.viewer_offer_minor1",
+            "ViewerSubscribeV1",
+            "accepted",
+            StableCode.ACCEPTED,
+            wire=_changed(subscribe, supported_minors=[0, 1]),
+        ),
+        _case(
+            "long-session.minor0_lease_rejects_minor1",
+            "LeaseV1",
+            "rejected",
+            StableCode.UNSUPPORTED_MINOR,
+            wire=_changed(values["LeaseV1"], protocol_minor=1),
+        ),
+        _case(
+            "long-session.epoch_rotated_zero_lease",
+            "EpochRotatedV1",
+            "accepted",
+            StableCode.ACCEPTED,
+            wire=_changed(values["EpochRotatedV1"], lease_id=ZERO_LEASE_ID),
+        ),
+        _case(
+            "long-session.epoch_rotated_skips",
+            "EpochRotatedV1",
+            "rejected",
+            StableCode.SCHEMA_INVALID,
+            wire=_changed(values["EpochRotatedV1"], opened_epoch="9"),
+        ),
+        _case(
+            "long-session.epoch_rotated_reuses",
+            "EpochRotatedV1",
+            "rejected",
+            StableCode.SCHEMA_INVALID,
+            wire=_changed(values["EpochRotatedV1"], opened_epoch="1"),
+        ),
+        _binary_case(
+            "long-session.pcm_minor1_header",
+            StableCode.ACCEPTED,
+            minor=1,
+            expected_minor=1,
+        ),
+        _binary_case(
+            "long-session.pcm_minor1_rejects_minor0_header",
+            StableCode.BINARY_HEADER_INVALID,
+            minor=0,
+            expected_minor=1,
+        ),
+    ]
+    for name in (
+        "LeaseV1Minor1",
+        "TranscriptSegmentV1Minor1",
+        "TimelineEventV1Minor1",
+        "ProtocolAckV1Minor1",
+        "ProtocolErrorV1Minor1",
+    ):
+        cases.append(
+            _case(
+                f"long-session.{name.lower()}_rejects_minor0",
+                name,
+                "rejected",
+                StableCode.UNSUPPORTED_MINOR,
+                wire=_changed(values[name], protocol_minor=0),
+            )
+        )
+    return cases
+
+
 def all_cases() -> list[dict[str, Any]]:
-    cases = [*accepted_cases(), *rejected_cases()]
+    cases = [*accepted_cases(), *rejected_cases(), *long_session_cases()]
     ids = [case["case_id"] for case in cases]
     if len(ids) != len(set(ids)):
         raise ValueError("golden case IDs must be unique")
@@ -1438,7 +1570,8 @@ def _evaluate_binary(metadata: dict[str, Any]) -> StableCode:
     if (
         metadata["magic"] != "LPCM"
         or metadata["major"] != 1
-        or metadata["minor"] != 0
+        or int(metadata["minor"]) not in (0, 1)
+        or int(metadata["minor"]) != int(metadata.get("expected_minor", 0))
         or flags is None
         or not 0 <= flags <= 0xFF
         or flags not in (0, 1)

@@ -144,6 +144,7 @@ class LeaseRuntimeState:
             lease_id=self.lease_id,
             epoch=self.epoch,
             input_start_seq=int(lease.input_start_seq),
+            protocol_minor=lease.protocol_minor,
         )
         self._output = StreamOrderingState(
             session_id=self.session_id,

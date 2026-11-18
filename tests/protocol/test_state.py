@@ -14,7 +14,13 @@ from livecho_protocol.binary import (
 )
 from livecho_protocol.compatibility import manifest_key
 from livecho_protocol.errors import ProtocolValidationError, StableCode
-from livecho_protocol.models import LeaseCancelV1, LeaseV1, ViewerCursorV1, WorkerResumeV1
+from livecho_protocol.models import (
+    LeaseCancelV1,
+    LeaseV1,
+    LeaseV1Minor1,
+    ViewerCursorV1,
+    WorkerResumeV1,
+)
 from livecho_protocol.parser import canonical_digest
 from livecho_protocol.runtime import LeaseRuntimeCoordinator
 from livecho_protocol.scalars import UINT64_MAX
@@ -298,6 +304,49 @@ def test_cancellation_capacity_evicts_oldest_before_close() -> None:
         now += timedelta(seconds=1)
     assert tuple(registry.tombstones) == tuple(lease_ids[1:])
     assert not hasattr(registry, "closed")
+
+
+def test_accept_pcm_enforces_the_lease_negotiated_minor(
+    valid_messages: dict[str, dict[str, object]],
+) -> None:
+    """Header minor is checked on LeaseRuntimeState.accept_pcm, not only the codec."""
+    now = datetime(2026, 1, 1, tzinfo=UTC)
+    coordinator = _coordinator(valid_messages)
+    cases = (
+        (
+            0,
+            LeaseV1,
+            "00000000-0000-4000-8000-0000000000a0",
+            "00000000-0000-4000-8000-0000000000b0",
+        ),
+        (
+            1,
+            LeaseV1Minor1,
+            "00000000-0000-4000-8000-0000000000a1",
+            "00000000-0000-4000-8000-0000000000b1",
+        ),
+    )
+    try:
+        for negotiated, model, session_id, lease_id in cases:
+            coordinator.session_teardown(session_id)
+            raw = deepcopy(valid_messages["LeaseV1"])
+            raw["protocol_minor"] = negotiated
+            raw["session_id"] = session_id
+            raw["lease_id"] = lease_id
+            runtime = coordinator.create(model.model_validate(raw))
+            rejected = PcmHeaderV1(lease_id, 1, 0, 0, 1, 2, protocol_minor=1 - negotiated)
+            rejected_frame = bytearray(encode_header(rejected)) + bytearray(rejected.payload_length)
+            assert runtime.accept_pcm(rejected_frame, now=now).code == (
+                StableCode.BINARY_HEADER_INVALID
+            )
+            assert runtime.buffered_audio_bytes == 0
+            accepted = PcmHeaderV1(lease_id, 1, 0, 0, 1, 2, protocol_minor=negotiated)
+            accepted_frame = bytearray(encode_header(accepted)) + bytearray(accepted.payload_length)
+            assert runtime.accept_pcm(accepted_frame, now=now).code == StableCode.ACCEPTED
+            assert runtime.buffered_audio_bytes == 2
+    finally:
+        for _, _, session_id, _ in cases:
+            coordinator.session_teardown(session_id)
 
 
 def test_cancellation_closes_pcm_and_output_atomically(

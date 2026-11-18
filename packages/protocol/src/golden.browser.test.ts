@@ -22,7 +22,7 @@ describe("protocol v1 browser-entry golden parity", () => {
   const cases = loadCases();
 
   it("runs every generated case through the browser adapters", () => {
-    expect(cases).toHaveLength(127);
+    expect(cases).toHaveLength(153);
     expect(new Set(cases.map((testCase) => testCase.case_id)).size).toBe(cases.length);
   });
 

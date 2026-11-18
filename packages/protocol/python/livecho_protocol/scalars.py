@@ -115,6 +115,21 @@ UUID4String = Annotated[
     Field(pattern=UUID4_PATTERN.pattern, json_schema_extra={"format": "uuid"}),
     AfterValidator(_uuid4),
 ]
+ZERO_LEASE_ID = "00000000-0000-0000-0000-000000000000"
+_LEASE_OR_ZERO_PATTERN = re.compile(rf"^(?:{ZERO_LEASE_ID}|{UUID4_PATTERN.pattern[1:-1]})$")
+
+
+def _lease_id_or_zero(value: str) -> str:
+    if value == ZERO_LEASE_ID:
+        return value
+    return _uuid4(value)
+
+
+EpochLeaseId = Annotated[
+    str,
+    Field(pattern=_LEASE_OR_ZERO_PATTERN.pattern),
+    AfterValidator(_lease_id_or_zero),
+]
 TimestampString = Annotated[
     str,
     Field(pattern=TIMESTAMP_PATTERN.pattern, json_schema_extra={"format": "date-time"}),

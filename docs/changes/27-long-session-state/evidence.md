@@ -96,7 +96,38 @@ absent until these artifacts are on `main`. The single pytest failure is an
 atime comparison in the existing #5 store test on this machine's filesystem; it
 is not a change in this diff.
 
+## Implementation
+
+- Branch: `issue/27-long-session-state-impl`, based on `1968239` (`main`, after
+  this artifact directory merged in #56).
+- Scope: `packages/protocol/**`, `tests/protocol/**`, and this evidence file.
+  No backend, web, worker, or ingest changes. `audio_origin` stays `synthetic`.
+
+The historical goldens `version.worker_supported_minor_missing` and
+`version.viewer_supported_minor_missing` send `supported_minors: [1]` and expect
+`unsupported_minor`. Those codes stay. A worker offer of only minor 1 is
+accepted only with the exact three capabilities. A viewer selects minor 1 only
+when the offer contains both 0 and 1. That keeps the accepted "existing golden
+codes stay" rule.
+
+Codex review on `c66dee8` required three contract alignments, now in this
+branch: TypeScript rejects an `EpochRotatedV1` whose opened epoch is not the
+closed epoch plus one; `lease_id` accepts a UUIDv4 or the exact zero UUID when
+no lease is active; PCM encode/decode and lease acceptance use the negotiated
+minor, with minor 0 remaining the default.
+
+| Command | Result |
+| --- | --- |
+| `uv run pytest -q tests/protocol` | 77 passed after the review fixes below |
+| `uv run pytest -q tests/protocol/test_long_session.py` | 9 passed. Counts cover 4,095/4,096/4,097 on each domain, three crossings, ceiling 8,193, and no epoch wrap. |
+| `pnpm --filter @livecho/protocol test` | 314 passed after the review fixes, browser entry ok |
+| `uv run python tools/protocol_codegen.py --check` | `protocol generated artifacts: ok` |
+| `uv run mypy packages/protocol/python tests/protocol` | no issues |
+| `uv run pytest -q tests/protocol/test_state.py::test_accept_pcm_enforces_the_lease_negotiated_minor` | Passed. `LeaseRuntimeState.accept_pcm` for a `LeaseV1Minor1` rejects header minor 0 and accepts header minor 1; a minor-0 lease does the reverse. Budget stays 0 on rejection. |
+| `make verify` | Exit 0 after wiring `lease.protocol_minor` into `PcmLeaseState`. 946 pytest passed, 1 deselected; protocol 314; web 51; railway 63; artifacts and protocol drift ok. |
+
 ## Release and rollback evidence
 
-Not deployed. Rollback of this pull request deletes the four new Markdown files
-and leaves protocol behavior unchanged.
+Not deployed. Rollback of the implementation reverts the Pydantic source and
+the generated schema, types, and fixtures together. Minor-0 fixtures keep their
+previous codes. A reader without minor 1 rejects those envelopes.

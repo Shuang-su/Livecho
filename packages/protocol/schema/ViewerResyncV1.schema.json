@@ -1,0 +1,95 @@
+{
+  "$id": "https://livecho.invalid/protocol/v1/ViewerResyncV1.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "epoch": {
+      "format": "uint64-decimal",
+      "pattern": "^(?:[1-9][0-9]{0,19})$",
+      "title": "Epoch",
+      "type": "string"
+    },
+    "gap": {
+      "const": true,
+      "title": "Gap",
+      "type": "boolean"
+    },
+    "media_continue_ms": {
+      "maximum": 2147483647,
+      "minimum": 0,
+      "title": "Media Continue Ms",
+      "type": "integer"
+    },
+    "message_id": {
+      "format": "uuid",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+      "title": "Message Id",
+      "type": "string"
+    },
+    "next_seq": {
+      "format": "uint64-decimal",
+      "pattern": "^(?:0|[1-9][0-9]{0,19})$",
+      "title": "Next Seq",
+      "type": "string"
+    },
+    "protocol": {
+      "const": "livecho.viewer.v1",
+      "title": "Protocol",
+      "type": "string"
+    },
+    "protocol_minor": {
+      "const": 1,
+      "title": "Protocol Minor",
+      "type": "integer"
+    },
+    "reason": {
+      "enum": [
+        "epoch_rotated",
+        "cursor_expired",
+        "cursor_unknown"
+      ],
+      "title": "Reason",
+      "type": "string"
+    },
+    "room_id": {
+      "maxLength": 128,
+      "minLength": 1,
+      "pattern": "^[a-z0-9][a-z0-9._:-]*$",
+      "title": "Room Id",
+      "type": "string"
+    },
+    "sent_at": {
+      "format": "date-time",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{3}Z$",
+      "title": "Sent At",
+      "type": "string"
+    },
+    "session_id": {
+      "format": "uuid",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+      "title": "Session Id",
+      "type": "string"
+    },
+    "type": {
+      "const": "viewer.resync",
+      "title": "Type",
+      "type": "string"
+    }
+  },
+  "required": [
+    "protocol",
+    "protocol_minor",
+    "message_id",
+    "type",
+    "sent_at",
+    "session_id",
+    "room_id",
+    "epoch",
+    "next_seq",
+    "media_continue_ms",
+    "reason",
+    "gap"
+  ],
+  "title": "ViewerResyncV1",
+  "type": "object"
+}
