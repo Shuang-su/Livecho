@@ -304,7 +304,7 @@ def create_auth_app(
 def _parse_object(raw: bytes, keys: frozenset[str]) -> dict[str, object] | None:
     try:
         value = json.loads(raw)
-    except json.JSONDecodeError:
+    except (json.JSONDecodeError, UnicodeDecodeError):
         return None
     if not isinstance(value, dict):
         return None

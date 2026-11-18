@@ -150,3 +150,19 @@ with reason `completed`, at the artifact merge. This implementation references
 
 Skipped and not passes: live Resend delivery, sealed-variable provisioning,
 staging or production sessions, and any deployment.
+
+## Review fixes
+
+Codex review of `80c6828` reported two findings. Both are fixed in the
+follow-up commit and covered by tests:
+
+- Each client-IP bucket keeps at most 30 in-window timestamps. Requests over
+  the quota do not append another timestamp, and buckets whose newest hit is
+  outside the 15-minute window are removed.
+- `json.loads` decoding failures return the specified `422` or `400`
+  `invalid_body` response instead of an uncaught `UnicodeDecodeError`.
+
+| Command | Result | Date/commit |
+| --- | --- | --- |
+| `uv run pytest -q tests/auth` | Exit 0. `28 passed`. | 2026-11-18 / review-fix tree |
+| `LIVECHO_HEAD_REF=issue/12-invite-only-auth-impl make verify` | Exit 0. pytest `974 passed, 1 deselected`; mypy 170 files; Railway 63, protocol 314, web 51; `change artifacts: ok`. | 2026-11-18 / review-fix tree |

@@ -3,14 +3,14 @@
 from __future__ import annotations
 
 import threading
-from datetime import timedelta
+from datetime import UTC, datetime, timedelta
 
 from livecho_backend.auth.app import create_auth_app
 from livecho_backend.auth.bootstrap import bootstrap_first_admin
 from livecho_backend.auth.config import AuthConfig
 from livecho_backend.auth.crypto import magic_link_verifier, session_verifier
 from livecho_backend.auth.mail import MemoryMailSink, TransportMailer, prepare_resend_call
-from livecho_backend.auth.records import MAGIC_LINK_TTL
+from livecho_backend.auth.records import IP_QUOTA, IP_WINDOW, MAGIC_LINK_TTL
 from livecho_backend.auth.store import MemoryAuthStore
 
 from .support import TEST_SIGNING_KEY, TickingClock, call_app, json_body, sending_config
@@ -142,6 +142,48 @@ def test_transport_is_refused_until_mail_is_fully_configured() -> None:
     assert calls == [1]
     assert len(mailer.calls) == 1
     assert mailer.calls[0].headers[2][0] == "Idempotency-Key"
+
+
+def test_rate_limit_buckets_stay_bounded_and_idle_buckets_leave() -> None:
+    store = MemoryAuthStore()
+    now = datetime(2026, 1, 1, tzinfo=UTC)
+    for _ in range(IP_QUOTA + 40):
+        store.prepare_magic_link(
+            account=None,
+            ip="203.0.113.8",
+            now=now,
+            verifier=None,
+            link_id=None,
+            can_send=False,
+            created_at=now,
+            expires_at=now,
+        )
+    assert len(store._ip_hits["203.0.113.8"]) == IP_QUOTA
+    store.prepare_magic_link(
+        account=None,
+        ip="198.51.100.9",
+        now=now,
+        verifier=None,
+        link_id=None,
+        can_send=False,
+        created_at=now,
+        expires_at=now,
+    )
+    later = now + IP_WINDOW
+    allowed = store.prepare_magic_link(
+        account=None,
+        ip="203.0.113.50",
+        now=later,
+        verifier=None,
+        link_id=None,
+        can_send=False,
+        created_at=later,
+        expires_at=later,
+    )
+    assert allowed.kind.value == "noop"
+    assert "203.0.113.8" not in store._ip_hits
+    assert "198.51.100.9" not in store._ip_hits
+    assert len(store._ip_hits["203.0.113.50"]) == 1
 
 
 def test_one_consume_wins_and_labels_do_not_match() -> None:

@@ -344,10 +344,21 @@ class MemoryAuthStore:
             return True
 
     def _record_ip(self, ip: str, now: datetime) -> bool:
+        self._evict_idle_buckets(now)
         hits = [item for item in self._ip_hits.get(ip, []) if now - item < IP_WINDOW]
+        if len(hits) >= IP_QUOTA:
+            self._ip_hits[ip] = hits
+            return False
         hits.append(now)
         self._ip_hits[ip] = hits
-        return len(hits) <= IP_QUOTA
+        return True
+
+    def _evict_idle_buckets(self, now: datetime) -> None:
+        idle = [
+            key for key, hits in self._ip_hits.items() if not hits or now - hits[-1] >= IP_WINDOW
+        ]
+        for key in idle:
+            del self._ip_hits[key]
 
     def _reusable(self, account_id: str, now: datetime) -> MagicLink | None:
         for link in self._links.values():

@@ -481,6 +481,17 @@ def test_redeem_rejects_query_token_bad_origin_and_bad_body() -> None:
     )
     assert still.status == 204
     assert call_app(app, "POST", "/api/auth/magic-link", body=b"{").status == 422
+    invalid_bytes = call_app(app, "POST", "/api/auth/magic-link", body=b'{"email":"\xff"}')
+    assert invalid_bytes.status == 422
+    assert invalid_bytes.body == b'{"error":"invalid_body"}'
+    invalid_token = call_app(
+        app,
+        "POST",
+        "/api/auth/session",
+        body=b'{"token":"\xff"}',
+    )
+    assert invalid_token.status == 400
+    assert invalid_token.body == b'{"error":"invalid_body"}'
     assert (
         call_app(
             app,
