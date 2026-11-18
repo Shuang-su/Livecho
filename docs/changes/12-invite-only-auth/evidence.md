@@ -2,11 +2,15 @@
 
 ## Artifact approval
 
-- Artifact PR: Pending.
-- Status: Proposed; documentation only. Implementation is not included.
-- Approved by/date: Pending @Shuang-su review and merge.
-- Authoring base: `a1f1c22c42944e42feaf9a1682acdfcbc8ffcb98` (`main`).
-- Branch: `issue/12-invite-only-auth`.
+- Artifact PR: [#57](https://github.com/Shuang-su/Livecho/pull/57), merged as
+  `878163eacb01514f78580db8d2a5f77db8394c66` on 2026-11-18.
+- Status: Owner merged intent, spec, and plan. Implementation follows on a new
+  branch and does not rewrite those three files.
+- Approved by/date: @Shuang-su / 2026-11-18 (merge of #57).
+- Authoring base: `a1f1c22c42944e42feaf9a1682acdfcbc8ffcb98` (`main` at authoring).
+- Implementation base: `8fbfa8a8ea359e6d1dd9778c216b489b47630366` (`main`), which
+  contains #57 and the merged #27 protocol implementation `8fbfa8a`.
+- Branch: `issue/12-invite-only-auth-impl`.
 
 ## Requirements-author exposure and assignment
 
@@ -73,9 +77,35 @@ created.
 
 ## Review findings
 
-None yet. Owner review of the invite-only premise, the matrix, and the decision
-not to adopt Issue #31 is still pending. Auth code stays blocked until that
-review merges intent, spec, and plan.
+Artifact review: the owner merged #57. Codex review of that documentation
+commit reported no findings. Auth code was blocked until that merge and is in
+scope only on `issue/12-invite-only-auth-impl`.
+
+## Implementer exposure and assignment
+
+- Identity/role/paths/date: Cursor cloud agent, Issue #12 implementer for
+  `services/backend/src/livecho_backend/auth/**`, `tests/auth/**`, and this
+  evidence file, 2026-11-18. This record is committed before those Python
+  paths are edited.
+- Assignment source: the owner merged #57, then asked for the accepted #12
+  contract to be implemented on a new branch from current `main`. The pull
+  request must reference #12 and must not use a closing keyword.
+- Repository inputs read before code: `AGENTS.md`, `CONTRIBUTING.md`, the four
+  accepted files in `docs/changes/12-invite-only-auth/`, live Issue #12 (body
+  still lists the original acceptance criteria; GitHub shows it closed by
+  @Shuang-su at 2026-11-18T03:42:19Z with reason `completed`), the backend
+  package layout, `create_local_vertical_app` health and viewer routes,
+  `.env.example`, and `pyproject.toml`. No reference authentication
+  implementation, upstream source, fixture, or screenshot was opened.
+- External fact carried from the accepted spec, not re-derived: Resend's
+  `Idempotency-Key` header. No sample provider key is copied.
+- Assignment decision: implement the accepted memory-adapter auth application
+  and offline tests. Do not add `db/migrations/`, because that path requires
+  the already accepted Issue #4 first-schema guard replacement and is not
+  needed for the offline contract tests. Do not provision secrets, call
+  Resend, or enable production mail or sessions.
+- Independent reviewer: required before merge. This author does not merge the
+  implementation pull request.
 
 ## Deviations
 
