@@ -28,10 +28,12 @@
    generator. Add `long-session-` golden cases to the shared manifest. Run both
    language runners.
 8. Add `tests/protocol/test_long_session.py` for the 4,095 / 4,096 / 4,097
-   counts, three crossings, duplicate-final and old-epoch isolation, cursor
-   table, session-versus-epoch media time, tombstone eviction at 8, and
-   `epoch_exhausted` without wrapping. Assert record counts and logical ceilings,
-   not process RSS.
+   counts on the worker-output domain and again on the viewer domain, three
+   crossings, duplicate-final and old-epoch isolation, cursor table,
+   session-versus-epoch media time, tombstone eviction at 8, and
+   `epoch_exhausted` without wrapping. Assert that the two domains do not share
+   slots and that the session total stays within 8,193 revision records, two
+   256-record JSON windows, and 8 tombstones. Use record counts, not process RSS.
 9. Confirm `git diff` does not touch `services/`, `apps/`, `workers/`, ingest, or
    the #30 index. Append implementation commands to this issue's `evidence.md`
    only. Do not rewrite the merged intent, spec, or plan.

@@ -77,7 +77,16 @@ and leave minor-0 `protocol_minor` literals at 0. Hello and subscribe stay
 pre-selection minor-0 requests. After that edit,
 `LIVECHO_HEAD_REF=issue/27-long-session-state uv run python tools/check_change_artifacts.py`
 exited 0 (`change artifacts: ok`) and the local Markdown link check reported
-`local links ok: 1`. Owner review of the revised text is still pending.
+`local links ok: 1`.
+
+Codex review on `a9ce345`
+([comment](https://github.com/Shuang-su/Livecho/pull/56#discussion_r4608955922))
+found the memory paragraph counted one revision domain of 4,096 while the
+session machine keeps a worker-output domain and a viewer domain. The spec now
+gives each of those domains its own 4,096 ceiling, adds the single lease
+record, and sets the session ceiling at 8,193 revision records. A crossing in
+either full domain rotates both. Owner review of the revised text is still
+pending.
 
 ## Deviations
 

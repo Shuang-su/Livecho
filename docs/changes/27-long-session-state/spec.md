@@ -50,7 +50,7 @@ accepted fixture sends that offer.
 
 | Name | Value | Applies |
 | --- | --- | --- |
-| `REVISION_DOMAIN_CAPACITY` | 4,096 identities | every active revision domain; no eviction inside the domain |
+| `REVISION_DOMAIN_CAPACITY` | 4,096 identities | each of the worker-output domain and the viewer domain; no eviction inside that domain, and no shared slot pool |
 | `SEQUENCE_WINDOW_CAPACITY` | 256 | unchanged JSON and PCM windows |
 | `ROTATION_TOMBSTONE_CAPACITY` | 8 per session | minor 1 only |
 | `CANCELLATION_TOMBSTONE_CAPACITY` | 64 process-wide, 120 seconds | unchanged |
@@ -62,9 +62,14 @@ revision record stays the #3 136-byte logical record. A rotation tombstone store
 only integers and one reason literal: closed epoch, the exclusive next input,
 output, and viewer sequences, `media_continue_ms`, `pcm_continue_pts`, and reason.
 It stores no transcript text, segment id, PCM sample, content digest, credential,
-or locator. Eight tombstones plus one active domain of at most 4,096 revision
-records and two 256-record JSON windows is the per-session ceiling. PCM windows
-store no records and no payload-derived bytes.
+or locator. A session holds two full revision domains at once: worker output
+and viewer. Each keeps its own 4,096 records. A free slot in one does not admit
+an identity into the other. The current lease adds one revision record, the #3
+capacity of that lease domain. The per-session ceiling is therefore 8,193
+revision records (4,096 + 4,096 + 1), two 256-record JSON windows (worker output
+and viewer), and eight tombstones. PCM windows store no records and no
+payload-derived bytes. Rotation drops both full domains and the lease record
+together; the successor epoch starts empty.
 
 ### Minor 0 retain rule
 
@@ -109,9 +114,11 @@ rotation is `unknown_field` or `schema_invalid` and changes nothing.
 
 Two triggers share one commit:
 
-1. `revision_capacity`. A candidate whose revision preview would be
-   `revision_capacity_exceeded` for a **new** identity. Updates, duplicates,
-   conflicts, and other non-capacity decisions do not trigger it.
+1. `revision_capacity`. A candidate whose own domain, worker-output or viewer,
+   would return `revision_capacity_exceeded` for a **new** identity. Either
+   domain crossing rotates the session even when the other domain is below
+   4,096. Updates, duplicates, conflicts, and other non-capacity decisions do
+   not trigger it. The lease domain's capacity of one is not this trigger.
 2. `lease_replaced`. An explicit backend request to issue a non-resumed lease
    for the same session. #14 and #15 decide when that request is legal. This
    spec defines the protocol effect only.
@@ -343,10 +350,13 @@ existing protocol package tests and golden runner.
 
 - [ ] Minor 0 goldens and the 4,096 / 4,097 capacity cases keep today's codes,
       and minor 0 never emits the new messages or rotates.
-- [ ] Minor 1 accepts identities 4,095 and 4,096, rejects the new 4,097th
-      identity with `epoch_rotated` without storing it, and repeats that
-      crossing on three successive epochs. Active revision records after each
-      commit equal only the new epoch's later admissions. Tombstones stay ≤ 8.
+- [ ] Minor 1 accepts identities 4,095 and 4,096 in a domain, rejects that
+      domain's new 4,097th identity with `epoch_rotated` without storing it,
+      and does so for the worker-output domain and again for the viewer domain.
+      It repeats a crossing on three successive epochs. Active revision records
+      after each commit equal only the new epoch's later admissions in both
+      domains plus the single lease record. Their sum stays ≤ 8,193. Tombstones
+      stay ≤ 8.
 - [ ] An existing-identity update or duplicate at size 4,096 does not rotate.
       A duplicate final stays idempotent. A final cannot be revised. Closed-epoch
       and out-of-order messages leave the active domain unchanged.
