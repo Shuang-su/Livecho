@@ -118,3 +118,35 @@ Product code is intentionally absent.
 Not deployed. No production traffic, real email, live Resend credential, or
 production auth is enabled. Rollback of this pull request deletes the four new
 Markdown files and leaves runtime behavior unchanged.
+
+## Implementation verification
+
+Commands below were run on 2026-11-18 from `issue/12-invite-only-auth-impl`
+after `make bootstrap`. The auth module under test is
+`50656755412fb9445b0cdfd907c62e3a450a32d1`. `make verify` is the GitHub
+`Verify` workflow's entry point. Live Resend, Railway provisioning, and
+production auth were not run.
+
+| Command | Result | Date/commit |
+| --- | --- | --- |
+| `uv run pytest -q tests/auth` | Exit 0. `27 passed`. | 2026-11-18 / `5065675` |
+| `uv run ruff check services/backend/src/livecho_backend/auth tests/auth` | Exit 0. `All checks passed`. | 2026-11-18 / `5065675` |
+| `uv run mypy services/backend/src/livecho_backend/auth tests/auth` | Exit 0. `Success: no issues found in 19 source files`. | 2026-11-18 / `5065675` |
+| `LIVECHO_HEAD_REF=issue/12-invite-only-auth-impl make verify` | Exit 0. ruff check and format; mypy 170 files; pytest `973 passed, 1 deselected`; Railway 63, protocol 314, web 51; `change artifacts: ok`; protocol codegen ok; production build ok. | 2026-11-18 / `5065675` |
+| `git diff --check` | Exit 0. | 2026-11-18 / `5065675` |
+| `rg -n 'RESEND_API_KEY=\\|LIVECHO_SESSION_SIGNING_KEY=' services/backend/src/livecho_backend/auth tests/auth` | No matches. | 2026-11-18 / `5065675` |
+
+The implementation keeps `LIVECHO_EMAIL_ENABLED` false in `.env.example` and
+does not add `db/migrations/`. Identity state is the process-local memory
+adapter from the spec. A Postgres schema would also have to replace the Issue
+#4 no-schema guard; that gate is not taken here. `create_auth_app()` does not
+read the process environment, so a present `RESEND_API_KEY` cannot send mail
+from the default app. The Resend request builder is invoked only through an
+injected transport in tests.
+
+GitHub showed Issue #12 already closed by @Shuang-su at 2026-11-18T03:42:19Z
+with reason `completed`, at the artifact merge. This implementation references
+#12 and does not use a closing keyword.
+
+Skipped and not passes: live Resend delivery, sealed-variable provisioning,
+staging or production sessions, and any deployment.
