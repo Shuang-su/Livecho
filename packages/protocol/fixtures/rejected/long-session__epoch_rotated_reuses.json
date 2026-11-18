@@ -1,0 +1,20 @@
+{
+  "case_id": "long-session.epoch_rotated_reuses",
+  "code": "schema_invalid",
+  "expect": "rejected",
+  "model": "EpochRotatedV1",
+  "wire": {
+    "closed_epoch": "1",
+    "lease_id": "00000000-0000-4000-8000-000000000020",
+    "media_continue_ms": 1000,
+    "message_id": "00000000-0000-4000-8000-000000000001",
+    "opened_epoch": "1",
+    "pcm_continue_pts": "1000",
+    "protocol": "livecho.worker.v1",
+    "protocol_minor": 1,
+    "reason": "revision_capacity",
+    "sent_at": "2026-01-01T00:00:00.000Z",
+    "session_id": "00000000-0000-4000-8000-000000000030",
+    "type": "worker.epoch_rotated"
+  }
+}

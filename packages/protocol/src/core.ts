@@ -390,6 +390,15 @@ function semanticModelCode(model: string, value: Record<string, unknown>): Stabl
       if (result !== "accepted") return result;
     }
   }
+  if (model === "EpochRotatedV1") {
+    try {
+      const closed = BigInt(String(value.closed_epoch));
+      const opened = BigInt(String(value.opened_epoch));
+      if (opened !== closed + 1n) return "schema_invalid";
+    } catch {
+      return "schema_invalid";
+    }
+  }
   if (base === "ProtocolErrorV1" && !isNfcScalarText(value.message)) return "schema_invalid";
   if (base === "ProtocolAckV1") {
     const outcome = value.outcome;
@@ -645,7 +654,8 @@ export function createProtocol(adapters: ProtocolAdapters): Protocol {
     if (
       value.magic !== "LPCM" ||
       value.major !== 1 ||
-      value.minor !== 0 ||
+      ![0, 1].includes(Number(value.minor)) ||
+      Number(value.minor) !== Number(value.expected_minor ?? 0) ||
       !validFlags ||
       value.header_length !== 56 ||
       epoch < 1n ||

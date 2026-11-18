@@ -8,6 +8,7 @@ from typing import Annotated, Literal
 from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, field_validator, model_validator
 
 from .scalars import (
+    EpochLeaseId,
     LanguageTag,
     ManifestText,
     NFCString,
@@ -529,7 +530,7 @@ class EpochRotatedV1(WorkerEnvelopeV1):
     protocol_minor: Minor1Literal  # type: ignore[assignment]
     type: Literal["worker.epoch_rotated"]
     session_id: UUID4String
-    lease_id: UUID4String
+    lease_id: EpochLeaseId
     closed_epoch: PositiveUint64Decimal
     opened_epoch: PositiveUint64Decimal
     media_continue_ms: Milliseconds

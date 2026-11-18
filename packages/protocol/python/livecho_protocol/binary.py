@@ -13,6 +13,7 @@ from .state import PcmSequenceWindow
 MAGIC = b"LPCM"
 PROTOCOL_MAJOR = 1
 PROTOCOL_MINOR = 0
+ACCEPTED_PCM_MINORS = frozenset({0, 1})
 HEADER_LENGTH = 56
 END_OF_SEGMENT = 0x01
 MAX_SAMPLE_COUNT = 16_000
@@ -32,6 +33,7 @@ class PcmHeaderV1:
     sample_count: int
     payload_length: int
     end_of_segment: bool = False
+    protocol_minor: int = 0
 
 
 def _valid_header(header: PcmHeaderV1) -> bool:
@@ -47,6 +49,7 @@ def _valid_header(header: PcmHeaderV1) -> bool:
         and 1 <= header.sample_count <= MAX_SAMPLE_COUNT
         and 2 <= header.payload_length <= MAX_PAYLOAD_LENGTH
         and header.payload_length == header.sample_count * 2
+        and header.protocol_minor in ACCEPTED_PCM_MINORS
     )
 
 
@@ -58,7 +61,7 @@ def encode_header(header: PcmHeaderV1) -> bytes:
     return _HEADER.pack(
         MAGIC,
         PROTOCOL_MAJOR,
-        PROTOCOL_MINOR,
+        header.protocol_minor,
         flags,
         HEADER_LENGTH,
         UUID(header.lease_id).bytes,
@@ -93,7 +96,7 @@ def decode_header(frame: bytes | bytearray | memoryview) -> PcmHeaderV1:
     if (
         magic != MAGIC
         or major != PROTOCOL_MAJOR
-        or minor != PROTOCOL_MINOR
+        or minor not in ACCEPTED_PCM_MINORS
         or flags & ~END_OF_SEGMENT
         or header_length != HEADER_LENGTH
         or len(view) != HEADER_LENGTH + payload_length
@@ -107,6 +110,7 @@ def decode_header(frame: bytes | bytearray | memoryview) -> PcmHeaderV1:
         sample_count=sample_count,
         payload_length=payload_length,
         end_of_segment=bool(flags & END_OF_SEGMENT),
+        protocol_minor=minor,
     )
     if not _valid_header(header):
         raise ProtocolValidationError(StableCode.BINARY_HEADER_INVALID)
@@ -123,9 +127,11 @@ class PcmLeaseState:
         epoch: int,
         input_start_seq: int,
         lease_budget: int = LEASE_AUDIO_BUDGET,
+        protocol_minor: int = PROTOCOL_MINOR,
     ) -> None:
         self.lease_id = lease_id
         self.epoch = epoch
+        self.protocol_minor = protocol_minor
         self.sequence = PcmSequenceWindow(input_start_seq)
         self.lease_budget = lease_budget
         self.buffered_bytes = 0
@@ -145,6 +151,8 @@ class PcmLeaseState:
             header = decode_header(frame)
         except ProtocolValidationError as error:
             return Decision(error.code)
+        if header.protocol_minor != self.protocol_minor:
+            return Decision(StableCode.BINARY_HEADER_INVALID)
         if header.lease_id != self.lease_id:
             return Decision(StableCode.BINDING_MISMATCH)
         if header.epoch < self.epoch:

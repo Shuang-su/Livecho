@@ -21,7 +21,7 @@ from .models import (
     WorkerResumeV1,
 )
 from .parser import canonical_digest, parse_control, strict_json_loads, validate_object
-from .scalars import UINT64_MAX
+from .scalars import UINT64_MAX, ZERO_LEASE_ID
 from .state import (
     ActiveLease,
     CancellationRegistry,
@@ -1355,6 +1355,39 @@ def long_session_cases() -> list[dict[str, Any]]:
             StableCode.UNSUPPORTED_MINOR,
             wire=_changed(values["LeaseV1"], protocol_minor=1),
         ),
+        _case(
+            "long-session.epoch_rotated_zero_lease",
+            "EpochRotatedV1",
+            "accepted",
+            StableCode.ACCEPTED,
+            wire=_changed(values["EpochRotatedV1"], lease_id=ZERO_LEASE_ID),
+        ),
+        _case(
+            "long-session.epoch_rotated_skips",
+            "EpochRotatedV1",
+            "rejected",
+            StableCode.SCHEMA_INVALID,
+            wire=_changed(values["EpochRotatedV1"], opened_epoch="9"),
+        ),
+        _case(
+            "long-session.epoch_rotated_reuses",
+            "EpochRotatedV1",
+            "rejected",
+            StableCode.SCHEMA_INVALID,
+            wire=_changed(values["EpochRotatedV1"], opened_epoch="1"),
+        ),
+        _binary_case(
+            "long-session.pcm_minor1_header",
+            StableCode.ACCEPTED,
+            minor=1,
+            expected_minor=1,
+        ),
+        _binary_case(
+            "long-session.pcm_minor1_rejects_minor0_header",
+            StableCode.BINARY_HEADER_INVALID,
+            minor=0,
+            expected_minor=1,
+        ),
     ]
     for name in (
         "LeaseV1Minor1",
@@ -1537,7 +1570,8 @@ def _evaluate_binary(metadata: dict[str, Any]) -> StableCode:
     if (
         metadata["magic"] != "LPCM"
         or metadata["major"] != 1
-        or metadata["minor"] != 0
+        or int(metadata["minor"]) not in (0, 1)
+        or int(metadata["minor"]) != int(metadata.get("expected_minor", 0))
         or flags is None
         or not 0 <= flags <= 0xFF
         or flags not in (0, 1)

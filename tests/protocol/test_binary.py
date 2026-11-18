@@ -26,6 +26,16 @@ def test_header_is_exactly_56_bytes_and_round_trips_metadata() -> None:
     assert decode_header(_frame(header)) == header
 
 
+def test_minor1_header_round_trips_and_minor0_lease_rejects_it() -> None:
+    header = PcmHeaderV1(LEASE_ID, 1, 0, 0, 1, 2, protocol_minor=1)
+    assert decode_header(_frame(header)) == header
+    minor1 = PcmLeaseState(lease_id=LEASE_ID, epoch=1, input_start_seq=0, protocol_minor=1)
+    assert minor1.accept(_frame(header)).code == StableCode.ACCEPTED
+    minor0 = PcmLeaseState(lease_id=LEASE_ID, epoch=1, input_start_seq=0)
+    assert minor0.accept(_frame(header)).code == StableCode.BINARY_HEADER_INVALID
+    assert minor0.buffered_bytes == 0
+
+
 def test_header_uint64_overflow_is_a_stable_structural_rejection() -> None:
     overflowing = UINT64_MAX + 1
     headers = (
