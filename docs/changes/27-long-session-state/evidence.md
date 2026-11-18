@@ -123,7 +123,8 @@ minor, with minor 0 remaining the default.
 | `pnpm --filter @livecho/protocol test` | 314 passed after the review fixes, browser entry ok |
 | `uv run python tools/protocol_codegen.py --check` | `protocol generated artifacts: ok` |
 | `uv run mypy packages/protocol/python tests/protocol` | no issues |
-| `make verify` | Exit 0 after the review fixes. 945 pytest passed, 1 deselected; protocol 314; web 51; railway 63; artifacts and protocol drift ok. |
+| `uv run pytest -q tests/protocol/test_state.py::test_accept_pcm_enforces_the_lease_negotiated_minor` | Passed. `LeaseRuntimeState.accept_pcm` for a `LeaseV1Minor1` rejects header minor 0 and accepts header minor 1; a minor-0 lease does the reverse. Budget stays 0 on rejection. |
+| `make verify` | Exit 0 after wiring `lease.protocol_minor` into `PcmLeaseState`. 946 pytest passed, 1 deselected; protocol 314; web 51; railway 63; artifacts and protocol drift ok. |
 
 ## Release and rollback evidence
 
