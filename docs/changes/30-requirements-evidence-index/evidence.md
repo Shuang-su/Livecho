@@ -475,3 +475,50 @@ Result: 23 Issues, 62 direct edges, 0 roadmap differences, #31 title-only OPEN,
   M2 identity/gateway, #27/#28. Index maintenance does not enable those capabilities.
 - Process: independent human reviewer (plan step 8) and owner merge of this draft PR.
   No auto-close of Issue #30 from this change.
+
+## 2026-11-21 — Index refresh for merged #12 and #27 work
+
+Maintenance refresh under the accepted spec's "README and maintenance behavior" rule:
+an owning Issue's later implementation or evidence change triggers review of its rows.
+Base: `main` at `f62951f2b5a083610a92d155d28afa19e4159dbe`, which adds
+[#56](https://github.com/Shuang-su/Livecho/pull/56)–[#59](https://github.com/Shuang-su/Livecho/pull/59)
+to the previous `c8ee4a1` baseline. Branch: `issue/30-requirements-index-refresh`.
+Accepted intent/spec/plan are not rewritten. The 2026-11-15 record above stays as
+historical evidence for its own baseline.
+
+### Author exposure and assignment
+
+This record is committed before the index, README or roadmap is edited.
+
+- Identity/role/date: StablEdge desktop agent working for @Shuang-su, Issue #30
+  documentation implementer, 2026-11-21. Paths: the plan allowlist only
+  (`docs/requirements-index.md`, `README.md`, `docs/roadmap.md`, this `evidence.md`).
+- Assignment source: the owner asked the agent to keep advancing the repository and
+  left the choice of next step to it. The agent chose this refresh because #30 has
+  accepted artifacts, its deliverables state the `c8ee4a1` baseline, and `main` has
+  since merged #12 and #27 work that the roadmap still reports as not implemented.
+  This is authority to prepare the change, not owner approval of its contents.
+- Repository inputs read at the base: `AGENTS.md`, `CONTRIBUTING.md`, the accepted #30
+  spec and plan and this evidence file, `README.md`, `docs/roadmap.md`,
+  `docs/requirements-index.md` (header, profiles, the first two tables, rows naming
+  #12 or #27, the protocol/delivery and deployment tables, the discrepancy register
+  and link definitions), `docs/changes/12-invite-only-auth/intent.md` and
+  `evidence.md` plus its spec headings and acceptance criteria,
+  `docs/changes/27-long-session-state/evidence.md` plus its intent deferral and
+  non-goal sections and its spec headings and acceptance criteria, the test function
+  names in `tests/auth/` and `tests/protocol/test_long_session.py`, the file lists of
+  commits `878163e`, `1968239`, `8fbfa8a` and `f62951f`, and
+  `docs/policy/independent-implementation.md` (dependency and pull-request gate
+  sections). The four files of the unmerged `docs/changes/13-worker-invite-identity/`
+  directory were read earlier the same day for [#60](https://github.com/Shuang-su/Livecho/pull/60);
+  they are an unmerged proposal and supply no index authority.
+- GitHub inputs read 2026-11-21, unauthenticated and read-only: the repository README
+  page, the open Issue and pull-request lists, the #30 Issue page, the #60 page, and
+  the REST Issue/pull lists used by the dependency audit below. That audit parses
+  only the `依赖` section of #1–#19 and #27–#30. For #31 and #38 only number, title
+  and state were read; their bodies were not printed, parsed or used.
+- Exclusions: no reference repository, upstream source, research report, screenshot,
+  model, dataset, audio or credential was opened or downloaded. No live service,
+  provider or hardware was used. No normative source is edited.
+- Independent reviewer: **pending**. Plan step 8 requires a separate reviewer; this
+  author does not invent one. Owner review of the pull request supplies it.
