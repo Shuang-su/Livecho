@@ -4,6 +4,7 @@ version = "0.0.0"
 description = "Development tooling for the Livecho monorepo"
 requires-python = ">=3.12,<3.13"
 dependencies = [
+    "cryptography==50.0.2",
     "fastapi==0.163.0",
     "pydantic==2.13.5",
     "rfc8785==0.1.4",
