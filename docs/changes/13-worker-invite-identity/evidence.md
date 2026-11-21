@@ -158,3 +158,54 @@ Not deployed. No production traffic, real email, live credential, production
 auth, community-worker PCM, or CUDA runtime is enabled. Rollback of this pull
 request deletes the four new Markdown files and leaves runtime behavior
 unchanged.
+
+## Implementer exposure and assignment
+
+- Identity/role/date: Cursor cloud agent, implementer for Issue #13 worker
+  invite registration, device identity, and contribution statistics,
+  2026-11-21. This record is the pre-code assignment. It is not owner approval,
+  not a license compatibility opinion, and not the post-implementation
+  similarity review.
+- Assignment source: the task asked to implement Issue #13 from `main` at
+  `57236d26de3f9aadd88b55163963919364aff273` (squash-merged documentation PR
+  #60). The accepted inputs are `intent.md`, `spec.md`, and `plan.md` in this
+  directory. Those three files are not rewritten. The 2026-09-26 Issue #13
+  comment that points at #31 is not adopted.
+- Repository inputs read before Python edits: `AGENTS.md`, `CONTRIBUTING.md`,
+  `.github/pull_request_template.md`, `Makefile`, `pyproject.toml`,
+  `tools/check_change_artifacts.py` (branch pattern and the rule that an
+  implementation must not rewrite accepted intent/spec/plan),
+  `docs/policy/independent-implementation.md` (exposure rule, and the
+  requirement to review a new dependency's lock, license inventory, and
+  distribution obligations without treating that review as a legal
+  conclusion), the four files in this directory, the Issue #12 modules
+  `policy.py`, `crypto.py`, `records.py`, `app.py`, `store.py`, `service.py`,
+  `config.py`, `bootstrap.py`, `redact.py`, and `auth/__init__.py`, the
+  protocol modules `compatibility.py` (`negotiate_worker`), `errors.py`,
+  `models.py`, `scalars.py`, and the synthetic golden hello/manifest values in
+  `golden.py`, `local_vertical/service.py` and `config.py` (health and
+  `/api/viewer/ws` stay session-free), `tests/auth/support.py`, and
+  `tests/auth/test_boundaries.py`. The Issue #4 evidence license section was
+  read only as an example of how an earlier change recorded a lock inventory.
+- GitHub inputs: none opened in this assignment. Issue #13 and Issue #31 were
+  not fetched. The #31 direction remains excluded by the accepted spec.
+- External facts used: RFC 8032 is the public signature standard the issue and
+  the accepted spec already name. The implementation uses the spec's stated
+  checks (field prime `p = 2^255 - 19`, strict decoding, order dividing 8,
+  sign bit when `x` is zero, and `S < L`). No RFC text is copied. No sample
+  key, test vector, or library source is copied. PyPI metadata for the pinned
+  package is recorded with the lock, after this exposure and only as
+  inventory.
+- Exclusions: no LAPLACE repository, reference-only source, test, fixture,
+  schema, screenshot, or generated summary was opened. No model, dataset,
+  audio, or live credential was downloaded. `workers/mlx/` was not opened.
+  No known upstream contribution is an input.
+- Assignment decision: implement the process-local worker-identity module,
+  its tests, and the plan's exact `cryptography==50.0.2` pin. Do not edit
+  `packages/protocol/`, `workers/mlx/`, CI workflows, Railway config,
+  `.env.example`, or `db/migrations/`. Do not enable mail, production auth, or
+  production traffic.
+- Independent reviewer: a different post-implementation reviewer is still
+  required before merge for provenance and similarity review. This author does
+  not inspect reference-only upstream material, does not merge, and does not
+  close Issue #13.
