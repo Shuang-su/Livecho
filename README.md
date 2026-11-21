@@ -4,7 +4,7 @@ Livecho is an experimental, distributed real-time captioning system for public l
 streams. A trusted cloud service ingests one stream, while invited community workers
 perform speech recognition and a public web client renders the resulting timeline.
 
-At the 2026-11-15 source baseline (`c8ee4a1`), the merged repository contains:
+At the 2026-11-21 source baseline (`f62951f`), the merged repository contains:
 
 - Engineering foundation (#1), Alpha boundary records (#2), protocol v1 with
   deterministic Python/TypeScript verification (#3), and an offline fail-closed
@@ -13,11 +13,18 @@ At the 2026-11-15 source baseline (`c8ee4a1`), the merged repository contains:
   #6 worker fixture CLI, #7 ingest fixtures, #8 audio control plane, #9
   `fixture_timeline` local vertical, #10 offline event normalize, #11 caption PWA
   with Node-double and Python cross-stack E2E ([#44](https://github.com/Shuang-su/Livecho/pull/44)–[#54](https://github.com/Shuang-su/Livecho/pull/54)).
+- **Offline-only M2 slices** (not real product acceptance): #27 protocol minor 1 for
+  long-session epoch rotation and viewer resynchronization, in the protocol package
+  only ([#58](https://github.com/Shuang-su/Livecho/pull/58)); #12 invite-only
+  magic-link authentication and role matrix on a process-local memory adapter, not
+  mounted by any other application and with mail off
+  ([#59](https://github.com/Shuang-su/Livecho/pull/59)).
 
 The business runtime chain that performs real ASR, live Bilibili acquisition, wire
-danmaku/SC publication, or provider deployment is **not** established. Production
-traffic remains disabled. CUDA remains mock/contract-only. Green CI and closed
-fixture Issues do not mean hardware, rights, or live gates passed.
+danmaku/SC publication, invited login with delivered mail and durable accounts, or
+provider deployment is **not** established. Production traffic remains disabled. CUDA
+remains mock/contract-only. Green CI and closed fixture Issues do not mean hardware,
+rights, or live gates passed.
 
 See the [requirements and evidence index](docs/requirements-index.md) for source
 authority, evidence categories, and blockers, and the [roadmap](docs/roadmap.md) for

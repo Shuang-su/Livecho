@@ -522,3 +522,205 @@ This record is committed before the index, README or roadmap is edited.
   provider or hardware was used. No normative source is edited.
 - Independent reviewer: **pending**. Plan step 8 requires a separate reviewer; this
   author does not invent one. Owner review of the pull request supplies it.
+
+### What changed
+
+- `docs/requirements-index.md` — header baseline; two new evidence profiles, S12
+  (`#offline-auth`) and S27 (`#offline-long-session`); nine rows: `IDX-INVITED-IDENTITY`
+  and `IDX-LONG-SESSION` now point at their accepted specs and the new profiles,
+  `IDX-ROLE-MATRIX`, `FLOW-ALLOW-010`, `CTRL-AUTHZ-DENY-BY-DEFAULT`, `CTRL-AUTH-EXPIRY`,
+  `DATA-AUTH-BEARER` and `IDX-PROTOCOL-BOUNDS` keep their primary pointer and owners
+  and gain a narrowly worded offline profile, and `IDX-WORKER-IDENTITY-STATS` notes
+  the open artifact PR; three new discrepancy-register rows. No ID was added, removed
+  or renamed, and no owner cell changed.
+- `docs/roadmap.md` — snapshot date and commit; #12 planning state `closed`; fixture
+  notes for #12, #13 and #27; a title-only paragraph for #38; two conditional-gate
+  bullets; link references for #56 and #58–#60.
+- `README.md` — baseline line, one bullet for the offline #12/#27 slices, and invited
+  login added to the list of capabilities that are not established.
+
+### Findings
+
+- The roadmap reported #12 as `open` and "not implemented". GitHub closed #12 on
+  2026-11-18 and `main` holds a memory-adapter implementation. The row now says both,
+  and the register records that closed is not production authentication.
+- The roadmap reported #27 as "not implemented". The protocol package holds minor 1.
+  A search of `services/`, `workers/`, `apps/` and `tools/` for the minor-1 names
+  found no consumer, which matches #27's stated deferral. The row says protocol only.
+- #27's own evidence still reads "Artifact PR: Pending" although #56 merged. Recorded
+  in the register for #27's owner; not edited here.
+- Open Issue #38 was absent from the roadmap. The accepted #30 spec names only #31 as
+  title-only. #38 is now listed by number, title and state, with nothing inferred.
+  Whether it belongs in the dependency table is an owner decision.
+- Not done by this refresh: the full manual source cross-check and selected capability
+  traces of plan steps 7 and 8 were repeated only for the nine changed rows and the
+  #12/#27 summaries. Every other row keeps its 2026-11-15 review.
+
+### Exact ephemeral audits (not added to the repository)
+
+Scripts were executed from `/tmp` only, with `uv` 0.12.1 and `pnpm` 11.21.0 taken from
+temporary directories because the machine's own `uv` was 0.12.2. `gh` was not
+installed, so the dependency audit uses unauthenticated read-only REST calls instead
+of the `gh` commands in the 2026-11-15 record.
+
+#### Index / link / ownership / scope audit
+
+Command: `uv run python /tmp/livecho-issue30-index-audit.py`
+
+The script is the 2026-11-15 index audit above with these exact differences:
+
+- `BASE = "f62951f2b5a083610a92d155d28afa19e4159dbe"`, and the base assertion is
+  `git merge-base origin/main HEAD == BASE`.
+- `PROFILE_RE` also accepts `offline-auth` and `offline-long-session`.
+- The changed-path set also includes `git ls-files --others --exclude-standard`.
+- Every in-page anchor link used in the index must exist as an anchor in the index.
+- A small `git(*args)` helper and assertion messages; no other logic change.
+- The addition below, placed after the control-owner check.
+
+```python
+# Rows untouched by this refresh must be byte-identical to the base.
+base_index = git("show", f"{BASE}:docs/requirements-index.md")
+base_records = dict(re.findall(
+    r"^\| ((?:IDX|DEC|FLOW|CTRL|DATA|THREAT|RISK|BILI|LIC|GATE)-[A-Z0-9-]+) — (.*)$",
+    base_index, re.M,
+))
+assert set(base_records) == set(counts)
+changed_rows = sorted(k for k, rest in records if base_records[k] != rest)
+for key, rest in records:
+    if key in changed_rows:
+        old, new = base_records[key].split("|"), rest.split("|")
+        assert old[0] == new[0] and old[2].split(";")[0] == new[2].split(";")[0], key
+```
+
+Here `git(*args)` is `subprocess.check_output(["git", *args], text=True)`. The last
+assertion checks that each changed row kept its summary and its owner list.
+
+Result: local links 581, external URLs 52, source/index stable IDs 130/130, IDX nav
+70, duplicates 0, unresolved 0, CTRL owner matches 30, changed rows exactly the nine
+named above, false-complete none, `AUDIT_PASS`.
+
+#### Dependency / roadmap / merged-PR audit
+
+Command: `uv run python /tmp/livecho-issue30-dependency-audit.py`
+
+```python
+from pathlib import Path
+import json
+import re
+import urllib.request
+
+REPO = "Shuang-su/Livecho"
+NUMBERS = [*range(1, 20), 27, 28, 29, 30]
+TITLE_ONLY = [31, 38]
+MERGED_PRS = [
+    20, 21, 22, 23, 24, 25, 26, 32, 33, 34, 41, 42,
+    44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54,
+    56, 57, 58, 59,
+]
+OPEN_PRS = [60]
+
+
+def get(path):
+    request = urllib.request.Request(
+        f"https://api.github.com/repos/{REPO}/{path}",
+        headers={"Accept": "application/vnd.github+json", "User-Agent": "livecho-issue30-audit"},
+    )
+    with urllib.request.urlopen(request, timeout=30) as response:
+        return json.load(response)
+
+
+items = get("issues?state=all&per_page=100&direction=asc")
+assert len(items) < 100, "pagination needed"
+issues = {v["number"]: v for v in items if "pull_request" not in v}
+pulls = {v["number"]: v for v in get("pulls?state=all&per_page=100&direction=asc")}
+assert len(pulls) < 100, "pagination needed"
+
+unknown = sorted(set(issues) - set(NUMBERS) - set(TITLE_ONLY))
+
+roadmap = Path("docs/roadmap.md").read_text(encoding="utf-8")
+expected = {}
+for line in roadmap.splitlines():
+    if re.match(r"\| \[#\d+\]\[i\d+\]", line):
+        cells = line.split("|")
+        number = int(re.search(r"#(\d+)", cells[1]).group(1))
+        expected[number] = (
+            cells[2].strip().lower(),
+            sorted(map(int, re.findall(r"\[#(\d+)\]\[i\d+\]", cells[4]))),
+        )
+assert set(expected) == set(NUMBERS), sorted(set(expected) ^ set(NUMBERS))
+
+differences, edges, states = [], 0, {}
+for number in NUMBERS:
+    value = issues[number]
+    section = re.search(r"^## 依赖\s*\n(.*?)(?=^## |\Z)", value["body"] or "", re.M | re.S)
+    deps = sorted({int(n) for n in re.findall(r"#(\d+)", section.group(1))}) if section else []
+    edges += len(deps)
+    states[number] = value["state"]
+    got = (value["state"], deps)
+    if got != expected[number]:
+        differences.append({"number": number, "github": got, "roadmap": expected[number]})
+
+title_only = {}
+for number in TITLE_ONLY:
+    value = issues[number]
+    title_only[number] = {"state": value["state"], "title_in_roadmap": value["title"] in roadmap}
+
+merged = {}
+for number in MERGED_PRS:
+    value = pulls[number]
+    assert value["state"] == "closed" and value["merged_at"], number
+    merged[number] = value["merge_commit_sha"][:7]
+open_prs = {n: (pulls[n]["state"], pulls[n]["merged_at"]) for n in OPEN_PRS}
+other_open_prs = sorted(n for n, v in pulls.items() if v["state"] == "open" and n not in OPEN_PRS)
+
+print(json.dumps({
+    "issues": len(NUMBERS),
+    "direct_edges": edges,
+    "open": sorted(n for n, s in states.items() if s == "open"),
+    "closed": sorted(n for n, s in states.items() if s == "closed"),
+    "closed_at": {n: issues[n]["closed_at"] for n in (12,)},
+    "roadmap_differences": differences,
+    "title_only": title_only,
+    "unknown_issue_numbers": unknown,
+    "merged_prs_checked": len(merged),
+    "merge_commits_56_59": {n: merged[n] for n in (56, 57, 58, 59)},
+    "open_prs": open_prs,
+    "other_open_prs": other_open_prs,
+    "AUDIT_PASS": not differences and not unknown and all(
+        v["state"] == "open" and v["title_in_roadmap"] for v in title_only.values()
+    ),
+}, ensure_ascii=False, indent=1))
+```
+
+The executed file also began with a docstring stating the same read limits. The Issue
+list response contains every Issue body. The script reads the body only for the
+numbers in `NUMBERS`, and only its `依赖` section.
+
+First run, before the roadmap edit: one difference, #12 `closed` on GitHub against
+`open` in the roadmap; #38 title absent from the roadmap; `AUDIT_PASS` false.
+
+Final run: 23 Issues, 62 direct edges, 0 roadmap differences; open
+#9/#11/#13–#19/#27–#30, closed #1–#8/#10/#12; #12 closed at `2026-11-18T03:42:19Z`;
+#31 and #38 open with titles present; no unknown Issue number; 27 merged PRs checked,
+with #56–#59 at `1968239`, `878163e`, `8fbfa8a`, `f62951f`; #60 open and unmerged; no
+other open PR; `AUDIT_PASS`.
+
+### Automated verification
+
+| Exact command | Result | Date/tree |
+| --- | --- | --- |
+| `uv run python /tmp/livecho-issue30-index-audit.py` | `AUDIT_PASS`; local links 581; external 52; stable IDs 130; IDX 70; unresolved 0; CTRL owners 30; nine changed rows | 2026-11-21 / `issue/30-requirements-index-refresh`, final tree |
+| `uv run python /tmp/livecho-issue30-dependency-audit.py` | `AUDIT_PASS`; 23 Issues; 62 edges; 0 roadmap diffs; 27 merged PRs; #60 open | 2026-11-21 / final tree |
+| `git diff --quiet origin/main -- docs/changes/30-requirements-evidence-index/intent.md docs/changes/30-requirements-evidence-index/spec.md docs/changes/30-requirements-evidence-index/plan.md` | Exit 0 (accepted artifacts unchanged) | 2026-11-21 / final tree |
+| `git diff --check` / `git diff --cached --check` | Exit 0 | 2026-11-21 / final tree |
+| `LIVECHO_HEAD_REF=issue/30-requirements-index-refresh make artifacts` | `change artifacts: ok` | 2026-11-21 / final tree |
+| `LIVECHO_HEAD_REF=issue/30-requirements-index-refresh make verify` | Exit 0: Ruff; format, 170 files; mypy 170 files; pytest 974 passed (1 deselected); protocol Vitest 314; Railway Vitest 63; web Vitest 51; artifacts ok; protocol codegen ok; web build ok | 2026-11-21 / tree before this section's result text |
+| `git diff --name-only origin/main` | Exactly the four allowlisted paths | 2026-11-21 / final tree |
+
+### Remaining blockers (not claimed done)
+
+- Product/runtime: unchanged from the 2026-11-15 list, plus mail delivery, durable
+  identity, restore rejection and sealed secrets for #12, and consumer wiring and
+  long-run evidence for #27. This refresh enables none of them.
+- Process: independent reviewer (plan step 8) and owner merge. This change references
+  Issue #30 and must not close it.

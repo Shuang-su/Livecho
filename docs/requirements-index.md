@@ -1,8 +1,11 @@
 # Requirements and evidence index
 
-Reviewed 2026-11-15 against repository baseline
-`c8ee4a1658774416b1a00b70a872f8818110a060` (`main`, includes squash-merged
-[#54](https://github.com/Shuang-su/Livecho/pull/54)). Maintenance owner:
+Reviewed 2026-11-21 against repository baseline
+`f62951f2b5a083610a92d155d28afa19e4159dbe` (`main`, includes squash-merged
+[#59](https://github.com/Shuang-su/Livecho/pull/59)). This review covers the rows
+and summaries affected by the #12 and #27 merges
+([#56](https://github.com/Shuang-su/Livecho/pull/56)–[#59](https://github.com/Shuang-su/Livecho/pull/59));
+all other rows keep their 2026-11-15 review at `c8ee4a1`. Maintenance owner:
 [Issue #30](https://github.com/Shuang-su/Livecho/issues/30). Audit and historical
 snapshots: [implementation evidence](changes/30-requirements-evidence-index/evidence.md).
 Current direct planning edges: [roadmap](roadmap.md).
@@ -75,7 +78,8 @@ merge `982fc37`. Offline contract verification **passed** at `978673b`,
 focused transactional rejection tests; subsequent boundary fixes retain dated evidence
 in the same record. Pydantic source and generated Schema/TypeScript/golden corpus exist.
 Runtime integration is **missing**, not inferred from validator success. Owning runtime
-Issues supply it; #27 long-session and #28 real-input gaps are separate records below.
+Issues supply it; the #27 long-session extension has its own [S27](#offline-long-session)
+profile and the #28 real-input gap is a separate record below.
 Hardware/provider evidence is not applicable to the pure protocol result.
 
 <a id="railway"></a>
@@ -162,6 +166,41 @@ Python cross-stack E2E [#54](https://github.com/Shuang-su/Livecho/pull/54) merge
 **passed**. Caption/session-status only; danmaku/SC belong to #29. Real ASR/live
 product acceptance **missing**.
 
+<a id="offline-auth"></a>
+**S12 — #12 memory-adapter auth, offline only.** Artifact
+[#57](https://github.com/Shuang-su/Livecho/pull/57) merge `878163e`, with owner
+approval recorded in [#12 evidence](changes/12-invite-only-auth/evidence.md#artifact-approval);
+implementation [#59](https://github.com/Shuang-su/Livecho/pull/59) merge `f62951f`.
+Offline contract verification **passed**, 2026-11-18, per
+[implementation verification](changes/12-invite-only-auth/evidence.md#implementation-verification)
+and [review fixes](changes/12-invite-only-auth/evidence.md#review-fixes):
+`uv run pytest -q tests/auth` (28 passed) and `make verify`. The implemented part is
+the `livecho_backend.auth` package with a process-local memory adapter: the role
+matrix decision, identical invited/uninvited link responses, hashed single-use
+expiring links, expiring revocable session cookies, and a Resend request builder
+reached only through an injected transport in tests. No other module in the
+repository imports or mounts `create_auth_app`, and its default form reads no
+process environment; `LIVECHO_EMAIL_ENABLED` stays false. Live mail delivery, sealed-secret
+provisioning, a durable identity store and its migration, restore rejection of old
+credentials, key rotation, the #16 deletion checkpoint, staging or production
+sessions, and deployment are **missing**. GitHub closed #12 at the artifact merge;
+that is **not** production authentication.
+
+<a id="offline-long-session"></a>
+**S27 — #27 protocol minor 1, offline only.** Artifact
+[#56](https://github.com/Shuang-su/Livecho/pull/56) merge `1968239`;
+implementation [#58](https://github.com/Shuang-su/Livecho/pull/58) merge `8fbfa8a`.
+Offline contract verification **passed** per
+[#27 implementation evidence](changes/27-long-session-state/evidence.md#implementation):
+`uv run pytest -q tests/protocol` (77 passed), the long-session counts in
+`tests/protocol/test_long_session.py` (9 passed), protocol Vitest (314 passed),
+`tools/protocol_codegen.py --check`, and `make verify`. The implemented part is
+limited to `packages/protocol/` and `tests/protocol/`: closed minor-1 message twins,
+epoch rotation and viewer resynchronization models, and their golden fixtures.
+`audio_origin` stays synthetic. Wiring rotation into the #9 vertical, #6 worker, #11
+PWA, #14 gateway or #15 scheduler is explicitly deferred to those owners and is
+**missing**; no long-running session has been exercised. Issue #27 remains open.
+
 <a id="pending"></a>
 **N — planned capability / not implemented.** The linked Issue defines planning
 ownership. At this baseline the named product capability is **not established** beyond
@@ -180,7 +219,7 @@ in [minimum role matrix][roles], [trust zones][zones], and accepted [#2 spec][s2
 | --- | --- | --- | --- |
 | IDX-ARTIFACT-LIFECYCLE — owner merges artifacts before implementation | [Change lifecycle](../CONTRIBUTING.md#change-lifecycle) | #1; every implementation/O | [F](#foundation) |
 | IDX-ARTIFACT-DURABILITY — preserve accepted intent/spec/plan and exact evidence | [Versioned records](changes/README.md) | #1; repository changes/O | [F](#foundation) |
-| IDX-ROLE-MATRIX — deny-by-default distinct viewer/contributor/operator/admin/owner authority | [Minimum roles][roles] | #12/#13/#17; identity/action authorization/D,R,P | [D](#design) |
+| IDX-ROLE-MATRIX — deny-by-default distinct viewer/contributor/operator/admin/owner authority | [Minimum roles][roles] | #12/#13/#17; identity/action authorization/D,R,P | [D](#design); [S12](#offline-auth) offline #12 part only |
 | DEC-ARCH-001 — single authoritative modular-monolith backend | [One online authority][dec-arch] | #3/#7/#8/#10/#12–#16/#19 per [follow-on obligations][follow]; online application/L,D,R,P | [D](#design) |
 | DEC-MAINT-001 — mutually exclusive, non-serving maintenance | [Maintenance exception][dec-maint] | #4/#16/#19; maintenance/D,P | [D](#design), [W](#railway) |
 | DEC-SAFETY-001 — current safety/intake continuity outranks restored data | [Safety authority][dec-safety] | #4/#7/#12/#13/#16/#17/#19; safety/recovery/D,R,P | [D](#design) |
@@ -214,7 +253,7 @@ proves bounded message validation only; [W](#railway) proves offline guards only
 | FLOW-ALLOW-007 — Validate untrusted transcript and health | [Allowed registry][allow] | #3/#13/#14/#15; worker output/L,D | [D](#design) |
 | FLOW-ALLOW-008 — Restricted normalized/minimal identity/control/audit to Postgres | [Allowed registry][allow] | #12/#13/#16; persistence/D | [D](#design) |
 | FLOW-ALLOW-009 — Sanitized compressed authenticated-encrypted raw to Bucket | [Allowed registry][allow] | #10/#16; archive/D,R | [D](#design) |
-| FLOW-ALLOW-010 — Minimum invited address and one-time link to Resend | [Allowed registry][allow] | #12; email identity/D | [D](#design) |
+| FLOW-ALLOW-010 — Minimum invited address and one-time link to Resend | [Allowed registry][allow] | #12; email identity/D | [D](#design); [S12](#offline-auth) request builder only, no send |
 | FLOW-ALLOW-011 — Protected ordered safety/deletion/revocation recovery copy | [Allowed registry][allow] | #4/#12/#13/#16/#19; recovery/D,P | [D](#design) |
 | FLOW-ALLOW-012 — Application backup to offline maintenance restore | [Allowed registry][allow] | #4/#16/#19; restore/P | [D](#design) |
 | FLOW-ALLOW-013 — Recovery copy to isolated replay/credential invalidation | [Allowed registry][allow] | #4/#12/#13/#16/#19; restore/P | [D](#design) |
@@ -261,7 +300,7 @@ exists; complete live control remains unestablished under D.
 
 | ID and requirement | Primary definition | Evidence owners; capability/stage | Profile |
 | --- | --- | --- | --- |
-| CTRL-AUTHZ-DENY-BY-DEFAULT — Object/action authorization; owner governance stays out of band | [Control catalog][controls] | #12/#13/#16/#17; authorization/D | [D](#design) |
+| CTRL-AUTHZ-DENY-BY-DEFAULT — Object/action authorization; owner governance stays out of band | [Control catalog][controls] | #12/#13/#16/#17; authorization/D | [D](#design); [S12](#offline-auth) offline #12 part only |
 | CTRL-DATA-RESTRICTED-DEFAULT — Per-source/per-field purpose, audience, retention and deletion | [Control catalog][controls] | #10/#12/#13/#16/#17; data/D,R | [D](#design) |
 | CTRL-SECRET-CONTAINMENT — Least-privilege backend secrets, RAM locators, redaction and rotation | [Control catalog][controls] | #4/#7/#12/#16/#19; secrets/L,D,R,P | [D](#design) |
 | CTRL-SAFETY-DEFAULT-OFF — No restored activation; verified continuity before traffic | [Control catalog][controls] | #4/#7/#16/#19; startup/recovery/D,R,P | [D](#design) |
@@ -286,7 +325,7 @@ exists; complete live control remains unestablished under D.
 | CTRL-BACKUP-EVIDENCE — Enumerated copies/windows and provider evidence | [Lifecycle registry][l-controls] | #4/#12/#13/#16/#19; backup/restore/D,P | [D](#design) |
 | CTRL-DELETION-FAIL-CLOSED — Exact containment, continuity, no guessed admission/purge | [Lifecycle registry][l-controls] | #11/#12/#13/#16/#17; deletion/identity/D,P | [D](#design) |
 | CTRL-RENDER-UNTRUSTED — Escape data, constrain URLs and content policy | [Control catalog][controls] | #10/#11/#17; rendering/L,D,R | [D](#design) |
-| CTRL-AUTH-EXPIRY — Single-use bounded bearer lifetime and verifier-only storage | [Control catalog][controls] | #12/#13; authentication/D | [D](#design) |
+| CTRL-AUTH-EXPIRY — Single-use bounded bearer lifetime and verifier-only storage | [Control catalog][controls] | #12/#13; authentication/D | [D](#design); [S12](#offline-auth) link/session in memory only; restore rejection **missing** |
 | CTRL-AUTH-KEY-LIFECYCLE — Revocable identity, key separation, rotation and restore rejection | [Control catalog][controls] | #4/#12/#13/#16/#19; identity/secrets/D,P | [D](#design) |
 | CTRL-MAINTENANCE-EXCLUSIVE — Approved non-serving operation with narrow temporary authority | [Control catalog][controls] | #4/#16/#19; maintenance/P | [D](#design) |
 | CTRL-SUPPLY-CHAIN — Pinned reviewed dependencies, manifests and release provenance | [Control catalog][controls] | #1/#4/#18/#19; build/artifact use/O,L,H,D,P | [D](#design) |
@@ -344,7 +383,7 @@ unverified admission never authorizes purge. No physical-media erasure is claime
 | DATA-NORMALIZED-EVENT — Restricted source-specific fields; no default retention grant | [Lifecycle matrix][data-matrix] | #10/#16/#17; timeline/history/D,R | [D](#design) |
 | DATA-RAW-BUSINESS — Sanitized compressed AES-256-GCM private archive | [Lifecycle matrix][data-matrix] | #10/#16; raw/D,R | [D](#design) |
 | DATA-ACCOUNT-IDENTITY — Minimum invited identity; deletion/revocation checkpoint | [Lifecycle matrix][data-matrix] | #12; account/D | [D](#design) |
-| DATA-AUTH-BEARER — 15-minute magic link, 24-hour enrollment, 30-day session maxima | [Lifecycle matrix][data-matrix] | #12/#13; authentication/D | [D](#design) |
+| DATA-AUTH-BEARER — 15-minute magic link, 24-hour enrollment, 30-day session maxima | [Lifecycle matrix][data-matrix] | #12/#13; authentication/D | [D](#design); [S12](#offline-auth) link/session only; #13 enrollment **not implemented** |
 | DATA-WORKER-DEVICE — Minimum device identity and contributor-own aggregates | [Lifecycle matrix][data-matrix] | #13; device/statistics/D | [D](#design) |
 | DATA-AUDIT — Payload-free restricted audit; 365-day rule and scoped incident hold | [Lifecycle matrix][data-matrix] | #12/#13/#16/#17/#19; audit/D | [D](#design) |
 | DATA-DELETION-TOMBSTONE — Typed room/session hidden tombstone; intake is not admission | [Lifecycle matrix][data-matrix] | #16; deletion/D,P | [D](#design) |
@@ -415,7 +454,7 @@ Generated output is not a second normative authority.
 | IDX-PROTOCOL-EPOCH — backend-authoritative non-resumed replacement | [Ordering/reconnect][p-order] | #3, runtime #9/#14/#15; lease lifecycle/O,L,D | [V](#protocol) |
 | IDX-PROTOCOL-SEQ — exact-next order, duplicate/conflict/exhaustion | [Ordering/reconnect][p-order] | #3, runtime #9/#14; sequence/O,L,D | [V](#protocol) |
 | IDX-PROTOCOL-REVISION — immutable identity/ranges, monotonic revisions/final | [Ordering/reconnect][p-order] | #3, runtime #9/#11/#14; transcript state/O,L,D | [V](#protocol) |
-| IDX-PROTOCOL-BOUNDS — bounded object/replay state, expiry and resync | [Ordering/reconnect][p-order] | #3/#27; state lifecycle/O,L,D | [V](#protocol) |
+| IDX-PROTOCOL-BOUNDS — bounded object/replay state, expiry and resync | [Ordering/reconnect][p-order] | #3/#27; state lifecycle/O,L,D | [V](#protocol); [S27](#offline-long-session) for the minor-1 extension |
 | IDX-PROTOCOL-REJECTION — stable precedence and no rejected-state mutation | [Stable rejection][p-rejection] | #3; protocol failures/O,L,D | [V](#protocol) |
 | IDX-PROTOCOL-GENERATION — one source, deterministic generated parity | [Generation/fixtures][p-generation] | #3; compatibility/O | [V](#protocol) |
 | IDX-PROTOCOL-VERSION — protocol Issue and golden compatibility evidence | [Version policy][p-version] | #3 and future protocol owner; protocol edits/O,L,D,R | [V](#protocol) |
@@ -426,11 +465,11 @@ Generated output is not a second normative authority.
 | IDX-EVENT-NORMALIZE — offline danmaku/SC/status normalize (no wire) | [Accepted #10 spec](changes/10-event-normalization/spec.md) | #10; events/O | [S10](#fixture-events) offline normalize/CI; live/wire/#29/#16 **missing** |
 | IDX-LOCAL-CAPTION — short synthetic end-to-end path | [Accepted #9 spec](changes/9-local-caption-vertical/spec.md) | #9; integration/L | [S9](#fixture-caption) `fixture_timeline` + Python/web E2E; `synthetic_mlx` **closed** |
 | IDX-CAPTION-WEB — first caption/session-status page | [Accepted #11 spec](changes/11-subtitle-web/spec.md) | #11; companion Web/L | [S11](#fixture-web) PWA + Node/Python E2E; event delivery belongs to #29 |
-| IDX-LONG-SESSION — capacity/lifecycle/resynchronization extension | [Issue #27](https://github.com/Shuang-su/Livecho/issues/27) | #27, supplies #15/#19; long sessions/D,P | [N](#pending); not a short #9 gate |
+| IDX-LONG-SESSION — capacity/lifecycle/resynchronization extension | [Accepted #27 spec](changes/27-long-session-state/spec.md) | #27, supplies #15/#19; long sessions/O,D,P | [S27](#offline-long-session) protocol/CI; runtime wiring and long-run evidence **missing**; not a short #9 gate |
 | IDX-REAL-NEGOTIATION — real-input origin and capability extension | [Issue #28](https://github.com/Shuang-su/Livecho/issues/28) | #28, supplies #19; real input/R,P | [N](#pending); existing #6/#9 remain synthetic |
 | IDX-EVENT-WEB — independent danmaku/Super Chat display | [Issue #29](https://github.com/Shuang-su/Livecho/issues/29) | #29 after #10/#11; event Web/R | [N](#pending); #10 normalize does not publish wire events |
-| IDX-INVITED-IDENTITY — invite-only email and role authorization | [Issue #12](https://github.com/Shuang-su/Livecho/issues/12) | #12; identity/D | [N](#pending) |
-| IDX-WORKER-IDENTITY-STATS — invited device identity and contributor-own statistics | [Issue #13](https://github.com/Shuang-su/Livecho/issues/13) | #13; worker identity/statistics/D | [N](#pending) |
+| IDX-INVITED-IDENTITY — invite-only email and role authorization | [Accepted #12 spec](changes/12-invite-only-auth/spec.md) | #12; identity/O,D | [S12](#offline-auth) memory adapter/CI; mail, durable store and production **missing** |
+| IDX-WORKER-IDENTITY-STATS — invited device identity and contributor-own statistics | [Issue #13](https://github.com/Shuang-su/Livecho/issues/13) | #13; worker identity/statistics/D | [N](#pending); artifact PR [#60](https://github.com/Shuang-su/Livecho/pull/60) is open and unmerged |
 | IDX-PERSISTENT-HISTORY — normalized timeline, encrypted raw and complete deletion | [Issue #16](https://github.com/Shuang-su/Livecho/issues/16) | #16; persistence/history/D | [N](#pending) |
 | IDX-INVITED-CONSOLE — authorized history/statistics and operator/admin controls | [Issue #17](https://github.com/Shuang-su/Livecho/issues/17) | #17; console/D | [N](#pending) |
 | IDX-CUDA-MOCK — mock/cross-provider contract only | [Issue #18](https://github.com/Shuang-su/Livecho/issues/18) | #18; contract/O,D | [N](#pending); real CUDA hardware not established |
@@ -487,8 +526,11 @@ the index creates no new normative precedence between those documents.
 | --- | --- | --- |
 | Accepted #2 artifacts coexist with proposed ADR and unaccepted High risks | [#2 evidence][e2], [ADR approval][adr-status], [risk decisions][risk-decisions] | Intentional authority distinction; retain pending production decisions. Repository owner must decide each scope, not #30. |
 | GitHub closed #5/#6/#7/#8/#10 after fixture/CI slices; real gates remain open in evidence | PRs [#46](https://github.com/Shuang-su/Livecho/pull/46)–[#53](https://github.com/Shuang-su/Livecho/pull/53); profiles [S5](#fixture-asr)–[S10](#fixture-events) | Planning-state closed ≠ hardware/rights/wire acceptance. Index rows keep missing blockers; do not reopen Issues here. |
-| Closed draft #35 index predates #44–#54 and must not be merged as history | [#35](https://github.com/Shuang-su/Livecho/pull/35) (closed, unmerged) | Prior art only; this refresh rewrites from `c8ee4a1` baseline. |
+| Closed draft #35 index predates #44–#54 and must not be merged as history | [#35](https://github.com/Shuang-su/Livecho/pull/35) (closed, unmerged) | Prior art only; the 2026-11-15 refresh rewrote from the `c8ee4a1` baseline. |
 | #31 title remains a proposal prefix | [Dated roadmap snapshot](roadmap.md#direct-dependency-snapshot), [accepted #30 stages](changes/30-requirements-evidence-index/spec.md#stages-and-dependencies) | Metadata-only; no body consulted or requirement adopted. |
+| GitHub closed #12 on 2026-11-18 at its artifact merge, before the implementation merged; the implementation is a memory adapter | [#12 evidence](changes/12-invite-only-auth/evidence.md#implementation-verification); profile [S12](#offline-auth) | Planning-state closed ≠ mail, durable identity or production auth. Rows keep missing blockers; do not reopen the Issue here. |
+| #27 evidence still reads "Artifact PR: Pending" although [#56](https://github.com/Shuang-su/Livecho/pull/56) merged as `1968239` | [#27 artifact approval](changes/27-long-session-state/evidence.md#artifact-approval); `main` history | Record gap, not a normative conflict. The merge is the approval fact used here. #27's owner corrects its own evidence; #30 does not edit it. |
+| Open Issue #38 has a proposal-prefixed title and an unmerged branch; the accepted #30 spec names only #31 as title-only | [Dated roadmap snapshot](roadmap.md#direct-dependency-snapshot) | Listed in the roadmap by number, title and state only, the same treatment as #31. No body consulted, no dependency or requirement inferred. Owner decides whether it enters the dependency table. |
 
 Unresolved authority rows: **0**. If a later review identifies ambiguity or conflict,
 mark the affected row `authority unresolved`, retain all candidate pointers and exact
