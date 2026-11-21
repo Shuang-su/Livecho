@@ -98,6 +98,21 @@ public key. The body must not contain a private key. Any extra key, including
 `private_key`, returns `422` and `{"error":"invalid_body"}` and must not use
 the token.
 
+The server must also reject, with that same `422` body and without using the
+token, a public key whose encoding:
+
+- fails strict RFC 8032 section 5.1.3 decoding. That includes an encoded `y`
+  coordinate not less than the field prime `p = 2^255 - 19`, a `y` with no
+  matching `x` on the curve, and a set sign bit when `x` is zero; or
+- decodes to a point of small order, meaning its order divides 8. There are
+  eight such points, including the identity.
+
+This check is an application rule, not a property of the verifier library.
+Some verifiers accept a small-order key, and then a signature with
+`R = identity, S = 0` verifies for every message. Such a key would let anyone
+who knows the `device_id` pass a challenge without a private key. Because the
+stored public key never changes, the check runs once at enrollment.
+
 A well-formed request with a bad, used, expired, or unknown token, or a token
 whose account is no longer an active contributor, returns `401` and
 `{"error":"rejected"}`. Those failures share one body. A malformed body does
@@ -142,7 +157,9 @@ livecho-worker-challenge-v1 || 0x00 || device_id ASCII || 0x00 || challenge_id A
 
 `device_id` and `challenge_id` are lowercase hyphenated UUID strings. The
 server verifies that signature with the stored public key. The private key is
-never an input.
+never an input. Verification is RFC 8032 Ed25519 (pure, no context, no
+prehash). A signature whose `S` half is not less than the group order `L`
+fails verification, as RFC 8032 requires.
 
 A well-formed signature that fails verification consumes that challenge.
 A second verify, a verify after expiry, a verify of a replaced challenge, and
@@ -349,8 +366,9 @@ the protocol's millisecond `Z` form. Clocks and random bytes are injectable.
 Tests must not write tokens, keys, signatures, or audio to disk.
 
 The Ed25519 verify operation is RFC 8032 over the message specified above.
-The package that performs it is an open decision in the plan. This artifact
-does not add that dependency.
+The package that performs it is named in the plan's Ed25519 verifier
+decision. This artifact does not add that dependency. The enrollment-time key
+checks above apply whichever package the merged plan names.
 
 No change to `epoch`, `seq`, or `revision` is in scope. A signature field
 inside `WorkerHelloV1` would be a protocol change and is out of scope.
@@ -363,6 +381,8 @@ inside `WorkerHelloV1` would be a protocol change and is out of scope.
 | Unused enrollment token still live | Second issuance returns `409` and no token. |
 | Bad, used, or expired enrollment token | `401` `rejected`. The row that exists stays used or expired. |
 | Extra `private_key` field | `422`, token not consumed, nothing stored. |
+| Small-order or non-canonical public key | `422` `invalid_body`, token not consumed, nothing stored. |
+| Signature `S` not less than `L` | `401` `rejected`, challenge consumed, audited `signature_invalid`. |
 | Replay or expired challenge | `401` `rejected`, audited `signature_invalid`. |
 | Revoked device | Further worker calls fail. The account row is unchanged. |
 | Empty allowlist or mismatched tuple | Hello decision audits `capability_rejected` and reports `manifest_not_allowed`. |
@@ -403,7 +423,9 @@ must not claim that drill.
       rejected at and after 24 hours from `created_at`.
 - [ ] The device row and every response and log lack a private key. The server
       stores the 32-byte Ed25519 public key. A `private_key` field is rejected
-      and does not consume a well-formed unused token.
+      and does not consume a well-formed unused token. Each small-order and
+      each non-canonical public-key encoding is rejected with `422` and does
+      not consume the token.
 - [ ] A challenge is rejected after use, after replacement, and at expiry. Two
       verifies of one challenge produce one success. Revoking a device leaves
       the account role and status unchanged and fails later authentication for

@@ -31,7 +31,9 @@ Lock the implementation contract for a later, separate pull request:
    is used.
 2. The worker enrolls an Ed25519 public key with that token. Later calls
    authenticate with a signed server challenge. The private key stays on the
-   worker. The server stores the public key only.
+   worker. The server stores the public key only, and refuses small-order or
+   non-canonical keys that would let a signature verify without a private
+   key.
 3. Challenges are single-use and expire. Replayed challenges fail. Revoking a
    device stops that device and leaves the contributor account unchanged.
 4. A schema-valid `WorkerHelloV1` is admitted only when its model reference
@@ -66,8 +68,9 @@ traffic.
 - The durable account/device checkpoint store, backup replay, and restore
   drill. Issues #4, #16, and #19 already own that evidence. Local revoke in
   this contract is not that drill.
-- The pinned Python package that verifies RFC 8032 Ed25519. The plan records
-  that choice as blocking implementation. This pull request adds no dependency.
+- Adding the Ed25519 verifier dependency. The plan proposes
+  `cryptography==50.0.2`; owner merge of the plan names it, and owner review
+  may replace it first. This pull request adds no dependency.
 
 ## Non-goals
 
@@ -126,8 +129,8 @@ request contains the four files in this directory and no application code.
 
 - Status: Proposed; documentation only. Worker-enrollment code is forbidden
   until the repository owner merges this directory's `intent.md`, `spec.md`,
-  and `plan.md`, and until the owner names the Ed25519 package recorded in
-  the plan.
+  and `plan.md`. That merge also names the Ed25519 package in the plan's
+  verifier decision.
 - Approved by/date: Pending @Shuang-su review and merge.
 - Production enrollment, production auth, and secret provisioning: not decided
   here.

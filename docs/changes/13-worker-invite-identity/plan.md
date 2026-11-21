@@ -12,9 +12,10 @@
    check can read issue 13. Append a fresh implementer exposure record to
    `evidence.md` before editing Python. The requirements-author record in this
    file is not that record.
-3. Stop before adding a dependency if the Ed25519 package named in Open
-   decisions is still unresolved. Do not vendor an implementation and do not
-   guess a package.
+3. Add exactly the Ed25519 dependency named in Ed25519 verifier decision,
+   with its lock entries, in the first implementation commit. Stop if owner
+   review struck or replaced that name. Do not vendor an implementation, do
+   not substitute another package, and do not widen the pin.
 4. Add the memory adapter, distinct HMAC label, injected clock, and injected
    random bytes. Unit-test token display-once, verifier-only storage, 24-hour
    absolute expiry, single-use compare-and-set, public-key-only device rows,
@@ -59,6 +60,16 @@
 - `uv run pytest -q tests/worker_identity`
 - A test that a stored enrollment row has no plaintext token and a device row
   has no private key
+- A test that each of the eight small-order point encodings, an encoding with
+  `y >= p`, and an encoding with the sign bit set while `x` is zero are
+  rejected by `POST /api/worker/devices` with `422` and `invalid_body`, leave
+  the token unused, and store no device
+- A test that `R = identity, S = 0` does not verify for any device, because
+  no such device can be enrolled
+- A test that a signature whose `S` is not less than the group order `L` is
+  rejected and consumes the challenge
+- `uv tree --frozen` shows the verifier and only its named transitive
+  packages as new entries
 - A test that the second challenge verify returns `401` and the account status
   is unchanged after device revoke
 - A test that a manifest mismatch returns `manifest_not_allowed` and an audit
@@ -92,22 +103,66 @@ A later owner who stores devices in Postgres must replace the Issue #4
 no-schema guard in that same change and must satisfy the existing restore
 rules before production authentication. That store is not authorized here.
 
-## Open decisions
+## Ed25519 verifier decision
 
-The pinned Python package that verifies RFC 8032 Ed25519 is unresolved. It
-blocks the implementation pull request. Python 3.12's standard library does
-not provide that verification, and `pyproject.toml` does not already depend on
-a library that does. This documentation pull request adds no dependency. The
-owner names one pinned, reviewed package in an accepted update of this plan
-before implementation code adds it. The package's job is signature
-verification. The implementation must not shell out and must not download a
-model or a binary at runtime.
+Python 3.12's standard library does not verify RFC 8032 Ed25519, and
+`pyproject.toml` does not already depend on a library that does. This
+documentation pull request adds no dependency. Owner merge of this plan names
+the package below. Owner review may strike or replace that name before merge;
+the implementation then follows the merged text.
+
+**Proposed package:** `cryptography==50.0.2`, runtime dependency in
+`pyproject.toml`, through
+`cryptography.hazmat.primitives.asymmetric.ed25519.Ed25519PublicKey` only:
+`from_public_bytes` and `verify`. The implementation must not import
+`hazmat` backends, OpenSSL bindings, or private modules directly.
+
+| Fact | Value recorded 2026-11-21 from PyPI JSON metadata |
+| --- | --- |
+| Release | 50.0.2, uploaded 2026-09-30 |
+| License expression | `Apache-2.0 OR BSD-3-Clause` |
+| New transitive packages | `cffi` 2.1.1 (`MIT-0`), `pycparser` 3.12 (`BSD-3-Clause`) |
+| Python 3.12 wheels | `cp311-abi3` for macOS arm64 and manylinux x86_64; no source build needed |
+| Bundled native library seen in a local probe | OpenSSL 4.0.3 |
+
+The implementation pull request's `uv.lock` is the authoritative digest set.
+The table above is a review aid, not a lock. Adding the package still
+requires the license-inventory and distribution review that
+`docs/policy/independent-implementation.md` names. This plan does not make a
+legal determination.
+
+Why this package and not `pynacl==1.6.2` (`Apache-2.0`, libsodium):
+
+- Both need `cffi` and `pycparser`, so the transitive set is the same size.
+- Issue #16 must encrypt raw archives. `cryptography` already provides the
+  authenticated encryption that change is likely to need, so the repository
+  can stay at one native crypto dependency. #16 still decides its own
+  primitive; this plan does not.
+- `cryptography` publishes type annotations that pass the repository's
+  `mypy --strict` setting without a stub package.
+
+The known difference that matters here: the local probe showed that
+`Ed25519PublicKey.from_public_bytes` accepts the identity point, and that
+`R = identity, S = 0` then verifies for any message. libsodium rejects that
+key. The spec therefore requires the application to reject small-order and
+non-canonical public keys at enrollment, independent of the library. With
+that rule, either package satisfies the spec. If the owner replaces the name
+with `pynacl==1.6.2`, the spec rule and its tests still apply unchanged.
+
+The verifier's only job is signature verification. The implementation must
+not generate server keys with it, must not shell out, and must not download a
+model or a binary at runtime. Tests may generate worker keys with it in
+process memory only.
+
+## Fixed bounds
 
 Every other rule in the spec is fixed for Issue #13. That includes the route
 list, HMAC label `livecho-worker-enrollment-v1`, 24-hour absolute token
 lifetime, 120-second absolute challenge lifetime, the quota table, the
 `ModelManifestRefV1` mapping of backend/model/revision/SHA, Hello binding
-through the existing `worker_id`, and the five statistic definitions. Those
+through the existing `worker_id`, the enrollment-time rejection of
+small-order and non-canonical public keys, and the five statistic
+definitions. Those
 bounds are this spec's proposed contract. The issue body requires the
 properties they implement and does not state each number or path. Owner merge
 of this directory accepts them. A different value, a signature field on

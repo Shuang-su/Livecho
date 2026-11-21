@@ -4,8 +4,8 @@
 
 - Artifact PR: Pending. This pull request is documentation only.
 - Status: Proposed. Worker-identity code waits until the owner merges
-  `intent.md`, `spec.md`, and `plan.md`, and until the owner names the Ed25519
-  package in the plan.
+  `intent.md`, `spec.md`, and `plan.md`. That merge names the Ed25519 package
+  proposed in the plan, unless owner review replaces it first.
 - Approved by/date: Pending @Shuang-su review and merge.
 - Authoring base: `f62951f2b5a083610a92d155d28afa19e4159dbe` (`main`). That
   commit is the squash-merged Issue #12 implementation from PR #59.
@@ -53,6 +53,41 @@
   reviewer are required before the later implementation. Owner merge of
   intent, spec, and plan is required before that code.
 
+### Second requirements-author revision (2026-11-21)
+
+- Identity/role/date: StablEdge desktop agent working for @Shuang-su,
+  requirements author for `docs/changes/13-worker-invite-identity/**` only,
+  2026-11-21. Not owner approval and not authority to implement.
+- Purpose: resolve the plan's open Ed25519 package decision into a named
+  proposal, and close a key-validation gap found while evaluating it.
+- Repository inputs read: `AGENTS.md`, `CONTRIBUTING.md`, the four files in
+  this directory at `310bad0`, `pyproject.toml`, the package names in
+  `uv.lock`, `Makefile`, `tools/check_change_artifacts.py` (function list
+  only), and `docs/policy/independent-implementation.md`.
+- GitHub inputs read 2026-11-21: the repository README, the open Issue list,
+  and the PR #60 description. Issue #31's body was not opened.
+- External inputs: PyPI JSON metadata (version, upload time, license
+  expression, `requires_dist`, wheel names and digests) for `cryptography`,
+  `pynacl`, `cffi`, and `pycparser`. No package source was read.
+- Local probe, outside this repository: a throwaway virtual environment in
+  `/tmp` with Python 3.12.13, `cryptography==50.0.2`, `pynacl==1.6.2`, and
+  `mypy==1.17.1`. It checked the RFC 8032 section 7.1 TEST 1 vector held in
+  process memory, a tampered message, an `S + L` signature, the identity
+  public key, a 31-byte key, and `mypy --strict` on a ten-line verify helper.
+  Results: TEST 1 verified with both packages; tampered message and `S + L`
+  were rejected by `cryptography`; `cryptography` accepted the identity key
+  and verified `R = identity, S = 0` for an arbitrary message; `pynacl`
+  rejected that same input; the 31-byte key was rejected; `mypy --strict`
+  reported no issues; `cryptography` ships `py.typed`. No vector, key, or
+  probe file was written into the repository.
+- Exclusions: no reference repository, upstream worker source, model,
+  dataset, audio, or live credential was opened or downloaded.
+- Changes made: the plan's Open decisions section became the Ed25519 verifier
+  decision proposing `cryptography==50.0.2`; the spec gained the
+  enrollment-time small-order and non-canonical public-key rejection, the
+  `S < L` rule, two failure-table rows, and one acceptance sentence; the plan
+  gained the matching tests; the intent and this file were aligned.
+
 ## Automated verification
 
 Commands below were run from this worktree on 2026-11-20 against base
@@ -71,6 +106,20 @@ run again after the table was written.
 | Local Markdown link check | Exit 0. `local links checked: 6`; `local links ok`. | 2026-11-20 / documentation tree |
 | `git diff --name-only origin/main` and untracked files | Exit 0. Exactly the four files in this directory. | 2026-11-20 / documentation tree |
 
+Second revision, 2026-11-21, on branch `issue/13-worker-invite-identity`
+from `310bad0`:
+
+| Command | Result | Date/commit |
+| --- | --- | --- |
+| `LIVECHO_HEAD_REF=issue/13-worker-invite-identity uv run python tools/check_change_artifacts.py` | Exit 0. `change artifacts: ok`. | 2026-11-21 / documentation tree |
+| `git diff --check` | Exit 0. No whitespace errors. | 2026-11-21 / documentation tree |
+| `git diff --name-only origin/main` and untracked files | Exit 0. Exactly the four files in this directory. | 2026-11-21 / documentation tree |
+| `make bootstrap` then `LIVECHO_HEAD_REF=issue/13-worker-invite-identity make verify` | Exit 0. ruff check passed; ruff format, 170 files already formatted; mypy, no issues in 170 source files; pytest `974 passed, 1 deselected`; Railway vitest 63, protocol vitest 314, web vitest 51; `change artifacts: ok`; `protocol generated artifacts: ok`; web production build ok. | 2026-11-21 / tree before this table text |
+
+The second-revision run used `uv` 0.12.1 and `pnpm` 11.21.0 from temporary
+directories outside the repository, because the machine's own `uv` was
+0.12.2 and the repository pins 0.12.1. No new local Markdown link was added.
+
 `make verify` is the GitHub `Verify` workflow's local entry point. It was run
 on this branch. Live enrollment, Resend, Railway provisioning, production
 auth, MLX, CUDA, and live ingest were not run. A documentation-only tree has
@@ -84,7 +133,13 @@ created.
 
 ## Review findings
 
-No review findings yet. Owner review is pending. This author does not merge
+- 2026-11-21, requirements-author self-review: the original spec stored any
+  32-byte public key. With the proposed verifier, a small-order key makes
+  `R = identity, S = 0` verify for every challenge, so device proof would not
+  require a private key. Resolved in the spec by an enrollment-time key rule
+  that does not depend on the library.
+
+Owner review is pending. This author does not merge
 the pull request and does not close Issue #13.
 
 ## Deviations
