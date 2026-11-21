@@ -209,3 +209,52 @@ unchanged.
   required before merge for provenance and similarity review. This author does
   not inspect reference-only upstream material, does not merge, and does not
   close Issue #13.
+
+## Implementation verification
+
+Recorded 2026-11-21 on branch `issue/13-worker-invite-identity-impl` from
+`57236d26de3f9aadd88b55163963919364aff273`. `uv` 0.12.1 was installed for this
+run because it was not on `PATH`. The first local `make verify` failed in
+`test_change_artifacts_are_complete` because the snapshot's `origin/main` was
+still `f62951f` and did not contain the merged Issue #13 documents. `git fetch
+origin main` moved `origin/main` to `57236d2`. The results below are from the
+rerun after that fetch. Live enrollment, Resend, Railway provisioning,
+production auth, MLX, CUDA, and live ingest were not run. They are not passes.
+
+| Command | Result | Date |
+| --- | --- | --- |
+| `uv run pytest -q tests/worker_identity` | Exit 0. `27 passed`. Includes token-versus-verifier storage, the eight small-order encodings plus `y >= p` and the sign-bit encoding, `R = identity, S = 0`, `S >= L`, challenge replay and revoke, `manifest_not_allowed` with audit `capability_rejected`, minor-1 `protocol.epoch-rotation` admission, the six statistics keys, and `create_local_vertical_app` / `create_auth_app` without `/api/worker/`. | 2026-11-21 |
+| `uv tree --frozen` | Exit 0. New runtime dependency is `cryptography v50.0.2`, depending on `cffi v2.1.1`, depending on `pycparser v3.12`. No other new root dependency. | 2026-11-21 |
+| `make bootstrap` then `make verify` | Exit 0. ruff check passed; ruff format, 187 files already formatted; mypy, no issues in 187 source files; pytest `1001 passed, 1 deselected`; Railway vitest 63, protocol vitest 314, web vitest 51; `change artifacts: ok`; `protocol generated artifacts: ok`; web production build ok. | 2026-11-21 |
+| `git diff --check` | Exit 0 on the tracked diff. A trailing-whitespace scan of the new Python files found none. | 2026-11-21 |
+| Diff path and secret scan | No path under `packages/protocol/`, `workers/mlx/`, `.github/`, `db/migrations/`, or `.env.example`. No `RESEND_API_KEY=` or `LIVECHO_SESSION_SIGNING_KEY=` assignment. The worker-identity package source does not read those names. | 2026-11-21 |
+
+### Lock and license inventory
+
+`uv.lock` is the authoritative digest set. The only packages added relative to
+`57236d2` are `cryptography==50.0.2`, `cffi==2.1.1`, and `pycparser==3.12`.
+Installed distribution metadata on this machine, read 2026-11-21, reports:
+
+| Package | License-Expression | License files in the installed distribution |
+| --- | --- | --- |
+| `cryptography` 50.0.2 | `Apache-2.0 OR BSD-3-Clause` | `cryptography-50.0.2.dist-info/licenses/LICENSE`, `LICENSE.APACHE`, `LICENSE.BSD` |
+| `cffi` 2.1.1 | `MIT-0` | `cffi-2.1.1.dist-info/licenses/LICENSE` |
+| `pycparser` 3.12 | `BSD-3-Clause` | `pycparser-3.12.dist-info/licenses/LICENSE` |
+
+These expressions match the table already in the merged plan. This change does
+not vendor the wheels or copy those license files into the tree. It does not
+copy LAPLACE or other reference-only material. No compatibility or
+distribution-obligation conclusion is made here. A later distribution of the
+locked wheels would need a separate review of those packages' own license
+files. The post-implementation similarity reviewer named above is still
+required before merge.
+
+## Implementation limitations
+
+The adapter is process-local memory. There is no `db/migrations/` change, no
+backup, and no restore drill. `create_worker_identity_app` is unmounted by
+`create_auth_app`, `create_local_vertical_app`, and the Railway start
+commands. The HMAC key is a constructor argument. `LIVECHO_EMAIL_ENABLED`
+stays false. Production auth, live ingest, real ASR, community-worker PCM,
+wired danmaku or superchat, real MLX, and real CUDA stay off. This pull
+request relates to Issue #13 and does not close it.
