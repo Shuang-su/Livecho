@@ -139,14 +139,22 @@ class MemoryWorkerIdentityStore:
             return RedeemKind.CREATED, row.account_id, device
 
     def consume_ip(self, family: str, ip: str, now: datetime) -> bool:
-        """Count one request. Return False when the rolling window is already over quota."""
+        """Count one request. Return False when the rolling window is already over quota.
+
+        The bucket keeps at most ``REQUEST_QUOTA`` in-window timestamps. Extra
+        hits replace the oldest ones, so a flood cannot grow the history and
+        the limiter stays closed until the window elapses from the retained hits.
+        """
         with self._lock:
             self._evict_idle_buckets(now)
             key = (family, ip)
             hits = [item for item in self._ip_hits.get(key, []) if now - item < QUOTA_WINDOW]
             hits.append(now)
+            allowed = len(hits) <= REQUEST_QUOTA
+            if len(hits) > REQUEST_QUOTA:
+                del hits[:-REQUEST_QUOTA]
             self._ip_hits[key] = hits
-            return len(hits) <= REQUEST_QUOTA
+            return allowed
 
     def issue_challenge(
         self,

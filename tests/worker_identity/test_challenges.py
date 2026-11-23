@@ -2,11 +2,21 @@
 
 from __future__ import annotations
 
+import logging
 import threading
-from datetime import timedelta
+from datetime import datetime, timedelta
 
+import pytest
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from livecho_backend.auth.records import AccountStatus, Role
+from livecho_backend.worker_identity.records import (
+    FAMILY_DEVICES,
+    QUOTA_WINDOW,
+    REQUEST_QUOTA,
+    DeviceStatus,
+)
+
+from tests.auth.support import Call
 
 from .support import (
     World,
@@ -97,6 +107,79 @@ def test_revoke_leaves_the_account_and_stops_only_that_device() -> None:
     del private
 
 
+def test_revoke_omits_unknown_paths_from_logs_and_audits(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    world = World()
+    _private, device_id = _device(world)
+    body = b'{"note":"do-not-log-revoke-body"}'
+    garbage = "not-a-device"
+    unknown = "00000000-0000-4000-8000-000000000077"
+    caplog.set_level(logging.INFO, logger="livecho.worker_identity")
+
+    def revoke(path: str, raw: bytes | None = None) -> Call:
+        caplog.clear()
+        return world.call(
+            "POST",
+            f"/api/worker/devices/{path}/revoke",
+            body=raw,
+            account=world.admin.account_id,
+        )
+
+    rejected = revoke(garbage, body)
+    assert rejected.status == 422
+    assert rejected.json() == {"error": "invalid_body"}
+    audit = world.store.audits()[-1]
+    assert audit.result == "invalid_body"
+    assert audit.account_id is None
+    assert audit.device_id is None
+    assert garbage not in caplog.text
+    assert "do-not-log-revoke-body" not in caplog.text
+
+    known = revoke(device_id, body)
+    assert known.status == 422
+    assert known.json() == {"error": "invalid_body"}
+    audit = world.store.audits()[-1]
+    assert audit.result == "invalid_body"
+    assert audit.device_id == device_id
+    assert audit.account_id == world.contributor.account_id
+    assert "do-not-log-revoke-body" not in caplog.text
+    stored = world.store.device(device_id)
+    assert stored is not None
+    assert stored.status is DeviceStatus.ACTIVE
+
+    missing_uuid = revoke(unknown)
+    assert missing_uuid.status == 404
+    assert missing_uuid.json() == {"error": "not_found"}
+    audit = world.store.audits()[-1]
+    assert audit.result == "not_found"
+    assert audit.account_id is None
+    assert audit.device_id is None
+    assert unknown not in caplog.text
+
+    missing_path = revoke(garbage)
+    assert missing_path.status == 404
+    assert missing_path.json() == {"error": "not_found"}
+    audit = world.store.audits()[-1]
+    assert audit.result == "not_found"
+    assert audit.account_id is None
+    assert audit.device_id is None
+    assert garbage not in caplog.text
+
+    revoked = revoke(device_id)
+    assert revoked.status == 204
+    audit = world.store.audits()[-1]
+    assert audit.result == "ok"
+    assert audit.device_id == device_id
+    assert audit.account_id == world.contributor.account_id
+    repeated = revoke(device_id)
+    assert repeated.status == 204
+    audit = world.store.audits()[-1]
+    assert audit.result == "ok"
+    assert audit.device_id == device_id
+    assert audit.account_id == world.contributor.account_id
+
+
 def test_challenge_quota_does_not_replace_the_current_challenge() -> None:
     world = World()
     _private, device_id = _device(world)
@@ -147,6 +230,41 @@ def test_ip_quota_hides_malformed_bodies_and_ignores_forwarded_for() -> None:
     )
     assert bad_path.status == 401
     assert world.store.challenges_for("NOT-A-UUID") == ()
+
+
+def _device_hits(world: World, ip: str) -> list[datetime]:
+    return list(world.store._ip_hits.get((FAMILY_DEVICES, ip), []))
+
+
+def test_ip_quota_history_stays_bounded_after_exhaustion() -> None:
+    world = World()
+    client = ("203.0.113.80", 4430)
+    idle = ("203.0.113.81", 4430)
+    assert world.call("POST", "/api/worker/devices", body=b"not-json", client=idle).status == 422
+    for _ in range(REQUEST_QUOTA):
+        response = world.call("POST", "/api/worker/devices", body=b"not-json", client=client)
+        assert response.status == 422
+    world.clock.advance(timedelta(minutes=10))
+    for _ in range(REQUEST_QUOTA * 4):
+        response = world.call("POST", "/api/worker/devices", body=b"not-json", client=client)
+        assert response.status == 401
+        assert len(_device_hits(world, client[0])) <= REQUEST_QUOTA
+    retained = _device_hits(world, client[0])
+    assert len(retained) == REQUEST_QUOTA
+    assert retained[-1] == world.clock.now
+    assert all(item == world.clock.now for item in retained)
+    # The original hits are now a full window old, but the retained flood is not.
+    world.clock.advance(timedelta(minutes=5))
+    still = world.call("POST", "/api/worker/devices", body=b"not-json", client=client)
+    assert still.status == 401
+    assert still.json() == {"error": "rejected"}
+    assert len(_device_hits(world, client[0])) <= REQUEST_QUOTA
+    assert (FAMILY_DEVICES, idle[0]) not in world.store._ip_hits
+    newest = _device_hits(world, client[0])[-1]
+    world.clock.advance(QUOTA_WINDOW - (world.clock.now - newest))
+    opened = world.call("POST", "/api/worker/devices", body=b"not-json", client=client)
+    assert opened.status == 422
+    assert len(_device_hits(world, client[0])) == 1
 
 
 def test_one_concurrent_verify_wins() -> None:

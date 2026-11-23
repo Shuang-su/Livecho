@@ -258,3 +258,22 @@ commands. The HMAC key is a constructor argument. `LIVECHO_EMAIL_ENABLED`
 stays false. Production auth, live ingest, real ASR, community-worker PCM,
 wired danmaku or superchat, real MLX, and real CUDA stay off. This pull
 request relates to Issue #13 and does not close it.
+
+## Review fixes
+
+Recorded 2026-11-23 on `issue/13-worker-invite-identity-impl` after head
+`0b31c00`. Two review findings are fixed in the following commit. Intent,
+spec, and plan are unchanged. Production auth, mail, and secrets stay off.
+
+- `consume_ip` keeps at most 30 in-window timestamps, replacing the oldest
+  when a flood continues, and still evicts idle buckets outside the 15-minute
+  window. The 31st request in the window remains `401` `rejected`.
+- Revoke logs and audits use a stored device's account id and device id.
+  A non-UUID path, an unknown device, and a nonempty body for an unknown path
+  omit the raw path. Status codes are unchanged.
+
+| Command | Result |
+| --- | --- |
+| `uv run ruff check` on the worker-identity package and `tests/worker_identity` | Exit 0. |
+| `uv run mypy` on those same paths | Exit 0. No issues in 17 source files. |
+| `uv run pytest -q tests/worker_identity` | Exit 0. `29 passed`. |

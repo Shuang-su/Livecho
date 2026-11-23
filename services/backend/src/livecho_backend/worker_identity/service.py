@@ -441,40 +441,18 @@ class WorkerIdentityService:
         if denied is not None:
             return denied
         assert principal is not None
+        known = self.store.device(device_id) if is_uuid4(device_id) else None
         if raw_body != b"":
-            self._record("device.manage", "invalid_body", "device", principal, target=device_id)
+            self._record_known_device(principal, "invalid_body", known)
             return _error(422, "invalid_body")
-        if not is_uuid4(device_id):
-            self._record(
-                "device.manage",
-                "not_found",
-                "device",
-                principal,
-                target=device_id,
-                audit_account=False,
-            )
+        if known is None:
+            self._record_known_device(principal, "not_found", None)
             return _error(404, "not_found")
-        kind, device = self.store.revoke(device_id, self._instant())
-        if kind is RevokeKind.UNKNOWN:
-            self._record(
-                "device.manage",
-                "not_found",
-                "device",
-                principal,
-                target=device_id,
-                audit_account=False,
-            )
+        kind, device = self.store.revoke(known.device_id, self._instant())
+        if kind is RevokeKind.UNKNOWN or device is None:
+            self._record_known_device(principal, "not_found", None)
             return _error(404, "not_found")
-        account_id = device.account_id if device is not None else None
-        self._record(
-            "device.manage",
-            "ok",
-            "device",
-            principal,
-            target=device_id,
-            account_id=account_id,
-            device_id=device_id,
-        )
+        self._record_known_device(principal, "ok", device)
         return ApiResult(204)
 
     def add_allowlist(self, principal: Principal | None, raw_body: bytes) -> ApiResult:
@@ -715,6 +693,33 @@ class WorkerIdentityService:
             device_id=None if device is None else device.device_id,
         )
         return False
+
+    def _record_known_device(
+        self,
+        principal: Principal,
+        result: AuditResult,
+        device: Device | None,
+    ) -> None:
+        """Log and audit a revoke using store identifiers, never the raw path."""
+        if device is None:
+            self._record(
+                "device.manage",
+                result,
+                "device",
+                principal,
+                target="-",
+                audit_account=False,
+            )
+            return
+        self._record(
+            "device.manage",
+            result,
+            "device",
+            principal,
+            target=device.device_id,
+            account_id=device.account_id,
+            device_id=device.device_id,
+        )
 
     def _record(
         self,
