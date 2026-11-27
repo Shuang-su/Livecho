@@ -21,6 +21,7 @@ from .points import acceptable_point, group_order
 
 _ENROLLMENT_LABEL = b"livecho-worker-enrollment-v1\x00"
 _CHALLENGE_LABEL = b"livecho-worker-challenge-v1\x00"
+_GATEWAY_UPGRADE_LABEL = b"livecho-worker-gateway-upgrade-v1\x00"
 _UNPADDED = re.compile(r"[A-Za-z0-9_-]+\Z")
 
 
@@ -66,6 +67,23 @@ def challenge_message(device_id: str, challenge_id: str, nonce: bytes) -> bytes:
         + challenge_id.encode("ascii")
         + b"\x00"
         + nonce
+    )
+
+
+def gateway_proof_message(
+    device_id: str, challenge_id: str, nonce: bytes, handshake_key: bytes
+) -> bytes:
+    """Bind the challenge to the RFC 6455 key of the actual upgrade."""
+    if len(nonce) != 32 or len(handshake_key) != 16:
+        raise ValueError("invalid upgrade proof inputs")
+    return (
+        _GATEWAY_UPGRADE_LABEL
+        + device_id.encode("ascii")
+        + b"\x00"
+        + challenge_id.encode("ascii")
+        + b"\x00"
+        + nonce
+        + handshake_key
     )
 
 

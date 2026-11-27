@@ -8,7 +8,7 @@ from datetime import datetime
 from enum import StrEnum
 from threading import Lock
 
-from .crypto import challenge_message, verify_signature
+from .crypto import challenge_message, gateway_proof_message, verify_signature
 from .records import (
     QUOTA_WINDOW,
     REQUEST_QUOTA,
@@ -19,6 +19,7 @@ from .records import (
     Device,
     DeviceStatus,
     Enrollment,
+    GatewayProof,
     HealthState,
     Statistic,
 )
@@ -80,6 +81,7 @@ class MemoryWorkerIdentityStore:
         self._stats: dict[str, Statistic] = {}
         self._challenges: dict[str, Challenge] = {}
         self._admissions: dict[str, Admission] = {}
+        self._gateway_proofs: dict[str, GatewayProof] = {}
         self._allowlist: dict[tuple[str, str, str, str], AllowlistEntry] = {}
         self._audits: list[AuditRecord] = []
         self._ip_hits: dict[tuple[str, str], list[datetime]] = {}
@@ -234,6 +236,47 @@ class MemoryWorkerIdentityStore:
             )
             return VerifyKind.OK, device.account_id, device.device_id
 
+    def verify_gateway_upgrade(
+        self,
+        *,
+        device_id: str,
+        challenge_id: str,
+        signature: bytes,
+        handshake_key: bytes,
+        now: datetime,
+        account_active: AccountActive,
+    ) -> tuple[VerifyKind, str | None, GatewayProof | None]:
+        """Consume and verify one challenge under the shared identity-store lock."""
+        with self._lock:
+            device = self._devices.get(device_id)
+            challenge = self._challenges.get(challenge_id)
+            if device is None or challenge is None or challenge.device_id != device_id:
+                return VerifyKind.REJECTED, None, None
+            if device.status is not DeviceStatus.ACTIVE or not account_active(device.account_id):
+                return VerifyKind.DEVICE_REVOKED, device.account_id, None
+            nonce = challenge.nonce
+            if nonce is None or challenge.used_at is not None or now >= challenge.expires_at:
+                return VerifyKind.REJECTED, device.account_id, None
+            self._consume_challenge(challenge, now)
+            message = gateway_proof_message(device_id, challenge_id, nonce, handshake_key)
+            if not verify_signature(device.public_key, signature, message):
+                return VerifyKind.SIGNATURE_INVALID, device.account_id, None
+            proof = GatewayProof(device_id, challenge.expires_at)
+            self._gateway_proofs[device_id] = proof
+            return VerifyKind.OK, device.account_id, proof
+
+    def discard_gateway_proof(self, proof: GatewayProof) -> None:
+        with self._lock:
+            self._detach_gateway_proof(proof)
+
+    def _detach_gateway_proof(self, proof: GatewayProof) -> bool:
+        # The device slot checks supersession. The caller must already own this
+        # very object and cannot fetch or consume it just by naming the device.
+        if self._gateway_proofs.get(proof.device_id) is not proof:
+            return False
+        del self._gateway_proofs[proof.device_id]
+        return True
+
     def decide_hello(
         self,
         *,
@@ -242,21 +285,33 @@ class MemoryWorkerIdentityStore:
         now: datetime,
         account_active: AccountActive,
         negotiate: Negotiate,
+        gateway_proof: GatewayProof | None = None,
     ) -> tuple[str, str, int | None, str | None]:
         """Apply Hello precedence. Return audit result, protocol code, minor, account id."""
         with self._lock:
             device = self._devices.get(device_id)
             if device is None:
                 return "rejected", "rejected", None, None
+            if gateway_proof is None:
+                proof_live = self._admission_live(device_id, now)
+            else:
+                proof_live = (
+                    gateway_proof.device_id == device_id
+                    and self._detach_gateway_proof(gateway_proof)
+                    and now < gateway_proof.expires_at
+                )
             active = device.status is DeviceStatus.ACTIVE and account_active(device.account_id)
             if not active:
-                self._consume_live_admission(device_id, now)
+                if gateway_proof is None:
+                    self._consume_live_admission(device_id, now)
                 return "device_revoked", "device_revoked", None, device.account_id
-            if worker_id != device_id or not self._admission_live(device_id, now):
-                self._consume_live_admission(device_id, now)
+            if worker_id != device_id or not proof_live:
+                if gateway_proof is None:
+                    self._consume_live_admission(device_id, now)
                 return "signature_invalid", "signature_invalid", None, device.account_id
             code, accepted, minor = negotiate(self._allowlist_keys())
-            self._consume_live_admission(device_id, now)
+            if gateway_proof is None:
+                self._consume_live_admission(device_id, now)
             if not accepted:
                 if code in {"manifest_not_allowed", "capability_required"}:
                     return "capability_rejected", code, None, device.account_id
@@ -269,6 +324,7 @@ class MemoryWorkerIdentityStore:
             if device is None:
                 return RevokeKind.UNKNOWN, None
             self._retire_challenges(device_id, now)
+            self._gateway_proofs.pop(device_id, None)
             if device.status is DeviceStatus.REVOKED:
                 return RevokeKind.ALREADY, device
             updated = Device(

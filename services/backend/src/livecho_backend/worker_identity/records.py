@@ -97,6 +97,14 @@ class Admission:
     consumed_at: datetime | None
 
 
+@dataclass(frozen=True, slots=True, repr=False, eq=False)
+class GatewayProof:
+    """Identity-only context reserved for the socket whose upgrade was verified."""
+
+    device_id: str
+    expires_at: datetime
+
+
 @dataclass(frozen=True, slots=True)
 class AllowlistEntry:
     provider: str

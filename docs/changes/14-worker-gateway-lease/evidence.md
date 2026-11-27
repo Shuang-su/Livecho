@@ -1,5 +1,38 @@
 # Evidence: Worker gateway, heartbeat, and lease state machine
 
+## Runtime implementation assignment — 2026-11-27
+
+- User request: “把 #62 的本地修订推上去，审查和 CI 通过后合并。然后继续让
+  Claude Code 实现网关，把 #27 的轮换和重同步接到调度器和字幕页，跑通
+  #15 的三 worker 故障切换验收。”
+- Accepted owning artifacts: PR #62 merged as `63783a5`. Worktree
+  `codex/issue-14-worker-gateway-runtime` starts at that commit.
+- Claude Code Opus 5.5 is assigned the standalone gateway state machine
+  and transport. Codex is assigned the shared identity binding, acceptance
+  tests and independent review. Inputs are Livecho's accepted artifacts,
+  own code and standard transport contracts. Neither assignment includes
+  third-party reference source, schemas, assets or screenshots.
+- The #14 runtime is the single-lease synthetic foundation. The scheduler,
+  viewer publication and minor-1 rotation consumer belong to follow-on
+  work rather than to the #14 gateway contract.
+
+### Local gateway runtime checkpoint
+
+- Claude Code wrote the gateway wire builders and validated model dispatch
+  after its first larger write stopped at the file preamble. Codex corrected
+  the protocol imports, implemented the lease and connection authority,
+  and integrated the shared identity store and tests.
+- The gateway owns the original upgrade proof, bounded frame gates, one
+  synthetic lease, expiry, same-lease resume, revocation and statistics.
+  The existing #13 HTTP routes and the separate minor-0 viewer are exercised
+  by their original suites. The worker app remains isolated.
+- `uv run --no-sync pytest -q tests/worker_identity tests/worker_gateway`
+  exited 0 with 45 passed. These include real loopback WSS connections with
+  certificate validation and private test keys in anonymous pipes, replay
+  rejection, minor 0/1 lease parity, exact resume, two-waiter refusal,
+  expiry/idempotence, PCM rates and revocation. Ruff and targeted mypy
+  passed. The socket tests do not use a proxy or a real audio source.
+
 ## Upgrade proof revision for PR #62
 
 - 2026-11-27, local branch `codex/issue-14-gateway-proof-binding` from PR #62

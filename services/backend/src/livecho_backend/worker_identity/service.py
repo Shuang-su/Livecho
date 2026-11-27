@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
+import base64
 import json
 import secrets
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from decimal import ROUND_DOWN, Decimal
@@ -41,6 +42,7 @@ from .records import (
     Device,
     DeviceStatus,
     Enrollment,
+    GatewayProof,
     HealthState,
     ObjectClass,
 )
@@ -60,6 +62,12 @@ RandomBytes = Callable[[int], bytes]
 NewId = Callable[[], str]
 PrincipalResolver = Callable[[str | None], Principal | None]
 _HEALTH: frozenset[str] = frozenset({"ready", "busy", "draining", "error"})
+_PROOF_HEADER_LENGTHS = {
+    b"livecho-device-id": 36,
+    b"livecho-challenge-id": 36,
+    b"livecho-device-signature": 86,
+    b"sec-websocket-key": 24,
+}
 
 
 class AccountLookup(Protocol):
@@ -547,7 +555,66 @@ class WorkerIdentityService:
         )
         return ApiResult(200, rows)
 
+    def device_usable(self, device_id: str) -> bool:
+        device = self.store.device(device_id)
+        return (
+            device is not None
+            and device.status is DeviceStatus.ACTIVE
+            and self._contributor_active(device.account_id)
+        )
+
+    def verify_gateway_upgrade(
+        self,
+        headers: Iterable[tuple[bytes, bytes]],
+        client_ip: str,
+        *,
+        eligible: bool = True,
+    ) -> GatewayProof | None:
+        """Check one actual upgrade without creating an HTTP Hello admission."""
+        now = self._instant()
+        if not self.store.consume_ip(FAMILY_CHALLENGES, _peer(client_ip), now):
+            self._audit("device.gateway_verify", "rate_limited", "device", now=now)
+            return None
+        parsed = _gateway_proof_headers(headers) if eligible else None
+        if parsed is None:
+            self._audit("device.gateway_verify", "invalid_body", "device", now=now)
+            return None
+        device_id, challenge_id, signature, handshake_key = parsed
+        kind, account_id, proof = self.store.verify_gateway_upgrade(
+            device_id=device_id,
+            challenge_id=challenge_id,
+            signature=signature,
+            handshake_key=handshake_key,
+            now=now,
+            account_active=self._contributor_active,
+        )
+        try:
+            self._audit(
+                "device.gateway_verify",
+                kind.value,
+                "device",
+                account_id=account_id,
+                device_id=device_id if account_id is not None else None,
+                now=now,
+            )
+        except BaseException:
+            if proof is not None:
+                self.discard_gateway_proof(proof)
+            raise
+        return proof
+
+    def discard_gateway_proof(self, proof: GatewayProof) -> None:
+        self.store.discard_gateway_proof(proof)
+
+    def admit_gateway_hello(self, hello: WorkerHelloV1, proof: GatewayProof) -> HelloDecision:
+        return self._admit_hello(hello, proof.device_id, gateway_proof=proof)
+
     def admit_hello(self, hello: WorkerHelloV1, device_id: str) -> HelloDecision:
+        return self._admit_hello(hello, device_id)
+
+    def _admit_hello(
+        self, hello: WorkerHelloV1, device_id: str, *, gateway_proof: GatewayProof | None = None
+    ) -> HelloDecision:
         def negotiate(keys: frozenset[tuple[str, str, str, str]]) -> tuple[str, bool, int | None]:
             result = negotiate_worker(hello, keys)
             return (
@@ -563,6 +630,7 @@ class WorkerIdentityService:
             now=now,
             account_active=self._contributor_active,
             negotiate=cast(Negotiate, negotiate),
+            gateway_proof=gateway_proof,
         )
         stored = cast(AuditResult, audit_result)
         self._audit(
@@ -815,6 +883,41 @@ def _object(raw: bytes, keys: frozenset[str]) -> dict[str, object] | None:
     if set(parsed) != keys:
         return None
     return parsed
+
+
+def _gateway_proof_headers(
+    headers: Iterable[tuple[bytes, bytes]],
+) -> tuple[str, str, bytes, bytes] | None:
+    values: dict[bytes, bytes] = {}
+    for name, value in headers:
+        name = name.lower()
+        length = _PROOF_HEADER_LENGTHS.get(name)
+        if length is None:
+            continue
+        if name in values or len(value) != length:
+            return None
+        values[name] = value
+    if values.keys() != _PROOF_HEADER_LENGTHS.keys():
+        return None
+    try:
+        device_id = values[b"livecho-device-id"].decode("ascii")
+        challenge_id = values[b"livecho-challenge-id"].decode("ascii")
+        signature_text = values[b"livecho-device-signature"].decode("ascii")
+        wire_key = values[b"sec-websocket-key"]
+        handshake_key = base64.b64decode(wire_key, validate=True)
+    except (UnicodeDecodeError, ValueError):
+        return None
+    signature = decode_unpadded(signature_text, 64)
+    if (
+        not is_uuid4(device_id)
+        or not is_uuid4(challenge_id)
+        or signature is None
+        or base64.urlsafe_b64encode(signature).rstrip(b"=") != values[b"livecho-device-signature"]
+        or len(handshake_key) != 16
+        or base64.b64encode(handshake_key) != wire_key
+    ):
+        return None
+    return device_id, challenge_id, signature, handshake_key
 
 
 def _peer(client_ip: str) -> str:
