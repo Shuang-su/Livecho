@@ -93,6 +93,18 @@ its live cursor. The post-review run exercised socket re-admission,
 cancellation, stale observations, pending PCM, and a stale cursor while
 old partials were open.
 
+The local implementation checkpoint is
+`5d5b25ba60b45d43e3dc887b1f3a1bc0e265edf5` and the review fixes are
+`675eb50e65effe1c2ae66130e558a90a3d8184b0`. The first full run on the
+review fixes hit an existing invite-mail test that searches an entire JSON
+body for the substring `cc`. The generated fixture token contained that
+substring. The same test passed when rerun alone.
+
+The final run of `LIVECHO_BASE_SHA=7acf5ea88daa833ccec95835a6f49bab4542f1bf PYTEST_ADDOPTS=--tb=line make verify`
+at `675eb50` exited 0. Python reported 1,036 passed and one stress case
+excluded. Vitest reported 431 passed. Ruff, mypy, TypeScript, artifact and
+schema checks, and the default build passed.
+
 ## Historical artifact approval and exposure
 
 - Proposed. Owner merge and implementation evidence pending.
