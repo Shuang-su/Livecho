@@ -85,7 +85,7 @@ class Asset(Closed):
             or "\\" in value
             or ":" in value
             or any(part.startswith(".") for part in path.parts)
-            or path.suffix not in {".safetensors", ".json", ".txt", ".model"}
+            or path.suffix not in {".safetensors", ".json", ".txt", ".model", ".md"}
         ):
             raise ValueError("asset_path_denied")
         return value

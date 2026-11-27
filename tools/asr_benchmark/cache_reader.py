@@ -171,6 +171,44 @@ class VerifiedModelReader:
                 self.close()
             raise BlockedEvidence("cache_read_failed") from None
 
+    def read_all_verified(self) -> bytes:
+        """Read entire verified asset once with single-pass SHA-256 and inode verification."""
+        self._check_cancelled()
+        try:
+            before = _fingerprint(_private_file(self._fd))
+            named = os.stat(
+                self._entry._name("asset"), dir_fd=self._entry._directory, follow_symlinks=False
+            )
+            if before[2] != self._size or _fingerprint(named)[:3] != before[:3]:
+                raise BlockedEvidence("cache_final_changed")
+            buf = bytearray(self._size)
+            digest = hashlib.sha256()
+            offset = 0
+            view = memoryview(buf)
+            try:
+                while offset < self._size:
+                    self._check_cancelled()
+                    chunk = os.pread(self._fd, min(CHUNK_BYTES, self._size - offset), offset)
+                    if not chunk:
+                        raise BlockedEvidence("cache_final_length")
+                    end = offset + len(chunk)
+                    view[offset:end] = chunk
+                    digest.update(chunk)
+                    offset = end
+            finally:
+                view.release()
+            if os.pread(self._fd, 1, self._size) or digest.hexdigest() != self._entry.asset.sha256:
+                raise BlockedEvidence("cache_final_integrity")
+            after = _fingerprint(_private_file(self._fd))
+            if after != before:
+                raise BlockedEvidence("cache_final_changed")
+            self._stamp = after
+            return bytes(buf)
+        except BaseException:
+            with suppress(BaseException):
+                self.close()
+            raise BlockedEvidence("cache_read_failed") from None
+
     def close(self) -> None:
         if self.closed:
             return

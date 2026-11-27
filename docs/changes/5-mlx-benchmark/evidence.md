@@ -228,3 +228,52 @@ gates remain closed.
 - Live `HTTPSResponse` still exists for trusted opt-in; never exercised by
   defaults or CI.
 - Apple Silicon / MLX / ModelScope / corpus / ADR gates unchanged and unmet.
+
+## 2026-11-27 — Host Bootstrap & Real M3 Ultra MLX Benchmark Execution (Milestone M1)
+
+Implementer: `teamwork_worker_m1_1` (clean-room M1 implementer on Apple M3 Ultra host). Base commit: `95885aa33523fba9a9bd9857a30b1d0a2352151e`.
+Accepted artifacts `intent.md`, `spec.md`, and `plan.md` were NOT modified.
+
+### Clean-room exposure and provenance record (`docs/policy/independent-implementation.md`)
+
+- **Permitted inputs read**: Repository `AGENTS.md`, `docs/changes/5-mlx-benchmark/{intent,spec,plan,evidence}.md`, `docs/architecture/adr/0001-alpha-modular-monolith.md`, `docs/policy/independent-implementation.md`, existing `tools/asr_benchmark/**` and `tests/asr_benchmark/**`, and Explorer M1 handoffs (`teamwork_explorer_m1_1`, `teamwork_explorer_m1_2`).
+- **Disclosed exclusions**: No `mlx-audio`, `torch`, `transformers`, `LocalAI-WeKnora`, or LAPLACE code, weights, or tests were read, copied, or executed. `claude-plugins/` was untouched and never read.
+- **Model provenance (Apache-2.0, stored outside Git at `~/.cache/livecho/asr_models`)**:
+  - `Qwen/Qwen3-ASR-1.7B` — Hugging Face revision `7278e1e70fe206f11671096ffdd38061171dd6e5`, ModelScope parity revision `a04930dbe5419bfee073f7cade734f572689a3a8` (11 source assets, `708` tensor rules); preparation SHA-256 `d8e2ca03963285178084054fd41c461d3bc7696442285e65fec2418f7e1e66da`; converted affine 8-bit group-64 MLX `model.safetensors` (`2,500,527,858 B`, SHA-256 `26cd49585ec0e24cc3dffcd60d6bc484ab0e8cf4a59baf5aac253dcfa4a939bd`).
+  - `Qwen/Qwen3-ASR-0.6B` — Hugging Face revision `5eb144179a02acc5e5ba31e748d22b0cf3e303b0`, ModelScope parity revision `4ce9cc728b473a5aedbe7b6e1ea45646316824dc` (9 source assets, `612` tensor rules); preparation SHA-256 `5edef17a0b2c8694cec217782bd4b43cc32d68910a189c26172e342bfeda8544`; converted affine 8-bit group-64 MLX `model.safetensors` (`1,000,936,771 B`, SHA-256 `cf02ddc8cb529b8e4df1f2ae2f9a78872927751e2224c9bb8edb91335c06caa9`).
+- **In-RAM speech corpus**: `benchmarks/asr/manifests/m3-ultra-qwen3-asr-v1.corpus.json` (`SHA-256` `062044b0e3c91961d6ac2d9fe16b733757204e93a347644c4a63d28b07bd474e`), 60 scripts balanced across `speaker-linfei` (`com.apple.siri.natural.Linfei`), `speaker-tingting` (`com.apple.voice.compact.zh-CN.Tingting`), and `speaker-meijia` (`com.apple.voice.super-compact.zh-TW.Meijia`), synthesized via Swift `AVSpeechSynthesizer.write(_:toBufferCallback:)` -> FFmpeg `pipe:0 -> pipe:1` (`pcm_s16le`, `16,000 Hz`, mono) strictly in RAM (`0` disk audio writes).
+
+### What this milestone implements
+
+- **Cross-platform MLX dependencies**: `pyproject.toml` + `uv.lock` (`SHA-256` `a2f58cd48bef9bdffc7a7ac1fc8de70724ae31e7389e16dbd293036c606d95c2`) with `; sys_platform == 'darwin' and platform_machine == 'arm64'` markers on `mlx==0.31.1`, `numpy==2.4.4`, `safetensors==0.7.0`, `tokenizers==0.22.2` and lazy/guarded imports so Linux CI passes without `mlx`.
+- **Reviewed manifest registry & 8-bit conversion**: `tools/asr_benchmark/registry.py`, `tools/asr_benchmark/mlx_converter.py` (`RedirectingHTTPSStream` with allowlisted HTTPS CDN redirects, `MLXConversionBackend`, `MLXPreparationSerializer`), and `benchmarks/asr/manifests/m3-ultra-qwen3-asr-v1.{preparations,inferences,corpus}.json`.
+- **Independent MLX Qwen3-ASR forward pass**: `tools/asr_benchmark/mlx_adapter.py` (`MLXEagerBackend`, `MLXASRProvider`, 128-bin Whisper log-Mel in RAM, Conv2d audio tower, 24/18-layer attention encoder, 28-layer Qwen3 GQA decoder with 8-bit group-64 quantized KV cache bounding audio-bearing memory `<= 15,279,616 B <= 16,777,216 B`).
+- **RAM-only synthesis & M3 Ultra host matrix runner**: `tools/asr_benchmark/corpus_source.py` (`SwiftFFmpegSynthesizer`, `InMemoryCorpusSourceFactory` with 1-script lookahead prefetch and rolling 60s silence budget retirement, `InMemoryReplaySource`), `tools/asr_benchmark/mlx_runner.py` (`max_workers=1` isolated default), `tools/asr_benchmark/__main__.py` (preserving exit `2` without `builtins.open` on unapproved IDs), and unit tests in `tests/asr_benchmark/test_mlx_benchmark.py`.
+- **Model-decision ADR**: `docs/architecture/adr/0002-mlx-asr-model-decision.md`.
+
+### M3 Ultra hardware telemetry & 24-run benchmark results
+
+- **Host & privacy verification**: `Apple M3 Ultra`, `32` CPU cores, `80` GPU cores, `512 GiB` unified RAM (`549,755,813,888 B`), macOS `26A428`, `sysctl vm.swapusage` = `total = 0.00M  used = 0.00M  free = 0.00M  (encrypted)`, `RLIMIT_CORE=(0, 0)`, `audio_pageouts=0` across all 24 processes, `teardown_passed=True`, `write_sinks_passed=True`, `silence_nonempty_finals=0`, `silence_nonempty_partials=0`, `incremental_peak_physical_bytes` `7.14–7.16 GiB` (`1.7B`) and `2.95–2.97 GiB` (`0.6B`) (`<= 8.0 GiB`).
+- **Complete 24-repetition report**: `benchmarks/asr/reports/m3-ultra-qwen3-asr-v1-20261127T143708Z.json` (`exit 0`, `missing=[]`, `Decision.state="neither_qualifies"`).
+  - Accuracy & stability (`6s`, 3-rep aggregate): `1.7B` achieved `1.13%` clean / `1.37%` noise micro CER (`<= 10%` / `<= 20%`), `91.7–100.0%` target exactness, `12.6%–16.7%` rewrite frequency, `4.6%–8.1%` rewrite severity, and `0.0%` boundary omissions, while failing `boundary_duplicate` (`6/156 = 3.85% > 1.0%` at `6s`, `24/294 = 8.16%` clean / `15/294 = 5.10%` noise at `4s`). `0.6B` achieved `1.69%` clean / `2.53%` noise micro CER and `83.3–100.0%` targets at `6s`, failing `boundary_duplicate` (`12/156 = 7.69%` clean / `6/156 = 3.85%` noise at `6s`; `45/294 = 15.31%` at `4s`).
+  - Because `task-793` ran with `max_workers=24`, 24-way Metal GPU queue contention inflated matrix RTF (`1.344–2.212`) and latencies (`final p95 = 633–2,154 ms`).
+- **Isolated single-process verification (`1` worker)**:
+  - Uncontended latency & RTF (`task-823`): `1.7B w=1` `rtf=0.386, first_txt=114.4ms, first_p=574.0ms, final=109.1ms, se2f=117.3ms`; `1.7B w=6` `rtf=0.656, first_txt=88.5ms, first_p=1394.0ms, final=212.5ms, se2f=213.4ms`; `0.6B w=1` `rtf=0.247, first_txt=305.8ms, first_p=557.6ms, final=69.2ms, se2f=71.9ms`; `0.6B w=6` `rtf=0.540, first_txt=78.3ms, first_p=1489.3ms, final=161.4ms, se2f=162.2ms` — all latency and RTF gates pass in isolation.
+  - Isolated boundary-duplicate verification (`task-811`): `1.7B` still produces `2/52 (3.85%)` duplicates at `6s` and `8/98 (8.16%)` at `4s` on `continuous` due to stateless `800 ms` PCM slicing mid-syllable (`声音` -> `因年轻`, `高效` -> `笑语音`, `最柔软` -> `被柔软`) breaking `metrics.stitch`'s exact suffix-prefix match. Thus `Decision.state = "neither_qualifies"` stands without gate relaxation.
+
+### Automated and protected-host verification commands
+
+| Exact command | Result |
+| --- | --- |
+| `make bootstrap && pnpm --filter @livecho/web exec playwright install chromium` | Exit `0`; Darwin-arm64 `.venv`, workspace `node_modules`, and Playwright Chromium installed |
+| `uv lock --check` | Exit `0`; `Resolved 44 packages in 5ms` |
+| `uv run python tools/check_change_artifacts.py` | Exit `0`; `change artifacts: ok` |
+| `make asr-benchmark-check` | Exit `0`; `ruff`, `ruff format`, `mypy` (54 files), `pytest -q tests/asr_benchmark` (`625 passed in 47.30s`) |
+| `make verify` | Exit `0`; `ruff` (`297 files`), `mypy` (`297 source files`), `pytest -q -m "not stress"` (`1086 passed, 1 deselected`), `pnpm test` (protocol `422` + railway `63` + web), `check_change_artifacts`, `protocol_codegen --check`, `pnpm build` |
+| `make web-check` | Exit `0`; `16 passed (1.7m)` |
+| `make web-python-e2e` | Exit `0`; `8 passed (1.1m)` |
+| `uv run python -m tools.asr_benchmark preflight --manifest pending` | Exit `2`; `state=blocked_evidence` (`reviewed_manifest_unavailable`, no file I/O) |
+| `uv run python -m tools.asr_benchmark preflight --manifest m3-ultra-qwen3-asr-v1` | Exit `0`; `state=ready`, `chip="Apple M3 Ultra"`, `gpu_cores=80`, `mlx_version="0.31.1"`, `scripts=60` |
+| `uv run python -m tools.asr_benchmark prepare-models --manifest m3-ultra-qwen3-asr-v1 --source modelscope` / `--source huggingface` | Exit `0`; verified source SHA-256s + affine 8-bit group-64 MLX conversion receipts |
+| `uv run python -m tools.asr_benchmark run --manifest m3-ultra-qwen3-asr-v1` | Exit `0`; `repetitions=24`, `missing=[]`, `state="neither_qualifies"`, report `benchmarks/asr/reports/m3-ultra-qwen3-asr-v1-20261127T143708Z.json` |
+| `git diff --check -- pyproject.toml uv.lock tools/asr_benchmark benchmarks/asr tests/asr_benchmark docs/architecture/adr/0002-mlx-asr-model-decision.md docs/changes/5-mlx-benchmark/evidence.md` | Exit `0`; clean whitespace across all M1-owned files |
