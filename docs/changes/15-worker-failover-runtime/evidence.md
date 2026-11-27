@@ -29,6 +29,34 @@
 
 ## Verification
 
-Local artifact check, staged whitespace check and relative-link validation
-are recorded with this documentation checkpoint. No socket, device,
-three-worker, hardware, or production result is asserted by this draft.
+| Command | Observed result on 2026-11-27 |
+| --- | --- |
+| `python3 -B tools/check_change_artifacts.py` | Exit 0, `change artifacts: ok`. |
+| `git diff --check origin/main...HEAD` | Exit 0, no whitespace errors. |
+| `git diff --cached --check` | Exit 0 on the staged evidence revision. |
+| `gh run view 45960338115 -R Shuang-su/Livecho --json headSha,conclusion` | `success` for `78ecdef`, the original PR head before this evidence revision. |
+
+The exact local path and Markdown link check used:
+
+```sh
+python3 -B - <<'PY'
+from pathlib import Path
+import re
+
+root = Path("docs/changes/15-worker-failover-runtime")
+files = list(root.glob("*.md"))
+assert {p.name for p in files} == {"intent.md", "spec.md", "plan.md", "evidence.md"}
+relative_count = 0
+for file in files:
+    for target in re.findall(r"\]\(([^)]+)\)", file.read_text()):
+        if "://" in target or target.startswith("#"):
+            continue
+        assert (file.parent / target.split("#", 1)[0]).resolve().is_file()
+        relative_count += 1
+print(f"{len(files)} required artifacts, {relative_count} relative links verified")
+PY
+```
+
+It exited 0 with `4 required artifacts, 0 relative links verified`. No
+socket, device, three-worker, hardware, or production result is asserted by
+this draft.
