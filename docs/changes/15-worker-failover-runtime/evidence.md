@@ -3,8 +3,10 @@
 ## Artifact approval and exposure
 
 - Proposed. Owner merge and implementation evidence pending.
-- Base `cae5ccd951e1c761163d372dc83558c016ee96d5`, branch
-  `codex/issue-15-long-session-runtime`.
+- Base `63783a514002cfbfa43f6ac9ef3962a8975ebd50`, branch
+  `codex/issue-15-failover-artifacts`. This publication follows explicit
+  owner authorization to open and merge the documentation PR after review
+  and CI pass.
 - 2026-11-27: Codex documented the application integration from the user's
   request, Livecho's own #13/#14/#27 contracts, the current #15 issue and
   its owner confirmation. Claude Code Opus 5.5 independently analyzed the #27
@@ -14,8 +16,9 @@
 
 ## Existing gates
 
-- [PR #62](https://github.com/Shuang-su/Livecho/pull/62) is the gateway
-  documentation PR. Its local proof-binding revision is `8370848`.
+- [PR #62](https://github.com/Shuang-su/Livecho/pull/62) merged the gateway
+  documentation and its proof-binding revision at `63783a5`. The gateway
+  implementation and this consumer implementation are separate changes.
 - [Issue #27](https://github.com/Shuang-su/Livecho/issues/27) explicitly
   reserves gateway, scheduler, worker and viewer integration for their
   owning changes. The protocol adapter being validated locally only
