@@ -15,13 +15,15 @@
    file is not that record.
 3. Add `WorkerIdentityService.device_usable` as a read of the existing memory
    adapter and account lookup. Test unknown, revoked, and inactive-account
-   devices. Do not change `admit_hello`, enrollment routes, or statistic
-   formulas.
+   devices. Add an internal upgrade-proof verification and bound-Hello path
+   using the same identity store, cryptography and allowlist decision. Keep
+   the standalone `admit_hello`, HTTP routes and statistic formulas compatible.
 4. Add `livecho_backend.worker_gateway` and `create_worker_gateway_app` with
    the `/api/worker/ws` route, injectable clock, and injectable ids. Do not
    register that route on `create_local_vertical_app` or
    `create_worker_identity_app`. Assert both existing apps still lack it.
-5. Implement upgrade checks, Hello through `admit_hello`, Welcome, and
+5. Authenticate the actual upgrade before accept, attach its one-shot
+   context, and consume it on Hello. Implement Welcome and
    `arm_grant` lease issuance through `LeaseRuntimeCoordinator.create`. Use a
    20-second `expires_at`. Do not call `Minor1Session.replace_lease` and do
    not construct `EpochRotatedV1`.
@@ -59,9 +61,14 @@
 **Later implementation pull request:**
 
 - `uv run pytest -q tests/worker_gateway`
-- A test that Hello before a successful #13 verify sends neither Welcome nor
-  Lease, and that a header `livecho-device-id` different from `worker_id`
-  sends no lease
+- A real loopback WSS test of the native request's raw handshake key and
+  exact proof encoding. Missing proof, a different key, malformed/duplicate
+  headers, expired or superseded proof, or an old HTTP admission fails
+  closed. A valid proof and matching `worker_id` accept exactly one Hello.
+- Concurrency and cleanup tests for the shared quota, one-time challenge
+  consumption across both verification paths, cancellation/accept failure,
+  revocation before Hello, reconnect with fresh proof, and proof redaction.
+  Run the existing #13 HTTP and admission tests with their original expectations.
 - A test that `expires_at - issued_at` is exactly 20 seconds, that
   `heartbeat_healthy` is false at 5 seconds without a heartbeat, and that
   `lease_valid` is still true at that instant
@@ -83,9 +90,10 @@
   frame is not retained
 - A test that `submit_synthetic_pcm` refuses the 51st frame or the frame that
   would pass 32,000 payload bytes in the rolling second
-- A test that constructing each outbound model with an extra `shell`,
-  `container`, `code`, `url`, or `uri` field raises, and that the gateway
-  module does not reference `EpochRotatedV1`
+- Test that all outbound models reject added executable fields and that the
+  two error models accept their enumerated `code` values and reject unlisted
+  ones. Other models reject an extra `code` key. The gateway does not reference
+  `EpochRotatedV1`.
 - A test that `create_local_vertical_app` still serves `/health` and
   `/api/viewer/ws` and does not mount `/api/worker/ws`
 - `make verify`
@@ -103,7 +111,7 @@ No flag, secret, or deployment changes in either pull request. The gateway
 application stays unmounted by the local viewer app, the worker-identity app,
 and Railway start commands. Public live viewing stays anonymous.
 Community-worker audio stays synthetic. Rollback of the implementation reverts
-the gateway package, `device_usable`, and the new tests. Rollback of this
+the gateway and its internal identity integration and tests. Rollback of this
 documentation pull request deletes the four new Markdown files and leaves
 runtime behavior unchanged.
 
@@ -129,7 +137,7 @@ accepts them.
 | --- | --- | --- |
 | Lease lifetime | 20 seconds exactly | The issue's non-renewal expiry. It is inside the accepted `(0, 120]` lease window. `expires_at` stays immutable. |
 | Heartbeat lateness | 5 seconds | The issue's heartbeat period. Lateness clears `heartbeat_healthy` only. |
-| First Hello deadline | 5 seconds | The same period, applied to a socket that has not yet sent Hello. |
+| First Hello deadline | Earlier of 5 seconds after accept and challenge expiry | Context belongs to this socket and is consumed once. |
 | Session successor lease | not issued | #27 asks #14 when `lease_replaced` is legal. Non-goals exclude failover and indefinite renewal, so it is not legal here. |
 | Inbound text rate | 10 frames per rolling second | Above the 0.2 Hz heartbeat, still a hard flood cap. Size stays 65,536 from #3. |
 | Inbound binary rate | 2 frames per rolling second | The worker does not upload PCM. Two frames is enough to observe the cap; the body is not retained. Size stays 32,056 from #3. |
@@ -138,7 +146,7 @@ accepts them.
 | Active leases | one per process, and one per `session_id` for the life of the process | The issue's single active lease plus the alpha one-lease audio rule. |
 | Start sequences | `"0"` on minor 0, `"1"` on minor 1 | The accepted golden lease shapes already on `main`. |
 | Wire `retryable` | true only for `resync_required` and `epoch_rotated` | `epoch_rotated` is already specified as retryable. This gateway does not emit it. |
-| Device header | `livecho-device-id` | The #13 requirement that the gateway, not the Hello body alone, supply `device_id`. |
+| Upgrade authentication | #13 challenge, registered Ed25519 key and actual RFC 6455 handshake key | The device identifier selects identity. Only verified proof binds it to this socket. |
 
 A different lifetime, a successor-lease policy, a new protocol field, a
 persistent PCM path, or an Issue #31 enrollment or leaderboard change

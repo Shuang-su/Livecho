@@ -23,9 +23,9 @@ gateway. A process-local viewer socket from Issue #9 is not that gateway.
 Lock the implementation contract for a later, separate pull request:
 
 1. A worker opens an outbound WebSocket to `/api/worker/ws` and negotiates
-   exactly `livecho.worker.v1`. Hello is admitted only by the existing #13
-   `admit_hello` decision. A `LeaseV1` is sent only after that admission
-   succeeds.
+   exactly `livecho.worker.v1`. Before accept, it proves possession of the
+   registered #13 key for that upgrade. Hello consumes the verified identity
+   on that socket. A `LeaseV1` is sent only after bound Hello admission succeeds.
 2. The lease lasts exactly 20 seconds. The worker heartbeat period is 5
    seconds. A heartbeat does not move `expires_at`. At `expires_at` the lease
    expires, and a later heartbeat, resume, or output is an expired renewal:
@@ -43,7 +43,7 @@ Lock the implementation contract for a later, separate pull request:
    output, and process restart have state-machine tests. Restart drops leases
    and contribution memory together.
 6. Backend messages are the existing closed models only. They have no shell,
-   container, code, or arbitrary URL field.
+   container, executable code, or arbitrary URL field.
 
 Merging these documents does not mount the gateway on the public listener,
 enroll a worker, enable production auth or mail, provision a secret, accept
@@ -86,8 +86,8 @@ live audio, or turn on production traffic.
 - Enabling `LIVECHO_EMAIL_ENABLED`, reading or writing `RESEND_API_KEY` or
   `LIVECHO_SESSION_SIGNING_KEY`, adding `db/migrations/`, or opening
   production traffic.
-- A new enrollment scheme. Workers authenticate only through the merged #13
-  challenge and Hello admission.
+- A new enrollment scheme. The gateway uses the merged #13 device and challenge
+  authority to verify a proof for the upgrade that will carry Hello.
 - Publishing viewer timeline events, selecting a Bilibili room, or accepting
   platform credentials on this socket.
 - Points, cash, a public leaderboard, or counting a reconnect as task success.

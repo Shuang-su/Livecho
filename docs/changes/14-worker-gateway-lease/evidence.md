@@ -1,5 +1,28 @@
 # Evidence: Worker gateway, heartbeat, and lease state machine
 
+## Upgrade proof revision for PR #62
+
+- 2026-11-27, local branch `codex/issue-14-gateway-proof-binding` from PR #62
+  head `b751c29`. User request: “继续让 Claude Code 推进多 worker 阶段，先解决
+  #62 的设备持钥证明与连接绑定，再把 #27 的轮换和重同步接入运行时。”
+- Claude Code reported `claude-opus-5-5` and drafted the requirements and
+  acceptance matrix from the Livecho #13 contract and #62 draft. Codex checked
+  the #13 store and quota path, reviewed the draft, and applied the documentation
+  revision. This assignment covers documentation only. No reference-project
+  code, tests, schemas, screenshots, or assets supplied requirements.
+- The upgrade verifies a fresh challenge under a separate signature domain
+  covering the actual RFC 6455 request key. Only the resulting socket can use
+  the verified context. The public device id and standalone #13 HTTP admission
+  provide no gateway authorization. A new verified proof supersedes a pending
+  context. Challenge issuance alone cannot invalidate an already verified socket.
+- Addressed the [P2 error-code review](https://github.com/Shuang-su/Livecho/pull/62#discussion_r4674191520)
+  in the local specification and future test matrix. The two error schemas
+  still use the existing closed `code` enum.
+- `python3 -B tools/check_change_artifacts.py`, `git diff --cached --check`,
+  and relative Markdown link validation passed. The branch changes only the
+  four #14 artifacts. Cryptographic, WSS, proxy, and runtime verification remain
+  tests for the implementation PR after the owner merges this revision.
+
 ## Artifact approval
 
 - Artifact PR: Pending. This pull request is documentation only.

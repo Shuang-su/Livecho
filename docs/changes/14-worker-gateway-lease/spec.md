@@ -8,7 +8,8 @@ Accepted contracts this spec uses without rewriting:
 - `livecho.worker.v1` messages, the 65,536-byte JSON ceiling, the 32,056-byte
   PCM frame ceiling, lease lifetime `(0, 120]` seconds, and epoch/sequence
   rules in [the #3 spec](../3-protocol-v1-contract/spec.md)
-- Hello admission, `record_stats`, `record_health`, and `note_online` in
+- Device identity, challenge issuance, allowlist negotiation, `record_stats`,
+  `record_health`, and `note_online` in
   [the #13 spec](../13-worker-invite-identity/spec.md), as implemented in
   `livecho_backend.worker_identity` on this commit
 - Epoch isolation and the rule that #14 decides when `lease_replaced` is legal
@@ -46,7 +47,7 @@ not synonyms.
 | Predicate | True only when |
 | --- | --- |
 | `heartbeat_healthy(connection_id)` | That socket is open, it holds the active lease, and either the lease age is strictly under 5 seconds or the gateway accepted a heartbeat for that lease at gateway time `t` with `now - t` strictly under 5 seconds. |
-| `device_checked(connection_id)` | `admit_hello` returned accepted for that connection and `device_usable` is still true. |
+| `device_checked(connection_id)` | That socket consumed its verified upgrade context on an accepted Hello and `device_usable` is still true. |
 | `lease_valid(connection_id)` | That connection holds the process's single active lease, `now` is strictly before `expires_at`, and the lease is not cancelled. |
 | `result_accepted(message_id)` | The gateway recorded one `accepted` protocol decision for that worker message id. |
 
@@ -61,12 +62,12 @@ resume, and socket replacement must not record `result_accepted`. Only an
 
 | Actor | How it is established |
 | --- | --- |
-| Worker | Outbound WebSocket. No account cookie. Device proof is the existing #13 Hello admission. |
+| Worker | Outbound WSS. The gateway verifies device-key possession for the upgrade and attaches the verified identity to the resulting socket. |
 | Grant source | In-process `arm_grant` used by tests and, later, Issue #15. Not an HTTP route and not a worker message. |
 | Backend | Issues welcome, lease, cancel, ack, and error from the existing models. Assigns lease id, connection id, epoch, and start sequences. |
 
 The worker cannot create a grant, choose an epoch, extend `expires_at`, or
-name a shell, container, code, or URL field. Unknown JSON fields fail closed
+name a shell, container, executable code, or URL. Unknown JSON fields fail closed
 under the existing parser.
 
 ### Gateway process
@@ -78,13 +79,9 @@ start command. It reads no environment variable and sets no
 `livecho_session` cookie.
 
 The upgrade must offer the exact subprotocol `livecho.worker.v1`. Any other
-offer closes with WebSocket code `1002` and sends no application message. An
-`Origin` header closes with `1008` before the subprotocol is accepted. A
-missing or non-UUID `livecho-device-id` header closes with `1008` and does
-not call `admit_hello`. The header value is the lowercase hyphenated device
-id the gateway will pass into `admit_hello`. It is the connection binding #13
-already required. It is not a new credential, not a cookie, and not a
-protocol field.
+offer is denied before accept with code `1002` and no application message.
+An `Origin` header is denied with `1008`. Proof is carried in the HTTP
+upgrade and adds no ASR envelope, Hello field, cookie, or subprotocol.
 
 Clocks and ids are injectable. Timestamps use the existing millisecond `Z`
 form from `livecho_backend.worker_identity.clock`. Tests call `expire_due()`
@@ -92,29 +89,90 @@ after moving the clock. They must not sleep for the 5-second or 20-second
 bounds. The socket handler also calls `expire_due()` before each inbound
 frame and when a 5-second idle wait ends.
 
+### Device proof on the upgrade
+
+The worker obtains a challenge from the existing #13 challenge route. Its
+native handshake builder generates a fresh random `Sec-WebSocket-Key` before
+the worker signs. The client adds the proof to that same request and sends it
+without regenerating or overriding the key. A new connection or retry needs
+a fresh challenge, handshake key, and signature. This flow does not call the
+standalone #13 HTTP verify route.
+
+Read raw request headers before accepting the upgrade. Each header below
+must occur exactly once, case-insensitively. Reject missing, duplicate,
+combined, or noncanonical values.
+
+| Header | Value |
+| --- | --- |
+| `livecho-device-id` | Registered device's lowercase hyphenated UUIDv4. |
+| `livecho-challenge-id` | Lowercase hyphenated UUIDv4 assigned by #13. |
+| `livecho-device-signature` | Canonical unpadded base64url of the 64-byte Ed25519 signature. |
+| `Sec-WebSocket-Key` | Canonical standard padded base64 encoding of 16 random bytes. |
+
+Using the registered public key, verify pure Ed25519 over these bytes.
+
+```text
+ASCII("livecho-worker-gateway-upgrade-v1") || 0x00
+|| ASCII(device_id) || 0x00 || ASCII(challenge_id) || 0x00
+|| raw_32_byte_stored_nonce || raw_16_byte_websocket_key
+```
+
+The label is distinct from #13 HTTP verify. The verifier uses the opening
+request's WebSocket key, never a separate device claim or untrusted forwarded
+value. The WSS terminator must preserve that key to this verifier or verify at
+the original upgrade boundary. Deny the upgrade if that binding cannot be
+established. The key is a public per-connection nonce under
+[RFC 6455](https://www.rfc-editor.org/rfc/rfc6455.html#section-4.1).
+
+Use the same #13 identity store and the existing combined challenge/verify
+immediate-peer quota, counting attempted upgrades before proof verification.
+Under the store's synchronization boundary, check device and account status,
+match its live unused challenge, capture the nonce locally, consume the
+challenge and discard its stored nonce, then verify the proof. Concurrent HTTP verify and upgrade
+verification of that challenge have at most one success. A well-formed attempt
+on its own live challenge consumes the challenge even if its proof is invalid.
+Malformed or throttled attempts and mismatched device IDs cannot consume a
+different device's challenge or create authorization. The standalone #13 HTTP
+verify route retains its response and admission contract. A verification
+exception leaves no verified context and does not restore the challenge.
+
+On success attach a single-use context containing the verified device id and
+challenge expiry to this pending socket before accepting it. Never look up
+or transfer that context by the public id, a request header, or another
+socket. At most one pending context per device may pass Hello. A newer
+successfully verified upgrade supersedes any pending context, without
+affecting a socket whose Hello already succeeded. Issuing an unverified
+challenge does not supersede a verified context. Deny invalid proof with
+`1008` before accept and send no application
+message. A failed or cancelled upgrade disposes of the context without
+restoring its challenge. Omit proofs, nonces and signatures from logs, error
+strings, audit payloads and request traces.
+
 ### Hello and lease admission
 
 The first application frame must be one UTF-8 text frame of at most 65,536
 bytes carrying `WorkerHelloV1` with `protocol_minor` 0, and it must arrive
-before the socket has been open for 5 seconds of gateway time. Any other
+before both 5 seconds from accept and the context's challenge expiry. Any other
 first frame, a late first frame, or an oversize frame produces no lease. An
 oversize text frame uses `control_frame_too_large`. The gateway then closes
 the socket.
 
-On a well-formed Hello the gateway calls `admit_hello(hello, device_id)` with
-the header device id. It must not substitute `hello.worker_id` when the
-header differs. A decision that is not accepted sends a pre-selection
+Detach and consume the socket's context on the first Hello attempt, including
+malformed, expired, or rejected attempts. Discard it on timeout or disconnect.
+Check the verified id against `hello.worker_id` and recheck account and device
+status before #13's allowlist and capability negotiation. Factor the common
+decision and audit logic with `admit_hello` without creating or consuming a
+standalone HTTP admission. A rejected Hello sends a pre-selection
 `ProtocolErrorV1` (`protocol_minor` 0). If `HelloDecision.protocol_code` is
 already a minor-0 `ProtocolErrorV1` code, that code is used. The #13 results
 `rejected`, `device_revoked`, and `signature_invalid` are not protocol codes,
-so those three use `schema_invalid`. The #13 audit row is whatever
-`admit_hello` already wrote. The public `message` is the wire code and
-nothing else. The socket then closes. No Welcome and no Lease are sent. The
-failed call still consumes the admission exactly as #13 already specifies.
+so those three use `schema_invalid`. Use the #13 audit result for the decision.
+The public `message` is the wire code alone. The socket then closes without
+Welcome or Lease. No result restores the context or the used challenge.
 After Welcome, later errors use the selected minor's error model.
 
 An accepted decision sends `WorkerWelcomeV1` or `WorkerWelcomeV1Minor1` for
-the `selected_minor` `admit_hello` returned. Minor 0 lists exactly
+the `selected_minor` returned by the bound Hello decision. Minor 0 lists exactly
 `asr.transcribe` and `protocol.binary-pcm`. Minor 1 lists exactly those two
 plus `protocol.epoch-rotation`. `minimum_worker_version` stays `0.1.0`.
 `accepted_manifests` are the Hello manifests, which #13 already required to
@@ -213,7 +271,7 @@ rejection this issue owes is the runtime's `epoch_stale`, `epoch_unknown`, and
 
 ### Resume, disconnect, and duplicate connections
 
-`WorkerHelloV1.resume` is evaluated only after `admit_hello` accepts, and only
+`WorkerHelloV1.resume` is evaluated only after the bound Hello accepts, and only
 through `decide_worker_resume` against the live cursor of the active lease:
 `connection_id`, `lease_id`, `session_id`, `epoch`, `next_input_seq`,
 `next_output_seq`, and `expires_at`. The gateway fills that cursor from the
@@ -232,7 +290,7 @@ matching resume can still succeed. Disconnect does not call `record_stats` and
 does not record `result_accepted`. There is no audio retry queue and no replay
 of the released PCM. Sequences are not rewound.
 
-The online interval starts when `admit_hello` accepts, not when the TCP
+The online interval starts when the bound Hello accepts, not when the TCP
 connection opens. It closes on disconnect, expiry, revoke, or cancel. Resume
 starts a new interval at the resume instant. `note_online` is called once per
 closed interval with those two gateway times. The gap while the socket is down
@@ -294,7 +352,7 @@ must not read or write a file, database, or queue. After `restart()`:
 - the previous lease id is unknown and its output is rejected;
 - the new identity service's statistics are the empty initial values;
 - a replayed stats or transcript frame does not change those values;
-- a new Hello requires a new #13 admission on the new service.
+- a new Hello requires a fresh challenge and verified upgrade on the new service.
 
 Leases and contribution counters therefore disappear together. The gateway
 must not persist one of them without the other. This models a process restart
@@ -352,10 +410,12 @@ code string. `retryable` is true only for `resync_required` and
 integers. Error and ack bodies must not echo the rejected payload, transcript
 text, or PCM.
 
-Adding a key named `shell`, `container`, `code`, `url`, `uri`, `command`,
+Adding a key named `shell`, `container`, `url`, `uri`, `command`,
 `path`, or `download` to any outbound model must fail validation. Tests cover
 that rejection on the model classes the gateway uses. Encoded outbound objects
-contain only that model's fields.
+contain only that model's fields. `code` is permitted only as the existing closed
+error enum on `ProtocolErrorV1` and `ProtocolErrorV1Minor1`. Invalid code values
+and any extra executable-code field are rejected.
 
 Out-of-order worker output is not buffered. A `seq` above the next expected
 value returns `seq_gap` from the runtime, does not advance the sequence, and
@@ -379,7 +439,9 @@ The later implementation may add:
 - `create_worker_gateway_app`
 - `arm_grant`, `expire_due`, `restart`, `submit_synthetic_pcm`
 - the four predicate methods
-- `WorkerIdentityService.device_usable`
+- `WorkerIdentityService.device_usable`, plus internal verification and Hello
+  operations for a socket-bound context. Reuse the #13 authority, challenges,
+  crypto, and allowlist. The standalone HTTP route and admission stay compatible.
 
 It must import #13 and the protocol package rather than copy a second
 admission or epoch machine. It must not modify `packages/protocol/`,
@@ -401,8 +463,8 @@ error is sent.
 | Condition | Outcome |
 | --- | --- |
 | Wrong subprotocol or browser `Origin` | Close `1002` or `1008`. No Hello call. No lease. |
-| Hello before a live #13 admission | No Welcome, no lease, admission rules unchanged. |
-| Header device id mismatches `worker_id` | `admit_hello` applies the existing mismatch result. No lease. |
+| Missing or invalid upgrade proof, including when an HTTP admission exists | Deny before accept. No Hello, Welcome, or lease. |
+| Verified device id mismatches `worker_id` | Consume the socket context and apply the existing mismatch result. No Welcome or lease. |
 | Two authenticated waiters and no lease yet | Grant void. No lease. No device ranking. |
 | Second device while a lease is active | No second lease. First lease and epoch stay. |
 | Heartbeat 5 seconds late | `heartbeat_healthy` false. Lease stays until `expires_at`. Counters unchanged. |
@@ -421,9 +483,9 @@ together.
 
 ## Security, privacy, and data lifecycle
 
-- Trust boundary: the worker is untrusted. Authentication is the #13
-  admission. A valid device is not a lease, and a lease is not an accepted
-  result.
+- Trust boundary: the worker is untrusted. The server verifies registered
+  #13 device-key possession for this WSS upgrade. WSS protects the headers
+  in transit. A valid device is not a lease, and a lease is not an accepted result.
 - The socket carries ephemeral synthetic PCM and worker metadata. PCM must not
   be written to disk, database, queue, log, fixture, or object storage. Release
   it on consume, disconnect, expiry, cancel, revoke, disable, and teardown.
@@ -432,9 +494,9 @@ together.
   real-PCM grant. `RISK-WORKER-AUDIO-RETENTION` stays not accepted.
 - Logs, when present, may contain the stable code, device id, lease id,
   session id, and epoch integers. They must not contain PCM, transcript text,
-  tokens, signatures, public keys, cookies, or URLs.
+  tokens, signatures, proof/challenge fields, public keys, cookies, or URLs.
 - The worker receives no Bilibili credential, cookie, playback URL, archive
-  key, shell, container, code, or download URL. `FLOW-DENY` paths from the
+  key, shell, container, executable code, or download URL. `FLOW-DENY` paths from the
   worker to Postgres, Bucket, Resend, and the platform stay closed because
   this gateway does not open them.
 - `restart()` must not snapshot contribution counters or leases to survive the
@@ -443,9 +505,16 @@ together.
 
 ## Acceptance criteria
 
-- [ ] Hello and a lease are sent only after `admit_hello` accepts. A missing
-      admission, a device-id mismatch, a revoked device, and a Hello that
-      fails negotiation produce no lease.
+- [ ] A valid proof on the exact upgrade admits one Hello for the same device.
+      A missing proof, reused challenge, different handshake key, expired
+      context, device mismatch, revoked account/device, and failed Hello
+      negotiation never produce a lease. Standalone HTTP admission cannot
+      admit a gateway Hello. Duplicate headers and noncanonical encodings
+      are refused before a challenge is read.
+- [ ] Races involving two upgrades, standalone verify, newer proof, expiry,
+      revocation, or a failed accept leave at most one pending proof eligible
+      and never restore a consumed challenge. Capture the raw upgrade key
+      on a real loopback WSS stack before claiming transport compatibility.
 - [ ] An active lease has `expires_at` exactly 20 seconds after `issued_at`.
       `heartbeat_healthy` is false at 5 seconds without an accepted heartbeat,
       while `lease_valid` remains true until `expires_at`. A heartbeat does
@@ -464,9 +533,10 @@ together.
       renewal, out-of-order output, and `restart()`. Old-epoch output is
       rejected on first presentation and on resend, with no contribution
       change.
-- [ ] Encoded server messages are instances of the allowlisted models. Adding
-      `shell`, `container`, `code`, `url`, or `uri` fails validation. The
-      gateway does not send `EpochRotatedV1`.
+- [ ] Encoded server messages are instances of the allowlisted models.
+      Executable fields fail validation. The two existing error models accept
+      listed `code` values and reject unlisted values. Other models reject
+      the extra `code` key. The gateway does not send `EpochRotatedV1`.
 - [ ] Reconnect, `restart()`, expired renewal, revocation, and result resend
       leave the four predicates and the five #13 statistics consistent with
       the table above. Connection recovery does not set `result_accepted` and
