@@ -1,5 +1,54 @@
 # Evidence: Long-session state lifecycle and resynchronization
 
+## Protocol runtime integration assignment — 2026-11-27
+
+- User request: “继续让 Claude Code 推进多 worker 阶段，先解决 #62 的设备持钥证明与连接绑定，再把 #27 的轮换和重同步接入运行时。”
+- Implementer Codex, branch `codex/issue-27-runtime-protocol` from main
+  `cae5ccd`. Claude Code was assigned a separate design review of the private
+  protocol-runtime boundary from first-party inputs only.
+- Reviewed the current Issue #27 and owner confirmation, all four accepted
+  artifacts, this repository's ordering, PCM metadata, models, lease
+  coordinator and protocol tests. The assignment is to connect those existing
+  protocol primitives and add focused tests. It excludes changes to app
+  listeners, the worker gateway, scheduling policy, the presentation app,
+  negotiated schemas, and real audio. The earlier planning work did not
+  open reference-project code, fixtures, schemas, or assets. No such
+  material informs this implementation.
+
+### Runtime integration checkpoint
+
+- Claude Code reported `claude-opus-5-5` for its independent design review.
+  Codex applied the review against the existing code and model types. The
+  adapter stages both validated #27 wire notices before changing the lease
+  or epoch. It reuses the lease coordinator, the two existing ordering
+  domains, and the rotation tombstones. Only the protocol runtime owns the
+  shared revision records. Actual control and PCM header acceptance advance
+  the cursor counters. The new epoch's media floor is frozen so a worker final
+  can be projected to viewers within the same epoch.
+- Capacity produces `epoch_rotated` without accepting the candidate. An
+  explicit backend replacement is successful and yields the same notice
+  pair with reason `lease_replaced`. The old lease is retired and its PCM
+  accounting cleared before a successor can be installed. An exact viewer
+  cursor emits no gap notice. Other same-session cursors follow the accepted
+  expired, retired and unknown cases.
+- Service, scheduler, worker CLI and browser wiring are follow-on consumer
+  changes. The draft #15 application handoff is in its own branch. The
+  original #9 fixture uses minor 0. No generated schemas or wire versions
+  changed.
+
+| Command | Observed result, 2026-11-27 |
+| --- | --- |
+| `uv run --no-sync pytest -q tests/protocol` | 84 passed, including 6 new runtime cases. |
+| `uv run --no-sync ruff check packages/protocol/python/livecho_protocol tests/protocol` | Passed. |
+| `uv run --no-sync mypy packages/protocol/python/livecho_protocol tests/protocol` | No issues in 19 source files. |
+| `make protocol-check` | Generated protocol artifacts match. |
+| `make verify` | Passed. 1,009 Python tests, 1 stress case deselected, 428 JS tests, artifact/codegen checks and build passed. |
+
+New tests cover both real ordering domains at capacity, exact sequence and older
+epoch handling, old PCM accounting release, successor PTS and text floors,
+cursor outcomes, terminal-session fencing, and a notice validation failure
+before commit. PCM cases use header metadata without audio payloads.
+
 ## Artifact approval
 
 - Artifact PR: Pending.

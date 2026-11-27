@@ -128,6 +128,7 @@ class PcmLeaseState:
         input_start_seq: int,
         lease_budget: int = LEASE_AUDIO_BUDGET,
         protocol_minor: int = PROTOCOL_MINOR,
+        pcm_floor_ms: int = 0,
     ) -> None:
         self.lease_id = lease_id
         self.epoch = epoch
@@ -136,6 +137,7 @@ class PcmLeaseState:
         self.lease_budget = lease_budget
         self.buffered_bytes = 0
         self.last_pts_ms: int | None = None
+        self.pcm_continue_pts = pcm_floor_ms
         self.closed = False
 
     def accept(
@@ -151,6 +153,23 @@ class PcmLeaseState:
             header = decode_header(frame)
         except ProtocolValidationError as error:
             return Decision(error.code)
+        return self.accept_header(
+            header,
+            session_buffered_bytes=session_buffered_bytes,
+            process_buffered_bytes=process_buffered_bytes,
+        )
+
+    def accept_header(
+        self,
+        header: PcmHeaderV1,
+        *,
+        session_buffered_bytes: int = 0,
+        process_buffered_bytes: int = 0,
+    ) -> Decision:
+        if self.closed:
+            return Decision(StableCode.LEASE_CLOSED)
+        if not _valid_header(header):
+            return Decision(StableCode.BINARY_HEADER_INVALID)
         if header.protocol_minor != self.protocol_minor:
             return Decision(StableCode.BINARY_HEADER_INVALID)
         if header.lease_id != self.lease_id:
@@ -164,6 +183,11 @@ class PcmLeaseState:
             return sequence
         if self.last_pts_ms is not None and header.pts_ms < self.last_pts_ms:
             return Decision(StableCode.AUDIO_PTS_INVALID)
+        continued_pts = header.pts_ms + (header.sample_count * 1000 // 16000)
+        if self.protocol_minor == 1 and (
+            header.pts_ms < self.pcm_continue_pts or continued_pts > UINT64_MAX
+        ):
+            return Decision(StableCode.AUDIO_PTS_INVALID)
         if (
             self.buffered_bytes + header.payload_length > self.lease_budget
             or session_buffered_bytes + header.payload_length > LEASE_AUDIO_BUDGET
@@ -173,6 +197,8 @@ class PcmLeaseState:
         self.sequence.commit(header.seq)
         self.buffered_bytes += header.payload_length
         self.last_pts_ms = header.pts_ms
+        if self.protocol_minor == 1:
+            self.pcm_continue_pts = continued_pts
         if header.end_of_segment:
             self.buffered_bytes = 0
         return Decision(StableCode.ACCEPTED)
@@ -185,5 +211,6 @@ class PcmLeaseState:
     def clear(self) -> None:
         self.buffered_bytes = 0
         self.last_pts_ms = None
+        self.pcm_continue_pts = 0
         self.sequence.clear()
         self.closed = True

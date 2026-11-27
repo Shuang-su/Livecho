@@ -2,6 +2,7 @@
 
 from .compatibility import COMPATIBILITY_MATRIX, negotiate_viewer, negotiate_worker
 from .errors import Decision, ProtocolValidationError, StableCode
+from .long_session import Minor1SessionRuntime
 from .models import *  # noqa: F403
 from .parser import canonical_digest, canonical_json, parse_control, strict_json_loads
 from .runtime import LeaseRuntimeCoordinator
@@ -10,6 +11,7 @@ __all__ = [
     "COMPATIBILITY_MATRIX",
     "Decision",
     "LeaseRuntimeCoordinator",
+    "Minor1SessionRuntime",
     "ProtocolValidationError",
     "StableCode",
     "canonical_digest",

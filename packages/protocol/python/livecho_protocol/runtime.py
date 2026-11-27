@@ -6,12 +6,18 @@ from collections.abc import Mapping
 from datetime import datetime
 from typing import Any
 
-from .binary import LEASE_AUDIO_BUDGET, PROCESS_AUDIO_BUDGET, PcmLeaseState
+from .binary import LEASE_AUDIO_BUDGET, PROCESS_AUDIO_BUDGET, PcmHeaderV1, PcmLeaseState
 from .compatibility import manifest_key
 from .errors import Decision, ProtocolValidationError, StableCode
 from .models import LeaseCancelV1, LeaseV1
 from .scalars import parse_timestamp
-from .state import ActiveLease, CancellationRegistry, LeaseRevisionState, StreamOrderingState
+from .state import (
+    ActiveLease,
+    CancellationRegistry,
+    LeaseRevisionState,
+    RevisionDomain,
+    StreamOrderingState,
+)
 
 _PROCESS_CANCELLATIONS = CancellationRegistry()
 
@@ -81,7 +87,14 @@ class LeaseRuntimeCoordinator:
     def session_buffered_audio_bytes(self, session_id: str) -> int:
         return self._process_pcm.session_bytes(session_id)
 
-    def create(self, lease: LeaseV1) -> LeaseRuntimeState:
+    def create(
+        self,
+        lease: LeaseV1,
+        *,
+        output_revisions: RevisionDomain | None = None,
+        media_floor_ms: int | None = None,
+        pcm_floor_ms: int = 0,
+    ) -> LeaseRuntimeState:
         if manifest_key(lease.model_manifest) not in self._accepted_manifests:
             raise ProtocolValidationError(StableCode.MANIFEST_NOT_ALLOWED)
         replacement_epoch = int(lease.epoch)
@@ -94,6 +107,9 @@ class LeaseRuntimeCoordinator:
             lease=lease,
             cancellations=self._cancellations,
             process_pcm=self._process_pcm,
+            output_revisions=output_revisions,
+            media_floor_ms=media_floor_ms,
+            pcm_floor_ms=pcm_floor_ms,
         )
         session_runtimes = self._runtimes.setdefault(lease.session_id, set())
         for previous in tuple(session_runtimes):
@@ -104,6 +120,16 @@ class LeaseRuntimeCoordinator:
         self._session_epochs[lease.session_id] = replacement_epoch
         session_runtimes.add(runtime)
         return runtime
+
+    def retire(self, runtime: LeaseRuntimeState) -> None:
+        """Release a rotating lease while preserving the session's epoch fence."""
+        session_runtimes = self._runtimes.get(runtime.session_id)
+        if session_runtimes is None or runtime not in session_runtimes:
+            return
+        runtime._session_teardown()
+        session_runtimes.remove(runtime)
+        if not session_runtimes:
+            self._runtimes.pop(runtime.session_id)
 
     def prune(self, now: datetime) -> None:
         self._cancellations.prune(now)
@@ -130,6 +156,9 @@ class LeaseRuntimeState:
         lease: LeaseV1,
         cancellations: CancellationRegistry,
         process_pcm: _ProcessPcmBudget,
+        output_revisions: RevisionDomain | None = None,
+        media_floor_ms: int | None = None,
+        pcm_floor_ms: int = 0,
     ) -> None:
         self.lease_id = lease.lease_id
         self.session_id = lease.session_id
@@ -145,12 +174,15 @@ class LeaseRuntimeState:
             epoch=self.epoch,
             input_start_seq=int(lease.input_start_seq),
             protocol_minor=lease.protocol_minor,
+            pcm_floor_ms=pcm_floor_ms,
         )
         self._output = StreamOrderingState(
             session_id=self.session_id,
             lease_id=self.lease_id,
             epoch=self.epoch,
             start_seq=int(lease.output_start_seq),
+            revisions=output_revisions,
+            media_floor_ms=media_floor_ms,
         )
         self._lease = LeaseRevisionState(
             session_id=self.session_id,
@@ -176,6 +208,14 @@ class LeaseRuntimeState:
     @property
     def output_next_expected_seq(self) -> int:
         return self._output.sequence.next_expected_seq
+
+    @property
+    def input_next_expected_seq(self) -> int:
+        return self._pcm.sequence.next_expected_seq
+
+    @property
+    def pcm_continue_pts(self) -> int:
+        return self._pcm.pcm_continue_pts
 
     @property
     def output_revision_count(self) -> int:
@@ -233,13 +273,30 @@ class LeaseRuntimeState:
             session_buffered_bytes=self._process_pcm.session_bytes(self.session_id),
             process_buffered_bytes=self._process_pcm.buffered_bytes,
         )
+        self._account_pcm(decision, before)
+        return decision
+
+    def accept_pcm_header(self, header: PcmHeaderV1, *, now: datetime) -> Decision:
+        """Apply validated transport metadata without keeping the frame payload."""
+        terminal = self._expire_if_due(now)
+        if terminal is not None:
+            return terminal
+        before = self._pcm.buffered_bytes
+        decision = self._pcm.accept_header(
+            header,
+            session_buffered_bytes=self._process_pcm.session_bytes(self.session_id),
+            process_buffered_bytes=self._process_pcm.buffered_bytes,
+        )
+        self._account_pcm(decision, before)
+        return decision
+
+    def _account_pcm(self, decision: Decision, before: int) -> None:
         if decision.code == StableCode.ACCEPTED:
             buffered_delta = self._pcm.buffered_bytes - before
             if buffered_delta > 0:
                 self._process_pcm.add(self.session_id, buffered_delta)
             elif buffered_delta < 0:
                 self._process_pcm.release(self.session_id, -buffered_delta)
-        return decision
 
     def consume_pcm(self, byte_count: int) -> None:
         self._pcm.consume(byte_count)

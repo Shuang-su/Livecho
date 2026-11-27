@@ -319,12 +319,15 @@ class StreamOrderingState:
         epoch: int,
         start_seq: int,
         revision_capacity: int = REVISION_DOMAIN_CAPACITY,
+        revisions: RevisionDomain | None = None,
+        media_floor_ms: int | None = None,
     ) -> None:
         self.session_id = session_id
         self.lease_id = lease_id
         self.epoch = epoch
         self.sequence = JsonSequenceWindow(start_seq)
-        self.revisions = RevisionDomain(revision_capacity)
+        self.revisions = RevisionDomain(revision_capacity) if revisions is None else revisions
+        self.media_floor_ms = media_floor_ms
         self.closed = False
 
     def _binding_decision(self, message: Mapping[str, Any]) -> Decision:
@@ -354,6 +357,12 @@ class StreamOrderingState:
             self.sequence.commit(seq, str(message["message_id"]), full_digest)
             return Decision(StableCode.ACCEPTED)
         identity = revision_identity(message)
+        if self.media_floor_ms is not None and self.revisions.record(identity) is None:
+            payload = message.get("payload", message)
+            if isinstance(payload, Mapping):
+                start_ms = payload.get("start_ms")
+                if isinstance(start_ms, int) and start_ms < self.media_floor_ms:
+                    return Decision(StableCode.MEDIA_TIME_REGRESSED)
         revision = self.revisions.preview(
             identity,
             int(str(message["revision"])),
