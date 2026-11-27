@@ -22,6 +22,13 @@
   and relative Markdown link validation passed. The branch changes only the
   four #14 artifacts. Cryptographic, WSS, proxy, and runtime verification remain
   tests for the implementation PR after the owner merges this revision.
+- A separate positive loopback probe used the repository's pinned websockets
+  client and Uvicorn Sans-I/O ASGI stack. The original generated
+  `Sec-WebSocket-Key` reached the ASGI request exactly once and round-tripped
+  as canonical base64 of 16 bytes. The probe did not send an authentication
+  proof or exercise TLS termination. The pinned client's default
+  `additional_headers` path runs after request generation. The native
+  integration must sign the prepared request rather than add a second key.
 
 ## Artifact approval
 
