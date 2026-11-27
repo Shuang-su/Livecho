@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from datetime import datetime
@@ -134,11 +135,12 @@ class SyntheticFailoverGateway(WorkerGateway):
             return False
         return await super()._admit_connection(connection, hello, now)
 
-    async def _issue_locked(self, now: datetime) -> None:
+    async def _issue_locked(self, _requested_at: datetime) -> None:
         if self._stopped or self._grant is None or self._active is not None:
             return
         if not self._allowlisted():
             return
+        now = self._now()
         eligible = [
             connection
             for connection in self._connections.values()
@@ -169,7 +171,12 @@ class SyntheticFailoverGateway(WorkerGateway):
         assert runtime is not None
         active = _Lease(model, runtime, connection, 1, now)
         self._active = connection.lease = active
-        await self._send(connection, model, now)
+        try:
+            await self._send(connection, model, now)
+        except asyncio.CancelledError:
+            if self._active is active:
+                await self._detach(connection, self._now())
+            raise
 
     def _accept_pcm_header(self, active: _Lease, header: PcmHeaderV1, now: datetime) -> Decision:
         return self.protocol.accept_pcm_header(header, now=now)
@@ -183,18 +190,7 @@ class SyntheticFailoverGateway(WorkerGateway):
     ) -> None:
         active = self._active
         if active is None or active.connection is not connection:
-            # Ask the protocol owner to classify late frames only for the retired
-            # socket's own old lease. No other socket can reach the live domain.
-            retired = connection.lease
-            code = StableCode.LEASE_UNKNOWN
-            if (
-                retired is not None
-                and message.epoch == retired.model.epoch
-                and message.lease_id == retired.model.lease_id
-                and int(message.epoch) < self.protocol.epoch
-            ):
-                code = self.protocol.accept_worker(message, now=now).decision.code
-            await self._error(connection, code, now)
+            await self._error(connection, StableCode.LEASE_UNKNOWN, now)
             return
         if not self.device_checked(connection.id) or not self._allowlisted():
             await self._cancel(connection, "policy_disable", now)
@@ -207,6 +203,7 @@ class SyntheticFailoverGateway(WorkerGateway):
                 self.viewers.publish(event)
         if update.rotation is not None:
             await self._apply_rotation(active, update, now, notify_worker=True)
+            await self._issue_locked(self._now())
             return
         await self._acknowledge_output(active, message, update.decision, now)
 
@@ -242,7 +239,10 @@ class SyntheticFailoverGateway(WorkerGateway):
         active = self._active
         if active is not None and now >= active.runtime.expires_at:
             self._finish_online(active.connection, active.runtime.expires_at)
-            await self._replace(active, now, notify_worker=True)
+            try:
+                await self._replace(active, now, notify_worker=True)
+            finally:
+                await super()._detach(active.connection, self._now())
         await self._issue_locked(now)
 
     async def _replace(self, active: _Lease, now: datetime, *, notify_worker: bool) -> None:
@@ -260,30 +260,34 @@ class SyntheticFailoverGateway(WorkerGateway):
             return
         self.viewers.resync(rotation.viewer)
         previous = active.connection
-        if notify_worker and previous.open:
-            await self._send(previous, rotation.worker, now)
         if rotation.worker.reason == "revision_capacity":
-            if previous.open:
-                await self._send(
-                    previous,
-                    wire.error(
-                        self._fields("protocol.error", 1, now),
-                        minor=1,
-                        code=update.decision.code,
-                        expected=rotation.worker.opened_epoch,
-                        received=rotation.worker.closed_epoch,
-                    ),
-                    now,
-                )
             # Capacity is an ordering boundary, so a healthy peer can qualify again.
             previous.lease = None
-        await self._issue_locked(self._now())
+        if notify_worker and previous.open:
+            await self._send(previous, rotation.worker, now)
+        if previous.open and rotation.worker.reason == "revision_capacity":
+            await self._send(
+                previous,
+                wire.error(
+                    self._fields("protocol.error", 1, now),
+                    minor=1,
+                    code=update.decision.code,
+                    expected=rotation.worker.opened_epoch,
+                    received=rotation.worker.closed_epoch,
+                ),
+                now,
+            )
 
     async def _detach(self, connection: _Connection, now: datetime) -> None:
         active = self._active
         if active is not None and active.connection is connection:
-            await self._replace(active, now, notify_worker=False)
-        await super()._detach(connection, now)
+            try:
+                await self._replace(active, now, notify_worker=False)
+            finally:
+                await super()._detach(connection, self._now())
+            await self._issue_locked(self._now())
+        else:
+            await super()._detach(connection, now)
 
     async def _stop_locked(self, now: datetime) -> None:
         self._stopped = True

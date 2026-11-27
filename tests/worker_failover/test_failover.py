@@ -260,6 +260,15 @@ def test_three_worker_live_failover(fault: str, monkeypatch: pytest.MonkeyPatch)
             )
             assert (await read_control(primary.socket))["outcome"] == "accepted"
             assert (await read_control(viewer))["seq"] == "2"
+            stale_viewer = await stack.enter_async_context(_viewer(url, tls))
+            waiting = asyncio.create_task(
+                _subscribe(
+                    stale_viewer,
+                    {"session_id": gateway.session_id, "epoch": "1", "next_seq": "1"},
+                )
+            )
+            with pytest.raises(TimeoutError):
+                await asyncio.wait_for(asyncio.shield(waiting), 0.01)
 
             fault_at = monotonic()
             if fault == "expiry":
@@ -280,6 +289,12 @@ def test_three_worker_live_failover(fault: str, monkeypatch: pytest.MonkeyPatch)
                 True,
             )
             assert gap["reason"] == "epoch_rotated"
+            rebuilt = await waiting
+            assert (rebuilt["type"], rebuilt["epoch"], rebuilt["reason"]) == (
+                "viewer.resync",
+                "2",
+                "epoch_rotated",
+            )
             successor = await read_control(backup.socket)
             lease_at = monotonic()
             assert successor["session_id"] == lease["session_id"]
@@ -298,11 +313,8 @@ def test_three_worker_live_failover(fault: str, monkeypatch: pytest.MonkeyPatch)
                 await asyncio.wait_for(slow.recv(), 1)
 
             if fault == "expiry":
-                late = await _send_caption(
-                    primary, lease, 4, start_ms=20, end_ms=40, segment_id=str(uuid4())
-                )
-                assert (await read_control(primary.socket))["code"] == "epoch_stale"
-                assert not gateway.result_accepted(late["message_id"])
+                with pytest.raises(ConnectionClosed):
+                    await asyncio.wait_for(primary.socket.recv(), 1)
 
             await browser("gap")
             assert not await gateway.submit_synthetic_pcm(successor["lease_id"], _pcm(successor, 0))
@@ -362,6 +374,13 @@ def test_three_worker_live_failover(fault: str, monkeypatch: pytest.MonkeyPatch)
             third_lease = await read_control(last.socket)
             assert third_lease["epoch"] == "3"
             await _assert_only_primary(gateway, last, [])
+            # A retired worker releases its slot and can come back on a new proof,
+            # without ever inheriting the current primary's lease.
+            async with connect_worker(url, tls, primary.device.challenge(world)) as rejoined:
+                await send_control(rejoined, hello_for(primary.device.id, minor1=True))
+                new_welcome = await read_control(rejoined)
+                assert new_welcome["type"] == "worker.welcome"
+                assert not gateway.lease_valid(new_welcome["connection_id"])
             assert final_at - last_heartbeat <= 60
             print(
                 f"{fault}: heartbeat-to-final={1000 * (final_at - last_heartbeat):.1f}ms; "
@@ -489,6 +508,9 @@ def test_capacity_trigger_publishes_resync_and_does_not_acknowledge_candidate() 
                 assert (gap["type"], gap["epoch"], gap["next_seq"]) == ("viewer.resync", "2", "1")
                 assert not gateway.result_accepted(rejected["message_id"])
                 assert replacement["lease_id"] != lease["lease_id"]
+                await send_control(worker.socket, rejected)
+                assert (await read_control(worker.socket))["code"] == "epoch_stale"
+                assert not gateway.result_accepted(rejected["message_id"])
                 await _send_caption(
                     worker,
                     replacement,
@@ -500,6 +522,104 @@ def test_capacity_trigger_publishes_resync_and_does_not_acknowledge_candidate() 
                 )
                 assert (await read_control(worker.socket))["outcome"] == "accepted"
                 assert (await read_control(viewer))["epoch"] == "2"
+
+    asyncio.run(scenario())
+
+
+def test_cancelled_lease_send_retires_the_undelivered_lease(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    world, gateway, devices, _ = _setup(2)
+    sending = asyncio.Event()
+    actual_send = WebSocket.send_text
+
+    async def block_first_lease(socket: WebSocket, data: str) -> None:
+        if not sending.is_set() and '"type":"worker.lease"' in data:
+            sending.set()
+            await asyncio.Future()
+        await actual_send(socket, data)
+
+    monkeypatch.setattr(WebSocket, "send_text", block_first_lease)
+
+    async def scenario() -> None:
+        async with (
+            serve_gateway(create_failover_app(gateway)) as (url, tls),
+            AsyncExitStack() as stack,
+        ):
+            stack.push_async_callback(gateway.stop)
+            primary, standby = await _workers(stack, url, tls, world, devices)
+            viewer = await stack.enter_async_context(_viewer(url, tls))
+            await _subscribe(viewer)
+            arming = asyncio.create_task(_arm(gateway))
+            await asyncio.wait_for(sending.wait(), 2)
+            arming.cancel()
+            with pytest.raises(asyncio.CancelledError):
+                await arming
+            assert (await read_control(viewer))["epoch"] == "2"
+            assert (await read_control(standby.socket))["epoch"] == "2"
+            assert gateway.lease_valid(standby.connection_id)
+            assert not gateway.device_checked(primary.connection_id)
+
+    asyncio.run(scenario())
+
+
+def test_eligibility_is_rechecked_after_welcome(monkeypatch: pytest.MonkeyPatch) -> None:
+    world, gateway, devices, observed = _setup(1)
+    actual_send = WebSocket.send_text
+
+    async def advance_on_welcome(socket: WebSocket, data: str) -> None:
+        if '"type":"worker.welcome"' in data:
+            world.clock.advance(timedelta(seconds=2))
+        await actual_send(socket, data)
+
+    monkeypatch.setattr(WebSocket, "send_text", advance_on_welcome)
+
+    async def scenario() -> None:
+        async with (
+            serve_gateway(create_failover_app(gateway)) as (url, tls),
+            AsyncExitStack() as stack,
+        ):
+            stack.push_async_callback(gateway.stop)
+            await gateway.observe(
+                devices[0].id,
+                replace(observed[0], fresh_until=world.clock.now + timedelta(seconds=1)),
+            )
+            await _arm(gateway)
+            (worker,) = await _workers(stack, url, tls, world, devices)
+            with pytest.raises(TimeoutError):
+                await asyncio.wait_for(worker.socket.recv(), 0.025)
+            await gateway.observe(worker.device.id, observed[0])
+            assert (await read_control(worker.socket))["epoch"] == "1"
+
+    asyncio.run(scenario())
+
+
+def test_pending_pcm_write_observes_remaining_lease_time(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    world, gateway, devices, _ = _setup(2)
+
+    async def block_pcm(socket: WebSocket, data: bytes) -> None:
+        await asyncio.Future()
+
+    monkeypatch.setattr(WebSocket, "send_bytes", block_pcm)
+
+    async def scenario() -> None:
+        async with (
+            serve_gateway(create_failover_app(gateway)) as (url, tls),
+            AsyncExitStack() as stack,
+        ):
+            stack.push_async_callback(gateway.stop)
+            primary, standby = await _workers(stack, url, tls, world, devices)
+            await _arm(gateway)
+            lease = await read_control(primary.socket)
+            world.clock.advance(timedelta(milliseconds=19_960))
+            assert not await asyncio.wait_for(
+                gateway.submit_synthetic_pcm(lease["lease_id"], _pcm(lease, 0)), timeout=0.5
+            )
+            assert (await read_control(standby.socket))["epoch"] == "2"
+            assert gateway.lease_valid(standby.connection_id)
+            assert not gateway.lease_valid(primary.connection_id)
 
     asyncio.run(scenario())
 

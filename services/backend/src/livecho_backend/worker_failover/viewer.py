@@ -61,6 +61,9 @@ class Viewers:
         self._now = clock
         self._clients: dict[ViewerConnection, asyncio.Task[None]] = {}
         self._open_partials: set[str] = set()
+        self._revision_boundary = asyncio.Event()
+        self._revision_boundary.set()
+        self._serving = 0
         self._closed = False
         self.observations = LocalVerticalObservations()
 
@@ -69,8 +72,11 @@ class Viewers:
         if isinstance(payload, TranscriptTimelinePayloadV1):
             if payload.is_final:
                 self._open_partials.discard(event.event_id)
+                if not self._open_partials:
+                    self._revision_boundary.set()
             else:
                 self._open_partials.add(event.event_id)
+                self._revision_boundary.clear()
         encoded = _encode(event)
         seq = int(event.seq)
         for client, task in self._clients.items():
@@ -79,6 +85,7 @@ class Viewers:
 
     def resync(self, notice: ViewerResyncV1) -> None:
         self._open_partials.clear()
+        self._revision_boundary.set()
         encoded = _encode(notice)
         for client, task in self._clients.items():
             if not task.cancelling() and not client.offer_resync(encoded, int(notice.next_seq)):
@@ -87,6 +94,7 @@ class Viewers:
     def close(self) -> None:
         self._closed = True
         self._open_partials.clear()
+        self._revision_boundary.set()
         for task in self._clients.values():
             task.cancel()
 
@@ -100,6 +108,10 @@ class Viewers:
         if VIEWER_PROTOCOL not in socket.scope["subprotocols"]:
             await socket.close(code=1002)
             return
+        if self._serving >= MAX_VIEWERS:
+            await socket.close(code=1013)
+            return
+        self._serving += 1
         client = ViewerConnection(
             send_json=lambda data: socket.send_text(data.decode("utf-8")),
             close_socket=lambda: asyncio.wait_for(socket.close(code=1000), SEND_DEADLINE_SECONDS),
@@ -107,20 +119,12 @@ class Viewers:
         )
         sender: asyncio.Task[None] | None = None
         receiver: asyncio.Task[MutableMapping[str, Any]] | None = None
-        await socket.accept(subprotocol=VIEWER_PROTOCOL)
         try:
-            text = await asyncio.wait_for(socket.receive_text(), HELLO_TIMEOUT.total_seconds())
-            subscribe, _ = parse_control(text, ViewerSubscribeV1)
-            async with self._lock:
-                reply = self._reply(subscribe)
-                if not isinstance(reply, ProtocolErrorV1):
-                    if not client.offer(_encode(reply), int(reply.next_seq) - 1, is_terminal=False):
-                        return
-                    sender = asyncio.create_task(client.run_sender())
-                    self._clients[client] = sender
-                    self.observations.peak_viewers = max(
-                        self.observations.peak_viewers, len(self._clients)
-                    )
+            async with asyncio.timeout(HELLO_TIMEOUT.total_seconds()):
+                await socket.accept(subprotocol=VIEWER_PROTOCOL)
+                text = await socket.receive_text()
+                subscribe, _ = parse_control(text, ViewerSubscribeV1)
+                reply, sender = await self._admit(client, subscribe)
             if sender is None:
                 await asyncio.wait_for(
                     socket.send_text(_encode(reply).decode("utf-8")), SEND_DEADLINE_SECONDS
@@ -140,6 +144,7 @@ class Viewers:
             pass
         finally:
             self._clients.pop(client, None)
+            self._serving -= 1
             for task in (sender, receiver):
                 if task is not None:
                     task.cancel()
@@ -152,6 +157,27 @@ class Viewers:
                     await client.detach()
                 else:
                     await client.close_socket()
+
+    async def _admit(
+        self, client: ViewerConnection, subscribe: ViewerSubscribeV1
+    ) -> tuple[ViewerReadyV1Minor1 | ViewerResyncV1 | ProtocolErrorV1, asyncio.Task[None] | None]:
+        while True:
+            async with self._lock:
+                reply = self._reply(subscribe)
+                if isinstance(reply, ProtocolErrorV1):
+                    return reply, None
+                # A gap clears the viewer's revision domain. Wait for an
+                # admission point that needs no historical partials or replay.
+                if not isinstance(reply, ViewerResyncV1) or not self._open_partials:
+                    if not client.offer(_encode(reply), int(reply.next_seq) - 1, is_terminal=False):
+                        return self._error(StableCode.RESYNC_REQUIRED), None
+                    sender = asyncio.create_task(client.run_sender())
+                    self._clients[client] = sender
+                    self.observations.peak_viewers = max(
+                        self.observations.peak_viewers, len(self._clients)
+                    )
+                    return reply, sender
+            await self._revision_boundary.wait()
 
     def _reply(
         self, subscribe: ViewerSubscribeV1

@@ -235,9 +235,17 @@ class WorkerGateway:
                 return False
             active.next_input = header.seq + 1
             try:
-                await asyncio.wait_for(connection.socket.send_bytes(frame), SEND_TIMEOUT_SECONDS)
+                remaining = (active.runtime.expires_at - self._now()).total_seconds()
+                if remaining <= 0:
+                    raise TimeoutError
+                await asyncio.wait_for(
+                    connection.socket.send_bytes(frame), min(SEND_TIMEOUT_SECONDS, remaining)
+                )
+            except asyncio.CancelledError:
+                await self._detach(connection, self._now())
+                raise
             except (TimeoutError, OSError, RuntimeError, WebSocketDisconnect):
-                await self._detach(connection, now)
+                await self._detach(connection, self._now())
                 return False
             return True
 

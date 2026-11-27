@@ -47,8 +47,8 @@
 
 | Scenario | Accepted heartbeat to successor final | Fault to viewer resync | Fault to successor lease | Resync to final |
 | --- | ---: | ---: | ---: | ---: |
-| Primary disconnect | 32.2 ms | 1.3 ms | 1.4 ms | 27.2 ms |
-| Primary expiry with both browser viewports | 75.8 ms | 1.4 ms | 1.4 ms | 36.9 ms |
+| Primary disconnect | 47.7 ms | 1.9 ms | 2.0 ms | 27.8 ms |
+| Primary expiry with both browser viewports | 95.5 ms | 1.6 ms | 1.8 ms | 39.2 ms |
 
 These are local monotonic timings. The fixture advanced its scheduler clock
 by 2 seconds for the expiry case. Both scenarios discarded the previous
@@ -77,9 +77,21 @@ independently and on successive epochs, tombstone eviction, and minor 0.
 | `uv run pytest -q -s tests/worker_failover tests/worker_gateway tests/protocol/test_long_session.py tests/protocol/test_long_session_runtime.py` | Exit 0, 39 passed. |
 | `VITE_LIVECHO_VIEWER_MINOR_1=1 pnpm --filter @livecho/web build` | Exit 0. |
 | `LIVECHO_FAILOVER_BROWSER=1 uv run pytest -q -s --tb=short tests/worker_failover/test_failover.py -k three_worker_live_failover` | Exit 0, both scenarios passed, with Chromium in the expiry case. |
-| `LIVECHO_FAILOVER_BROWSER=1 uv run pytest -q -s --tb=short tests/worker_failover tests/worker_gateway tests/protocol/test_long_session.py tests/protocol/test_long_session_runtime.py` | Exit 0, final targeted run with Chromium, 39 passed. |
-| `LIVECHO_BASE_SHA=7acf5ea88daa833ccec95835a6f49bab4542f1bf make verify` | Exit 0. Ruff, mypy, 1,033 Python tests (1 stress case excluded), 431 Vitest cases, artifact and schema checks, and production build passed. |
+| `LIVECHO_FAILOVER_BROWSER=1 uv run pytest -q -s --tb=short tests/worker_failover tests/worker_gateway tests/protocol/test_long_session.py tests/protocol/test_long_session_runtime.py` | Exit 0, post-review targeted run with Chromium, 42 passed. |
+| `LIVECHO_BASE_SHA=7acf5ea88daa833ccec95835a6f49bab4542f1bf make verify` | Exit 0 at implementation checkpoint `5d5b25b`. Ruff, mypy, 1,033 Python tests (1 stress case excluded), 431 Vitest cases, artifact and schema checks, and production build passed. |
 | `pnpm --filter @livecho/protocol build && pnpm --filter @livecho/web test:e2e` | Exit 0, all 12 original minor-0 Chromium tests passed. |
+
+### Independent runtime review
+
+The reviewer identified five boundary conditions on `5d5b25b`. At expiry
+the old connection now receives a bounded notice and releases its admission
+slot. A cancelled lease send fences and detaches the selected worker before
+selection proceeds. Eligibility is sampled after Welcome at lease issue, and
+a blocked PCM send is capped by the remaining lease lifetime. A viewer that
+needs a gap waits for a bounded clean revision boundary before registering
+its live cursor. The post-review run exercised socket re-admission,
+cancellation, stale observations, pending PCM, and a stale cursor while
+old partials were open.
 
 ## Historical artifact approval and exposure
 
