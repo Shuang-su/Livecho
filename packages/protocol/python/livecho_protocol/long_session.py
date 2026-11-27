@@ -249,6 +249,12 @@ class Minor1SessionRuntime:
     def revision_record_count(self) -> int:
         return self._session.revision_record_count
 
+    @property
+    def active_lease_runtime(self) -> LeaseRuntimeState | None:
+        """Expose the owned lease to the transport for cursors and buffer release."""
+        lease = self._lease
+        return lease if lease is not None and lease.cancellation_active else None
+
     def install_lease(self, lease: LeaseV1 | LeaseV1Minor1, *, now: datetime) -> Decision:
         if lease.protocol_minor != 1:
             return Decision(StableCode.UNSUPPORTED_MINOR)

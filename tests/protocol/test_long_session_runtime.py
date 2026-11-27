@@ -112,6 +112,8 @@ def test_replacement_retires_old_pcm_and_emits_the_two_closed_messages(
 ) -> None:
     runtime, leases = session
     primary = _lease()
+    assert runtime.active_lease_runtime is not None
+    assert runtime.active_lease_runtime.lease_id == primary.lease_id
     final = _worker(primary, 1, start_ms=100, is_final=True)
     assert runtime.accept_worker(final, now=NOW).decision.code == StableCode.ACCEPTED
     projected = _viewer(1, 1, final)
@@ -146,6 +148,7 @@ def test_replacement_retires_old_pcm_and_emits_the_two_closed_messages(
         True,
     )
     assert runtime.revision_record_count == 0
+    assert runtime.active_lease_runtime is None
     assert leases.session_buffered_audio_bytes(SESSION) == 0
     assert runtime.accept_worker(final, now=NOW).decision.code == StableCode.EPOCH_STALE
     assert runtime.accept_viewer_event(projected, now=NOW).decision.code == StableCode.EPOCH_STALE
