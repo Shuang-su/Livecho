@@ -16,8 +16,8 @@ from typing import Any, Final
 from uuid import uuid4
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
-from livecho_protocol.binary import MAX_FRAME_LENGTH, decode_header
-from livecho_protocol.errors import ProtocolValidationError, StableCode
+from livecho_protocol.binary import MAX_FRAME_LENGTH, PcmHeaderV1, decode_header
+from livecho_protocol.errors import Decision, ProtocolValidationError, StableCode
 from livecho_protocol.models import (
     HeartbeatV1,
     LeaseV1,
@@ -231,7 +231,7 @@ class WorkerGateway:
                 byte_maximum=PCM_BYTES_PER_WINDOW,
             ):
                 return False
-            if active.runtime.accept_pcm(frame, now=now).code is not StableCode.ACCEPTED:
+            if self._accept_pcm_header(active, header, now).code is not StableCode.ACCEPTED:
                 return False
             active.next_input = header.seq + 1
             try:
@@ -240,6 +240,9 @@ class WorkerGateway:
                 await self._detach(connection, now)
                 return False
             return True
+
+    def _accept_pcm_header(self, active: _Lease, header: PcmHeaderV1, now: datetime) -> Decision:
+        return active.runtime.accept_pcm_header(header, now=now)
 
     async def consume_pcm(self, lease_id: str, byte_count: int) -> bool:
         async with self._lock:
@@ -354,11 +357,11 @@ class WorkerGateway:
             ):
                 await self._error(connection, StableCode.BINDING_MISMATCH, now)
                 return False
-            await self._detach(active.connection, now)
+            await self._detach_for_resume(active.connection, now)
             active.connection = connection
             connection.lease = active
             resumed = True
-        elif self._leases.active_lease_count:
+        elif self._leases.active_lease_count and not self._allows_standby():
             await self._error(connection, StableCode.RESYNC_REQUIRED, now)
             return False
         connection.online_since = now
@@ -378,6 +381,12 @@ class WorkerGateway:
             return False
         await self._issue_locked(now)
         return connection.open
+
+    def _allows_standby(self) -> bool:
+        return False
+
+    async def _detach_for_resume(self, connection: _Connection, now: datetime) -> None:
+        await self._detach(connection, now)
 
     async def _issue_locked(self, now: datetime) -> None:
         grant = self._grant
@@ -461,6 +470,12 @@ class WorkerGateway:
             await self._error(connection, StableCode.LEASE_UNKNOWN, now)
             return
         decision = active.runtime.accept_output(raw, now=now)
+        await self._acknowledge_output(active, message, decision, now)
+
+    async def _acknowledge_output(
+        self, active: _Lease, message: wire.WorkerOutput, decision: Decision, now: datetime
+    ) -> None:
+        connection = active.connection
         if not decision.accepted:
             await self._error(connection, decision.code, now)
             return

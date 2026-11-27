@@ -12,6 +12,8 @@ from collections.abc import AsyncIterator, Iterator
 from contextlib import asynccontextmanager, contextmanager
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
+from typing import Any
+from uuid import uuid4
 
 import uvicorn
 from cryptography import x509
@@ -19,6 +21,9 @@ from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from fastapi import FastAPI
+from livecho_protocol.golden import _public_values
+from livecho_protocol.models import WorkerHelloV1
+from livecho_protocol.parser import canonical_json, strict_json_loads
 from websockets.asyncio.client import ClientConnection, connect
 from websockets.datastructures import Headers, HeadersLike
 from websockets.typing import Subprotocol
@@ -186,3 +191,33 @@ def connect_worker(
         additional_headers=additional,
         create_connection=BoundConnection,
     )
+
+
+async def read_control(client: ClientConnection) -> dict[str, Any]:
+    raw = await asyncio.wait_for(client.recv(), timeout=3)
+    assert isinstance(raw, str)
+    return strict_json_loads(raw)
+
+
+async def send_control(client: ClientConnection, body: dict[str, Any] | WorkerHelloV1) -> None:
+    value = body.model_dump(mode="json") if isinstance(body, WorkerHelloV1) else body
+    await client.send(canonical_json(value).decode("utf-8"))
+
+
+def worker_output(
+    name: str,
+    lease: dict[str, Any],
+    seq: int,
+    **changes: object,
+) -> dict[str, Any]:
+    raw = _public_values()[name]
+    raw.update(
+        protocol_minor=lease["protocol_minor"],
+        lease_id=lease["lease_id"],
+        session_id=lease["session_id"],
+        epoch=lease["epoch"],
+        seq=str(seq),
+        message_id=str(uuid4()),
+    )
+    raw.update(changes)
+    return raw

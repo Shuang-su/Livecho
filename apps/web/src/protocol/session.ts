@@ -5,8 +5,7 @@ import {
   strictJsonParse,
   validateModel,
   type ViewerCursorV1,
-  type ViewerReadyV1,
-  type TimelineEventV1,
+  type ViewerResyncV1,
 } from "@livecho/protocol/browser";
 import {
   PresentationEngine,
@@ -15,7 +14,15 @@ import {
   type SchedulerClock,
   type TextMutation,
 } from "./scheduler";
-import { ViewerReceiveDomain, isBlockingStatus, type AcceptedStatus, type SessionStatus } from "./domain";
+import {
+  ViewerReceiveDomain,
+  isBlockingStatus,
+  type AcceptedStatus,
+  type AnyTimelineEvent,
+  type AnyViewerReady,
+  type SessionStatus,
+  type ViewerMinor,
+} from "./domain";
 import { CONNECTION_LABELS, type ConnectionState } from "./labels";
 
 export { CONNECTION_LABELS };
@@ -77,6 +84,8 @@ export interface SessionDeps {
   clock: SchedulerClock;
   environment: SessionEnvironment;
   webSocketFactory?: (url: string, protocols: string[]) => WebSocketLike;
+  /** Viewer minors offered in the subscribe; the subscribe wire stays minor 0. Default `[0]`. */
+  supportedMinors?: readonly (0 | 1)[];
   /** Timer functions are injectable so unit tests can avoid real waits. */
   setTimeoutFn?: (handler: () => void, milliseconds: number) => unknown;
   clearTimeoutFn?: (handle: unknown) => void;
@@ -103,6 +112,10 @@ export class CaptionSession {
   private drainTimerFireAt = 0;
   private socket: WebSocketLike | null = null;
   private sentCursor: ViewerCursorV1 | null = null;
+  /** Minor the server selected for the current socket; null until confirmed. */
+  private socketMinor: ViewerMinor | null = null;
+  private minorFloor: ViewerMinor = 0;
+  private readonly supportedMinors: readonly ViewerMinor[];
   private closed = false;
   private terminal = false;
   private incompatible = false;
@@ -131,6 +144,8 @@ export class CaptionSession {
     this.url = deps.url;
     this.roomIdValue = deps.roomId;
     this.clock = deps.clock;
+    const offered: readonly (0 | 1)[] = deps.supportedMinors ?? [0];
+    this.supportedMinors = [...new Set(offered)].sort();
     this.environment = deps.environment;
     this.engine = new PresentationEngine(deps.clock);
     this.webSocketFactory =
@@ -301,6 +316,7 @@ export class CaptionSession {
   private connect(): void {
     this.closeSocket();
     this.sentCursor = this.domain.cursor();
+    this.socketMinor = null;
     const socket = this.webSocketFactory(this.url, [VIEWER_PROTOCOL]);
     this.socket = socket;
     socket.addEventListener("open", (event) => {
@@ -330,7 +346,7 @@ export class CaptionSession {
       sent_at: new Date().toISOString(),
       type: "viewer.subscribe",
       client_version: CLIENT_VERSION,
-      supported_minors: [PROTOCOL_MINOR],
+      supported_minors: [...this.supportedMinors],
       room_id: this.roomIdValue,
     };
     if (cursor !== null) subscribe.cursor = cursor;
@@ -379,6 +395,9 @@ export class CaptionSession {
       case "viewer.ready":
         this.handleReady(value);
         return;
+      case "viewer.resync":
+        this.handleResync(value);
+        return;
       case "viewer.timeline_event":
         this.handleTimelineEvent(value);
         return;
@@ -386,7 +405,12 @@ export class CaptionSession {
         this.handleProtocolError(value);
         return;
       case "protocol.ack":
-        if (validateModel("ProtocolAckV1", value) !== "accepted") {
+        if (
+          validateModel(
+            this.socketMinor === 1 ? "ProtocolAckV1Minor1" : "ProtocolAckV1",
+            value,
+          ) !== "accepted"
+        ) {
           this.metricsValue.rejectedFrames += 1;
           this.notify();
         }
@@ -398,18 +422,32 @@ export class CaptionSession {
   }
 
   private handleReady(value: Record<string, unknown>): void {
-    if (validateModel("ViewerReadyV1", value) !== "accepted") {
+    if (this.socketMinor !== null || this.terminal) {
+      this.metricsValue.rejectedFrames += 1;
+      this.notify();
+      return;
+    }
+    const minor: ViewerMinor = value.protocol_minor === 1 ? 1 : 0;
+    const readyModel = minor === 1 ? "ViewerReadyV1Minor1" : "ViewerReadyV1";
+    if (
+      validateModel(readyModel, value) !== "accepted" ||
+      !this.supportedMinors.includes(minor) ||
+      minor < this.minorFloor
+    ) {
       this.metricsValue.rejectedFrames += 1;
       this.beginReconnectCycle(true);
       return;
     }
-    const ready = value as unknown as ViewerReadyV1;
+    const ready = value as unknown as AnyViewerReady;
     const assessment = this.domain.acceptReady(ready, this.sentCursor);
     if (assessment.outcome === "invalid") {
       this.metricsValue.rejectedFrames += 1;
       this.beginReconnectCycle(true);
       return;
     }
+    // The server-selected minor is pinned to this socket from here on.
+    this.socketMinor = minor;
+    this.minorFloor = minor;
     if (assessment.outcome === "fresh") {
       // Room/session/epoch change erases the delay and all display state, and
       // a new binding ends any previous terminal visibility block.
@@ -425,14 +463,74 @@ export class CaptionSession {
     this.notify();
   }
 
+  /**
+   * Minor-1 viewer.resync: bind the new epoch and next_seq, clear revision and
+   * duplicate state, delay, display text, and the pending display timer, show
+   * the gap, and continue on this connection without a role change.
+   */
+  private handleResync(value: Record<string, unknown>): void {
+    const awaitingFirstResponse = this.socketMinor === null;
+    if (
+      this.terminal ||
+      !this.supportedMinors.includes(1) ||
+      (!awaitingFirstResponse && this.socketMinor !== 1)
+    ) {
+      this.metricsValue.rejectedFrames += 1;
+      this.notify();
+      return;
+    }
+    const outcome = this.domain.acceptResync(value as unknown as ViewerResyncV1, {
+      roomId: this.roomIdValue,
+      awaitingFirstResponse,
+      sentCursor: this.sentCursor,
+    });
+    if (outcome.outcome === "duplicate") {
+      this.metricsValue.duplicates += 1;
+      this.notify();
+      return;
+    }
+    if (outcome.outcome === "rejected") {
+      this.metricsValue.rejectedFrames += 1;
+      if (awaitingFirstResponse) this.beginReconnectCycle(false);
+      else this.notify();
+      return;
+    }
+    this.metricsValue.resyncs += 1;
+    this.socketMinor = 1;
+    this.cancelDrainTimer();
+    const { droppedUndisplayed } = this.engine.clearTextAndQueue();
+    if (droppedUndisplayed) this.notices.undisplayed = true;
+    this.engine.reset();
+    this.engine.setDelay(DELAY_MIN_MS);
+    this.notices.gap = true;
+    this.retryAttempt = 0;
+    this.retryOfferedValue = false;
+    this.cancelRetryTimer();
+    this.setState("connected");
+    this.notify();
+  }
+
   private handleTimelineEvent(value: Record<string, unknown>): void {
-    const schemaCode = validateModel("TimelineEventV1", value);
+    const eventModel = this.socketMinor === 1 ? "TimelineEventV1Minor1" : "TimelineEventV1";
+    const schemaCode = validateModel(eventModel, value);
     if (schemaCode !== "accepted") {
       this.metricsValue.rejectedFrames += 1;
       this.notify();
       return;
     }
-    const event = value as unknown as TimelineEventV1;
+    if (this.socketMinor === null) {
+      // Discard data sent before the server confirms this connection.
+      this.metricsValue.rejectedFrames += 1;
+      this.notify();
+      if (!this.supportedMinors.includes(1)) this.beginFreshResync();
+      return;
+    }
+    const event = value as unknown as AnyTimelineEvent;
+    if (this.socketMinor === 1 && event.room_id !== this.roomIdValue) {
+      this.metricsValue.rejectedFrames += 1;
+      this.notify();
+      return;
+    }
     const outcome = this.domain.acceptEvent(event);
     if (outcome.outcome === "duplicate") {
       this.metricsValue.duplicates += 1;
@@ -442,7 +540,9 @@ export class CaptionSession {
     if (outcome.outcome === "rejected") {
       this.metricsValue.rejectedFrames += 1;
       this.notify();
-      if (outcome.resync) this.beginFreshResync();
+      if (outcome.resync || (this.socketMinor === 1 && outcome.code === "revision_gap")) {
+        this.beginFreshResync();
+      }
       return;
     }
     this.metricsValue.receivedEvents += 1;
@@ -450,6 +550,7 @@ export class CaptionSession {
       this.applyStatus(outcome.event);
       return;
     }
+    if (this.terminal) return;
     const mutation: TextMutation = {
       seq: outcome.event.seq,
       eventId: outcome.event.eventId,
@@ -488,7 +589,9 @@ export class CaptionSession {
   }
 
   private handleProtocolError(value: Record<string, unknown>): void {
-    if (validateModel("ProtocolErrorV1", value) !== "accepted") {
+    if (this.terminal) return;
+    const errorModel = this.socketMinor === 1 ? "ProtocolErrorV1Minor1" : "ProtocolErrorV1";
+    if (validateModel(errorModel, value) !== "accepted") {
       this.metricsValue.rejectedFrames += 1;
       this.beginFreshResync();
       return;
@@ -547,7 +650,7 @@ export class CaptionSession {
    * the bounded retry ladder.
    */
   private beginFreshResync(): void {
-    if (this.closed) return;
+    if (this.closed || this.terminal) return;
     this.metricsValue.resyncs += 1;
     // A deliberate fresh resync starts a new bounded retry cycle.
     this.retryAttempt = 0;

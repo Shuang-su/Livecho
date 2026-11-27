@@ -84,6 +84,14 @@ class ViewerConnection:
             return False
         return len(self.queue) == 0
 
+    def offer_resync(self, frame: bytes, next_seq: int) -> bool:
+        """Discard queued bodies before queuing the new epoch's control frame."""
+        if self.send_in_flight:
+            return False
+        self.queue.clear()
+        self.queue_bytes = 0
+        return self.offer(frame, next_seq - 1, is_terminal=False)
+
     def _terminal_send_allowed(self, seq: int) -> bool:
         """At send time the terminal itself may be the sole queued frame."""
         if self.next_seq is None or seq != self.next_seq:

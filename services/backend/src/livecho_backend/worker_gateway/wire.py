@@ -49,7 +49,6 @@ SYNTHETIC_AUDIO_FORMAT: dict[str, Any] = {
     "sample_rate_hz": 16000,
     "channels": 1,
 }
-CURRENT_EPOCH = "1"
 CURRENT_REVISION = "1"
 
 
@@ -99,6 +98,7 @@ def lease(
     issued_at: str,
     expires_at: str,
     manifest: ModelManifestRefV1,
+    epoch: int = 1,
 ) -> LeaseV1:
     model = LeaseV1Minor1 if minor == 1 else LeaseV1
     start = "1" if minor == 1 else "0"
@@ -108,7 +108,7 @@ def lease(
             "lease_id": lease_id,
             "session_id": session_id,
             "room_id": room_id,
-            "epoch": CURRENT_EPOCH,
+            "epoch": str(epoch),
             "revision": CURRENT_REVISION,
             "issued_at": issued_at,
             "expires_at": expires_at,
@@ -121,13 +121,27 @@ def lease(
     )
 
 
-def error(fields: dict[str, Any], *, minor: int, code: str) -> ProtocolErrorV1:
+def error(
+    fields: dict[str, Any],
+    *,
+    minor: int,
+    code: str,
+    expected: str | None = None,
+    received: str | None = None,
+) -> ProtocolErrorV1:
     model = ProtocolErrorV1Minor1 if minor == 1 else ProtocolErrorV1
     retryable_codes = {"resync_required", "epoch_rotated"} if minor == 1 else {"resync_required"}
 
     def build(value: str) -> ProtocolErrorV1:
         return model.model_validate(
-            {**fields, "code": value, "message": value, "retryable": value in retryable_codes}
+            {
+                **fields,
+                "code": value,
+                "message": value,
+                "retryable": value in retryable_codes,
+                "expected": expected,
+                "received": received,
+            }
         )
 
     value = _code_value(code)

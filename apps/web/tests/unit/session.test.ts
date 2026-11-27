@@ -8,6 +8,7 @@ import {
 import {
   protocolErrorFrame,
   readyFrame,
+  stamp,
   statusEvent,
   testUuid,
   transcriptEvent,
@@ -90,13 +91,14 @@ interface Harness {
   clock: TestClock;
 }
 
-function startSession(): Harness {
+function startSession(supportedMinors?: SessionDeps["supportedMinors"]): Harness {
   const sockets: FakeSocket[] = [];
   const timers = new ManualTimers();
   const clock = new TestClock();
   const deps: SessionDeps = {
     url: "ws://test.invalid/api/viewer/ws",
     roomId: "livecho.fixture.room",
+    ...(supportedMinors && { supportedMinors }),
     clock,
     environment: ALWAYS_ONLINE,
     webSocketFactory: () => {
@@ -110,6 +112,111 @@ function startSession(): Harness {
   const session = new CaptionSession(deps);
   return { session, sockets, timers, clock };
 }
+
+function openMinor1(harness: Harness): FakeSocket {
+  const socket = harness.sockets[0]!;
+  socket.emit("open");
+  expect(strictJsonParse(socket.sent[0]!).value?.supported_minors).toEqual([0, 1]);
+  socket.emitMessage(JSON.stringify({
+    ...readyFrame({ nextSeq: 1n }),
+    protocol_minor: 1,
+    selected_minor: 1,
+  }));
+  expect(harness.session.getSnapshot().connection).toBe("connected");
+  return socket;
+}
+
+function resyncFrame(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+  return {
+    protocol: "livecho.viewer.v1",
+    protocol_minor: 1,
+    message_id: crypto.randomUUID(),
+    sent_at: stamp(),
+    type: "viewer.resync",
+    session_id: readyFrame({ nextSeq: 1n }).session_id,
+    room_id: "livecho.fixture.room",
+    epoch: "2",
+    next_seq: "1",
+    media_continue_ms: 20,
+    reason: "epoch_rotated",
+    gap: true,
+    ...overrides,
+  };
+}
+
+describe("minor-1 caption recovery", () => {
+  it("clears delayed old captions and ignores old-epoch data on the same socket", () => {
+    const { session, sockets, clock, timers } = startSession([0, 1]);
+    const socket = sockets[0]!;
+    socket.emit("open");
+    socket.emitMessage(JSON.stringify(transcriptEvent({ protocolMinor: 1 })));
+    expect(session.getSnapshot().partial).toBeNull();
+    socket.emitMessage(JSON.stringify({
+      ...readyFrame({ nextSeq: 1n }),
+      protocol_minor: 1,
+      selected_minor: 1,
+    }));
+    socket.emitMessage(JSON.stringify(transcriptEvent({ protocolMinor: 1, text: "old partial" })));
+    expect(session.getSnapshot().partial?.text).toBe("old partial");
+    session.setDelay(5_000);
+    socket.emitMessage(JSON.stringify(transcriptEvent({ protocolMinor: 1, seq: 2n, isFinal: true })));
+    expect(timers.pending()).toBe(1);
+    socket.emitMessage(JSON.stringify(resyncFrame()));
+    expect(session.getSnapshot()).toMatchObject({
+      connection: "connected",
+      delayMs: 0,
+      partial: null,
+      finals: [],
+      notices: { gap: true },
+    });
+    expect(timers.pending()).toBe(0);
+    socket.emitMessage(JSON.stringify(transcriptEvent({ protocolMinor: 1, seq: 3n, isFinal: true })));
+    socket.emitMessage(JSON.stringify({
+      ...transcriptEvent({ protocolMinor: 1, text: "new final", isFinal: true }),
+      epoch: "2",
+    }));
+    socket.emitMessage(JSON.stringify(resyncFrame()));
+    clock.advance(5_000);
+    timers.advance(5_000);
+    expect(session.getSnapshot().finals.map((row) => row.text)).toEqual(["new final"]);
+    expect(sockets).toHaveLength(1);
+  });
+
+  it("accepts an expired-cursor notice as the first response on a resumed socket", () => {
+    const harness = startSession([0, 1]);
+    const first = openMinor1(harness);
+    first.emitMessage(JSON.stringify(transcriptEvent({ protocolMinor: 1 })));
+    first.emit("close");
+    harness.timers.advance(250);
+    const second = harness.sockets[1]!;
+    second.emit("open");
+    expect(strictJsonParse(second.sent[0]!).value?.cursor).toMatchObject({ epoch: "1", next_seq: "2" });
+    second.emitMessage(JSON.stringify(resyncFrame({ epoch: "1", next_seq: "8", reason: "cursor_expired" })));
+    expect(harness.session.getSnapshot()).toMatchObject({
+      connection: "connected",
+      partial: null,
+      notices: { gap: true },
+    });
+    second.emitMessage(JSON.stringify(transcriptEvent({ protocolMinor: 1, seq: 8n, isFinal: true })));
+    expect(harness.session.getSnapshot().finals).toHaveLength(1);
+  });
+
+  it("rejects unrelated notices and keeps terminal visibility blocked", () => {
+    const harness = startSession([0, 1]);
+    const socket = openMinor1(harness);
+    for (const fields of [{ room_id: "other-room" }, { session_id: testUuid(91) }]) {
+      socket.emitMessage(JSON.stringify(resyncFrame(fields)));
+    }
+    expect(harness.session.getSnapshot().notices.gap).toBe(false);
+    socket.emitMessage(JSON.stringify({ ...statusEvent({ status: "failed" }), protocol_minor: 1 }));
+    socket.emitMessage(JSON.stringify(resyncFrame()));
+    expect(harness.session.getSnapshot()).toMatchObject({
+      sessionStatus: "failed",
+      notices: { gap: false },
+      finals: [],
+    });
+  });
+});
 
 function handshake(harness: Harness, nextSeq = 1n, withCursor: boolean[] = []): void {
   const { session, sockets, timers } = harness;

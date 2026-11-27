@@ -11,7 +11,12 @@ import {
   UNAVAILABLE_ROOM_NOTICE,
   reasonLabel,
 } from "../protocol/labels";
-import { CONFIGURED_ROOM_ID, PARTIAL_AVAILABILITY_LABEL, resolveRequestedRoom } from "../config";
+import {
+  CONFIGURED_ROOM_ID,
+  PARTIAL_AVAILABILITY_LABEL,
+  VIEWER_SUPPORTED_MINORS,
+  resolveRequestedRoom,
+} from "../config";
 import { CaptionSession, type SessionDeps, type SessionSnapshot } from "../protocol/session";
 import { useCaptionSession, useSessionSnapshot } from "./useCaptionSession";
 
@@ -43,6 +48,7 @@ function roomSessionDeps(roomId: string): SessionDeps {
   return {
     url: `${protocol}//${window.location.host}/api/viewer/ws`,
     roomId,
+    supportedMinors: VIEWER_SUPPORTED_MINORS,
     clock: { now: () => performance.now() },
     environment: browserEnvironment(),
   };

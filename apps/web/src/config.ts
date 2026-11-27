@@ -8,6 +8,9 @@ import { FIXTURE_PARTIAL_LABEL, UNKNOWN_PARTIAL_LABEL } from "./protocol/labels"
 export const CONFIGURED_ROOM_ID: string =
   (import.meta.env.VITE_LIVECHO_ROOM_ID as string | undefined) ?? "livecho.fixture.room";
 
+export const VIEWER_SUPPORTED_MINORS: readonly (0 | 1)[] =
+  import.meta.env.VITE_LIVECHO_VIEWER_MINOR_1 === "1" ? [0, 1] : [0];
+
 /**
  * Truthful partial availability text for the demonstration configuration.
  * This fixture timeline exercises v1 partial revisions, so the final-only
